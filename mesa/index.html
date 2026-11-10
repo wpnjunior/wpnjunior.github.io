@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MESA APP</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#14232b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MESA">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/mesa/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/mesa/icone-180.png">
+<link rel="icon" href="/mesa/icone-192.png">
+<style>
+  :root{--bg:#14232b;--ink:#e6eef1;--muted:#97a8b0;--accent:#ec6d9d}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left)) 24px max(16px,env(safe-area-inset-right))}
+  main{display:grid;gap:18px;justify-items:center;text-align:center;max-width:360px}
+  img{width:96px;height:96px;border-radius:22px}
+  h1{margin:0;font-size:34px;letter-spacing:-.01em}
+  p{margin:0;color:var(--muted)}
+  a.go{display:block;width:100%;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;padding:16px;border-radius:12px}
+</style>
+</head>
+<body>
+<main>
+  <img src="/mesa/icone-192.png" alt="">
+  <h1>MESA APP</h1>
+  <p>Abrindo suas Mesas no Claude…</p>
+  <a class="go" id="go" href="https://claude.ai/artifact/X7zzEF2guCL2pXAHDhkuat">Abrir MESA APP</a>
+  <p style="font-size:13px">Pede o seu login do claude.ai. Para pôr na tela do celular: Compartilhar → Adicionar à Tela de Início.</p>
+</main>
+<script>
+  // No ícone da tela inicial, já abre direto; no navegador, deixa o botão.
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (standalone) setTimeout(function(){ location.href = document.getElementById('go').href; }, 400);
+</script>
+</body>
+</html>
