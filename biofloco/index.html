@@ -41,6 +41,7 @@ nav button.on{background:var(--accent);color:var(--accent-ink)}
 #sub .subrow{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;align-items:center;gap:0;flex-basis:100%}
 #sub .subsep{flex:none;width:74px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 #btnNuvem{display:none}
+.pessoas{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pessoa{padding:14px 10px;font-size:16px;text-align:left}
 .top .btn{white-space:nowrap}
 @media (max-width:700px){header{position:static}}
 @media (max-width:440px){nav{gap:2px;padding:0 8px 8px}nav button{padding:8px 5px;font-size:14px}#sub button{padding:5px 7px}}
@@ -519,35 +520,41 @@ const idb={_p:null,open(){return this._p||(this._p=new Promise((ok,er)=>{const r
   async set(k,v){try{const d=await this.open();await new Promise((ok,er)=>{const t=d.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=ok;t.onerror=()=>er(t.error)})}catch(e){lsSet("bfw_"+k,v)}}};
 function carregaScript(src){return new Promise((ok,er)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=er;document.head.appendChild(s)})}
 function webStatus(){const n=wdb?wdb.pendentes():0;
-  if(!sbUser)return "Salvo só neste aparelho · toque em Entrar";
+  if(!sbUser)return "Salvo só neste aparelho · toque no seu nome para entrar na conta";
   if(!navigator.onLine)return "Sem internet · "+(n?n+" lançamento(s) esperando sinal":"tudo guardado no aparelho");
   if(syncErro)return "Nuvem com erro ("+syncErro+") · toque para ver";
   return n?"Enviando "+n+" para a nuvem…":"Tudo salvo na nuvem ✓"}
 async function webStart(){
-  let docs=(await idb.get("docs"))||{},outbox=(await idb.get("outbox"))||{},desde=(await idb.get("desde"))||"1970-01-01T00:00:00Z";
+  // nuvem: carrega a biblioteca (fica no cache do app para uso offline) e a sessão salva
+  try{await carregaScript(SB_JS);sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+    const {data}=await sb.auth.getSession();sbUser=data&&data.session?data.session.user:null}catch(e){sb=null}
+  // cada pessoa tem a sua gaveta no aparelho; sem login usa a gaveta antiga ("só neste aparelho")
+  const PF=perfilAtual(),PX=PF?PF+"/":"";const NS=(sbUser?"_"+sbUser.id:"")+(PF?"_"+PF:"");
+  let docs=(await idb.get("docs"+NS))||{},outbox=(await idb.get("outbox"+NS))||{},desde=(await idb.get("desde"+NS))||"1970-01-01T00:00:00Z";
+  // primeira vez desta pessoa neste aparelho: leva junto o que foi lançado sem login (menos os exemplos)
+  if(sbUser&&!(await idb.get("desde"+NS))&&!Object.keys(docs).length)for(const src of [PF?"_"+PF:null,""]){if(src===null||src===NS)continue;const ad=(await idb.get("docs"+src))||{};let m=0;for(const k in ad){if(ad[k]&&!ad[k].exemplo){docs[k]=ad[k];outbox[k]={data:ad[k],deleted:false,n:Date.now()+Math.random()};delete ad[k];m++}}if(m){await idb.set("docs"+src,ad);await idb.set("outbox"+src,{});await idb.set("docs"+NS,docs);await idb.set("outbox"+NS,outbox)}}
+  if(!sbUser&&PF&&!Object.keys(docs).length){const ad=(await idb.get("docs"))||{};if(Object.keys(ad).length){docs=ad;outbox=(await idb.get("outbox"))||{};await idb.set("docs",{});await idb.set("outbox",{});await idb.set("docs"+NS,docs);await idb.set("outbox"+NS,outbox)}}
   const subs=[];let tFire=null,tSave=null,enviando=false;
   const snapDoc=p=>({exists:p in docs,data:()=>clone(docs[p]),metadata:{fromCache:false}});
   const snapCol=c=>({docs:Object.keys(docs).filter(p=>p.startsWith(c+"/")&&p.split("/").length===2).map(p=>({id:p.slice(c.length+1),data:()=>clone(docs[p])})),metadata:{fromCache:false}});
   const fire=()=>{subs.forEach(s=>{try{s.cb(s.k==="doc"?snapDoc(s.key):snapCol(s.key))}catch(e){console.error(e)}});setStatus("")};
   const fireSoon=()=>{clearTimeout(tFire);tFire=setTimeout(fire,0)};
-  const guarda=()=>{clearTimeout(tSave);tSave=setTimeout(()=>{idb.set("docs",docs);idb.set("outbox",outbox)},50)};
+  const guarda=()=>{clearTimeout(tSave);tSave=setTimeout(()=>{idb.set("docs"+NS,docs);idb.set("outbox"+NS,outbox)},50)};
   function grava(p,d,apaga){if(apaga)delete docs[p];else docs[p]=clone(d);outbox[p]={data:apaga?null:clone(d),deleted:!!apaga,n:Date.now()+Math.random()};guarda();fireSoon();setTimeout(envia,300)}
   async function envia(){if(!sb||!sbUser||!navigator.onLine||enviando)return;const ks=Object.keys(outbox);if(!ks.length)return;enviando=true;
     try{for(let i=0;i<ks.length;i+=200){const lote=ks.slice(i,i+200).map(p=>[p,outbox[p]]);
-        const {error}=await sb.from("bf_docs").upsert(lote.map(([p,o])=>({user_id:sbUser.id,path:p,data:o.data,deleted:o.deleted})),{onConflict:"user_id,path"});
+        const {error}=await sb.from("bf_docs").upsert(lote.map(([p,o])=>({user_id:sbUser.id,path:PX+p,data:o.data,deleted:o.deleted})),{onConflict:"user_id,path"});
         if(error)throw error;lote.forEach(([p,o])=>{if(outbox[p]&&outbox[p].n===o.n)delete outbox[p]})}
       syncErro="";guarda()}catch(e){syncErro=(e&&(e.code||e.message))||"falha"}
     enviando=false;setStatus("");if(!syncErro&&Object.keys(outbox).length)setTimeout(envia,500)}
   async function puxa(){if(!sb||!sbUser||!navigator.onLine)return;let mudou=false;
-    try{for(;;){const {data,error}=await sb.from("bf_docs").select("path,data,deleted,updated_at").gt("updated_at",desde).order("updated_at").limit(1000);
-        if(error)throw error;for(const r of data){desde=r.updated_at;if(outbox[r.path])continue;if(r.deleted)delete docs[r.path];else docs[r.path]=r.data;mudou=true}
+    try{for(;;){const {data,error}=await sb.from("bf_docs").select("path,data,deleted,updated_at").like("path",PX+"%").gt("updated_at",desde).order("updated_at").limit(1000);
+        if(error)throw error;for(const r of data){desde=r.updated_at;const k=r.path.slice(PX.length);if(PX&&!r.path.startsWith(PX))continue;if(outbox[k])continue;if(r.deleted)delete docs[k];else docs[k]=r.data;mudou=true}
         if(data.length<1000)break}
-      syncErro="";idb.set("desde",desde);if(mudou){guarda();fireSoon()}}catch(e){syncErro=(e&&(e.code||e.message))||"falha"}setStatus("")}
+      syncErro="";idb.set("desde"+NS,desde);if(mudou){guarda();fireSoon()}}catch(e){syncErro=(e&&(e.code||e.message))||"falha"}setStatus("")}
   const sync=async()=>{await envia();await puxa()};
-  // nuvem: carrega a biblioteca (fica no cache do app para uso offline) e a sessão salva
-  try{await carregaScript(SB_JS);sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
-    const {data}=await sb.auth.getSession();sbUser=data&&data.session?data.session.user:null;
-    sb.auth.onAuthStateChange((ev,s)=>{const antes=sbUser&&sbUser.id;sbUser=s?s.user:null;if(sbUser&&sbUser.id!==antes){desde="1970-01-01T00:00:00Z";sync()}setStatus("")})}catch(e){sb=null}
+  // trocou de pessoa: recarrega para abrir a gaveta certa (nada se mistura)
+  if(sb)sb.auth.onAuthStateChange((ev,s)=>{const u=s?s.user:null;if((u&&u.id)!==(sbUser&&sbUser.id)){sbUser=u;setTimeout(()=>location.reload(),150)}else{sbUser=u;setStatus("")}});
   // primeira leitura: espera a nuvem (até 8 s) para não semear exemplo num aparelho novo
   if(sbUser&&navigator.onLine)await Promise.race([sync(),new Promise(r=>setTimeout(r,8000))]);
   addEventListener("online",sync);addEventListener("offline",()=>setStatus(""));
@@ -556,39 +563,56 @@ async function webStart(){
       onSnapshot:cb=>{const s={k:"doc",key:p,cb};subs.push(s);setTimeout(()=>cb(snapDoc(p)),0);return()=>subs.splice(subs.indexOf(s),1)}}),
     collection:c=>{const q={orderBy:()=>q,limit:()=>q,onSnapshot:cb=>{const s={k:"col",key:c,cb};subs.push(s);setTimeout(()=>cb(snapCol(c)),0);return()=>subs.splice(subs.indexOf(s),1)}};return q},
     pendentes:()=>Object.keys(outbox).length,sync,
-    backup:()=>({app:"Tanque Biofloco",em:new Date().toISOString(),docs})}}
+    backup:()=>({app:"Tanque Biofloco",perfil:PF,em:new Date().toISOString(),docs})}}
+// Perfis (pessoas) dentro da conta da nuvem: cada um com os próprios lançamentos e anotações (caminho "<perfil>/..." na nuvem).
+// Para cadastrar mais pessoas, o Wagner pede ao Claude no projeto.
+const PERFIS=[["usuario1","Usuário 1"],["usuario2","Usuário 2"],["usuario3","Usuário 3"]];
+const perfilAtual=()=>{try{const p=localStorage.getItem("bf_perfil");return PERFIS.some(x=>x[0]===p)?p:""}catch(e){return ""}};
+const nomePerfil=()=>{const p=PERFIS.find(x=>x[0]===perfilAtual());return p?p[1]:""};
+const emailDe=u=>(u.includes("@")?u:u.toLowerCase().replace(/[^a-z0-9._-]/g,"")+"@wpnjunior.github.io");
+const nomeDe=()=>nomePerfil()||"Entrar";
+function escolherPerfil(){let d=$("#dlgPerfil");if(!d){d=document.createElement("dialog");d.id="dlgPerfil";document.body.appendChild(d)}
+  d.innerHTML=`<div class="dlghead">Quem vai usar?</div><div class="dlgbody"><div class="pessoas">${PERFIS.map(p=>`<button class="btn pessoa" type="button" data-perfil="${p[0]}">👤 ${esc(p[1])}</button>`).join("")}</div>
+    <p class="muted" style="margin-top:14px">Cada pessoa tem os próprios lançamentos e anotações. Para cadastrar alguém, fale com o Claude no projeto.</p></div>`;
+  d.onclick=ev=>{const b=ev.target.closest("[data-perfil]");if(!b)return;try{localStorage.setItem("bf_perfil",b.dataset.perfil)}catch(e){}d.close();location.reload()};
+  d.oncancel=e=>e.preventDefault();if(!d.open)d.showModal()}
 function abrirLogin(){
   let d=$("#dlgLogin");if(!d){d=document.createElement("dialog");d.id="dlgLogin";document.body.appendChild(d)}
-  const sair=sbUser?`<p>Conectado como <b>${esc(sbUser.email||"")}</b>.</p><p class="muted">${esc(webStatus())}</p>
-    <div class="dlgfoot"><button class="btn" type="button" data-l="backup">Baixar cópia (JSON)</button><button class="btn" type="button" data-l="sair">Sair</button><button class="btn p" type="button" data-l="fechar">Fechar</button></div>`:"";
-  d.innerHTML=`<div class="dlghead">${sbUser?"Nuvem":"Entrar para guardar na nuvem"}</div><div class="dlgbody">`+(sair||(!sb?`<p>Sem internet agora. O app continua salvando neste aparelho; entre quando tiver sinal.</p><div class="dlgfoot"><button class="btn p" type="button" data-l="fechar">Fechar</button></div>`:
-    `<p class="muted">Com login, cada lançamento vai para a nuvem e volta se você trocar ou limpar o celular. Sem sinal no tanque, ele espera e manda depois.</p>
-    <div class="f"><label for="lgEmail">Usuário (ou e-mail)</label><input id="lgEmail" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
-    <div class="f"><label for="lgSenha">Senha (mínimo 6)</label><input id="lgSenha" type="password" autocomplete="current-password"></div>
+  const quem=`<p>Usando como <b>👤 ${esc(nomePerfil())}</b>.</p>`;
+  if(sbUser)d.innerHTML=`<div class="dlghead">👤 ${esc(nomePerfil())}</div><div class="dlgbody">${quem}<p class="muted">${esc(webStatus())}</p>
+    <div id="lgTroca" hidden><div class="f"><label for="lgNova">Nova senha da conta (6 ou mais)</label><input id="lgNova" type="password" autocomplete="new-password"></div><button class="btn p" type="button" data-l="salvaSenha">Salvar senha</button></div>
     <div class="muted" id="lgMsg" style="min-height:1.2em"></div>
-    <div class="dlgfoot"><button class="btn" type="button" data-l="fechar">Agora não</button><button class="btn" type="button" data-l="criar">Criar conta</button><button class="btn p" type="button" data-l="entrar">Entrar</button></div>`))+`</div>`;
+    <div class="dlgfoot" style="flex-wrap:wrap"><button class="btn" type="button" data-l="trocar">Trocar pessoa</button><button class="btn" type="button" data-l="senha">Trocar senha</button><button class="btn" type="button" data-l="backup">Baixar cópia</button><button class="btn" type="button" data-l="sair">Sair da conta</button><button class="btn p" type="button" data-l="fechar">Fechar</button></div></div>`;
+  else d.innerHTML=`<div class="dlghead">Entrar na conta</div><div class="dlgbody">${quem}${!sb?`<p>Sem internet agora. O app continua salvando neste aparelho; entre quando tiver sinal.</p><div class="dlgfoot"><button class="btn" type="button" data-l="trocar">Trocar pessoa</button><button class="btn p" type="button" data-l="fechar">Fechar</button></div>`:`
+    <p class="muted">Com a conta, os lançamentos vão para a nuvem e voltam se trocar ou limpar o celular. Sem sinal no tanque, ele espera e manda depois.</p>
+    <div class="f"><label for="lgEmail">Usuário</label><input id="lgEmail" type="text" value="biofloco" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+    <div class="f"><label for="lgSenha">Senha</label><input id="lgSenha" type="password" autocomplete="current-password"></div>
+    <div class="muted" id="lgMsg" style="min-height:1.2em"></div>
+    <div class="dlgfoot" style="flex-wrap:wrap"><button class="btn" type="button" data-l="trocar">Trocar pessoa</button><button class="btn" type="button" data-l="fechar">Agora não</button><button class="btn p" type="button" data-l="entrar">Entrar</button></div>`}</div>`;
   d.onclick=async ev=>{const b=ev.target.closest("[data-l]");if(!b)return;const a=b.dataset.l,msg=t=>{const m=$("#lgMsg");if(m)m.textContent=t};
     if(a==="fechar")return d.close();
-    if(a==="sair"){await sb.auth.signOut();d.close();return}
-    if(a==="backup"){const blob=new Blob([JSON.stringify(wdb.backup())],{type:"application/json"});baixarArquivo(blob,"biofloco-backup-"+hoje()+".json");return}
-    let email=($("#lgEmail").value||"").trim().toLowerCase();const password=$("#lgSenha").value||"";if(!email||password.length<6)return msg("Preencha usuário e senha (6 ou mais).");if(!email.includes("@"))email=email.replace(/[^a-z0-9._-]/g,"")+"@wpnjunior.github.io";
-    msg("Aguarde…");
-    const r=a==="criar"?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});
-    if(r.error)return msg(/invalid login/i.test(r.error.message)?"E-mail ou senha não conferem.":/not confirmed/i.test(r.error.message)?(/@wpnjunior\.github\.io$/.test(email)?"Conta ainda não liberada: avise o Claude.":"Confirme o e-mail: abra o link que chegou na sua caixa e depois toque em Entrar."):r.error.message);
-    if(a==="criar"&&!r.data.session)return msg(/@wpnjunior\.github\.io$/.test(email)?"Conta criada. Falta liberar: avise o Claude e depois toque em Entrar.":"Conta criada. Abra o e-mail de confirmação que chegou, clique no link e volte aqui para Entrar.");
-    d.close();toast("Conectado. Enviando para a nuvem…");wdb&&wdb.sync()};
-  d.showModal()}
+    if(a==="trocar"){d.close();try{localStorage.removeItem("bf_perfil")}catch(e){}return location.reload()}
+    if(a==="sair"){d.close();await sb.auth.signOut();return}
+    if(a==="senha"){$("#lgTroca").hidden=false;return}
+    if(a==="salvaSenha"){const pw=$("#lgNova").value||"";if(pw.length<6)return msg("A senha precisa de 6 ou mais.");msg("Aguarde…");const r=await sb.auth.updateUser({password:pw});return msg(r.error?r.error.message:"Senha trocada. Vale para todas as pessoas da conta.")}
+    if(a==="backup"){const blob=new Blob([JSON.stringify(wdb.backup())],{type:"application/json"});baixarArquivo(blob,"biofloco-"+perfilAtual()+"-"+hoje()+".json");return}
+    const u=($("#lgEmail").value||"").trim(),password=$("#lgSenha").value||"";if(!u||password.length<6)return msg("Preencha usuário e senha (6 ou mais).");
+    const email=emailDe(u);msg("Aguarde…");
+    const r=await sb.auth.signInWithPassword({email,password});
+    if(r.error)return msg(/invalid login/i.test(r.error.message)?"Usuário ou senha não conferem.":/not confirmed/i.test(r.error.message)?"Conta ainda não liberada: avise o Claude.":r.error.message);
+    d.close();toast("Conectado. Enviando para a nuvem…")};
+  if(!d.open)d.showModal()}
 function baixarArquivo(blob,nome){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
 if(WEB&&/[?&]teste=1/.test(location.search))window.__bf={put:(...a)=>put(...a),del:(...a)=>del(...a),recs:()=>recsAll,sync:()=>wdb.sync(),exportar:k=>exportar(k),grids:()=>Object.keys(GRID)};
 if(WEB){document.addEventListener("click",ev=>{if(ev.target.closest("#status,#btnNuvem"))abrirLogin()});
   if("serviceWorker" in navigator&&location.protocol!=="file:")addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 
 /* ===================== banco ===================== */
-function setStatus(t){if(WEB){t=webStatus();const b=$("#btnNuvem");if(b){b.style.display="inline-flex";b.textContent=sbUser?"☁️ Nuvem":"🔑 Entrar"}}$("#status").textContent=t}
+function setStatus(t){if(WEB){t=webStatus();const b=$("#btnNuvem");if(b){b.style.display="inline-flex";b.textContent="👤 "+(nomePerfil()||"Entrar")+(sbUser?"":" · entrar")}}$("#status").textContent=t}
 async function start(){
   render();
   const timer=setTimeout(()=>{if(mode!=="db")setStatus("Salvando neste aparelho")},10000);
-  if(WEB){clearTimeout(timer);db=await webStart()}
+  if(WEB){clearTimeout(timer);if(!perfilAtual()){render();setStatus("");return escolherPerfil()}db=await webStart();if(!sbUser&&sb&&!/[?&]teste=1/.test(location.search))setTimeout(()=>abrirLogin(),300)}
   else try{db=window.claude&&window.claude.use?await window.claude.use("db"):null}catch(e){db=null}
   if(!db){clearTimeout(timer);mode="local";cfg=mergeCfg(lsGet("bf_cfg"));prep=lsGet("bf_prep")||{feitos:{}};recsAll=sortRecs(lsGet("bf_recs")||[]);gest=lsGet("bf_gest")||[];filt();carregou={cfg:true,recs:true,gest:true};talvezSemear();setStatus("Salvando só neste aparelho");render();return}
   mode="db";if(!WEB)window.claude.use("downloads").then(d=>downloads=d).catch(()=>{});
