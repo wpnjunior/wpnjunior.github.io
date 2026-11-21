@@ -560,7 +560,7 @@ function abrirLogin(){
     <div class="dlgfoot"><button class="btn" type="button" data-l="backup">Baixar cópia (JSON)</button><button class="btn" type="button" data-l="sair">Sair</button><button class="btn p" type="button" data-l="fechar">Fechar</button></div>`:"";
   d.innerHTML=`<div class="dlghead">${sbUser?"Nuvem":"Entrar para guardar na nuvem"}</div><div class="dlgbody">`+(sair||(!sb?`<p>Sem internet agora. O app continua salvando neste aparelho; entre quando tiver sinal.</p><div class="dlgfoot"><button class="btn p" type="button" data-l="fechar">Fechar</button></div>`:
     `<p class="muted">Com login, cada lançamento vai para a nuvem e volta se você trocar ou limpar o celular. Sem sinal no tanque, ele espera e manda depois.</p>
-    <div class="f"><label for="lgEmail">E-mail</label><input id="lgEmail" type="email" autocomplete="username" inputmode="email"></div>
+    <div class="f"><label for="lgEmail">Usuário (ou e-mail)</label><input id="lgEmail" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
     <div class="f"><label for="lgSenha">Senha (mínimo 6)</label><input id="lgSenha" type="password" autocomplete="current-password"></div>
     <div class="muted" id="lgMsg" style="min-height:1.2em"></div>
     <div class="dlgfoot"><button class="btn" type="button" data-l="fechar">Agora não</button><button class="btn" type="button" data-l="criar">Criar conta</button><button class="btn p" type="button" data-l="entrar">Entrar</button></div>`))+`</div>`;
@@ -568,11 +568,11 @@ function abrirLogin(){
     if(a==="fechar")return d.close();
     if(a==="sair"){await sb.auth.signOut();d.close();return}
     if(a==="backup"){const blob=new Blob([JSON.stringify(wdb.backup())],{type:"application/json"});baixarArquivo(blob,"biofloco-backup-"+hoje()+".json");return}
-    const email=($("#lgEmail").value||"").trim(),password=$("#lgSenha").value||"";if(!email||password.length<6)return msg("Preencha e-mail e senha (6 ou mais).");
+    let email=($("#lgEmail").value||"").trim().toLowerCase();const password=$("#lgSenha").value||"";if(!email||password.length<6)return msg("Preencha usuário e senha (6 ou mais).");if(!email.includes("@"))email=email.replace(/[^a-z0-9._-]/g,"")+"@wpnjunior.github.io";
     msg("Aguarde…");
     const r=a==="criar"?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});
-    if(r.error)return msg(/invalid login/i.test(r.error.message)?"E-mail ou senha não conferem.":/not confirmed/i.test(r.error.message)?"Confirme o e-mail: abra o link que chegou na sua caixa e depois toque em Entrar.":r.error.message);
-    if(a==="criar"&&!r.data.session)return msg("Conta criada. Abra o e-mail de confirmação que chegou, clique no link e volte aqui para Entrar.");
+    if(r.error)return msg(/invalid login/i.test(r.error.message)?"E-mail ou senha não conferem.":/not confirmed/i.test(r.error.message)?(/@wpnjunior\.github\.io$/.test(email)?"Conta ainda não liberada: avise o Claude.":"Confirme o e-mail: abra o link que chegou na sua caixa e depois toque em Entrar."):r.error.message);
+    if(a==="criar"&&!r.data.session)return msg(/@wpnjunior\.github\.io$/.test(email)?"Conta criada. Falta liberar: avise o Claude e depois toque em Entrar.":"Conta criada. Abra o e-mail de confirmação que chegou, clique no link e volte aqui para Entrar.");
     d.close();toast("Conectado. Enviando para a nuvem…");wdb&&wdb.sync()};
   d.showModal()}
 function baixarArquivo(blob,nome){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
