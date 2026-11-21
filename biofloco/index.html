@@ -33,11 +33,17 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var
 .top h1{font-size:17px;margin:0}
 .top .st{font-size:12px;color:var(--muted)}
 nav{display:flex;gap:4px;overflow-x:auto;padding:0 12px 8px;max-width:1000px;margin:0 auto;scrollbar-width:none}
-nav button{flex:none;border:0;background:none;color:var(--muted);padding:8px 12px;border-radius:8px;font:inherit;cursor:pointer}
+nav button{flex:1 0 auto;white-space:nowrap;border:0;background:none;color:var(--muted);padding:8px 10px;border-radius:8px;font:inherit;cursor:pointer}
 nav button.on{background:var(--accent);color:var(--accent-ink)}
-#sub{display:flex;gap:2px;overflow-x:auto;padding:6px 12px 8px;max-width:1000px;margin:0 auto;scrollbar-width:none;border-top:1px solid var(--line)}
+#sub{display:flex;flex-wrap:wrap;row-gap:2px;gap:2px;overflow-x:auto;padding:6px 12px 8px;max-width:1000px;margin:0 auto;scrollbar-width:none;border-top:1px solid var(--line)}
 #sub button{flex:none;border:0;background:none;color:var(--ink);padding:5px 10px;border-radius:7px;font:inherit;font-size:14px;cursor:pointer}
 #sub button.on{background:var(--s-ok);font-weight:600}
+#sub .subrow{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;align-items:center;gap:0;flex-basis:100%}
+#sub .subsep{flex:none;width:74px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+#btnNuvem{display:none}
+.top .btn{white-space:nowrap}
+@media (max-width:700px){header{position:static}}
+@media (max-width:440px){nav{gap:2px;padding:0 8px 8px}nav button{padding:8px 5px;font-size:14px}#sub button{padding:5px 7px}}
 main{max-width:1000px;margin:0 auto;padding-block:16px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h2{font-size:16px;margin:22px 0 10px;text-wrap:balance}
 h2:first-child{margin-top:4px}
@@ -203,7 +209,7 @@ label.opt{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid
 <header>
   <div class="top">
     <div><h1 id="hTitle">Tanque Biofloco</h1><div class="st" id="status">Conectando…</div></div>
-    <button class="btn p" id="btnLancar" type="button">+ Lançar</button>
+    <div style="display:flex;gap:6px;align-items:center"><button class="btn" id="btnNuvem" type="button">🔑 Entrar</button><button class="btn p" id="btnLancar" type="button">+ Lançar</button></div>
   </div>
   <nav id="nav"></nav>
   <div id="sub"></div>
@@ -218,20 +224,17 @@ label.opt{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid
 (function(){
 "use strict";
 /* ===================== menus (mesma lógica do oProdutor) ===================== */
+// Menu por uso no dia a dia. Cada tela guarda a chave antiga (grupo_tela) de T, para nada se perder; "#" é só um título na barra.
 const MENU=[
- ["inicio","Hoje",[["painel","Hoje e mapa"]]],
- ["diario","Diário",[["hoje","Agenda e anotações"],["linha","Linha do tempo"],["semana","Próximos 7 dias"]]],
- ["manejo","Manejo",[["racao","Digitação de Ração"],["parametros","Digitação de Parâmetros"],["biometria","Biometria Semanal"],["ritual","Ritual do dia"],["mortalidade","Reg. de Mortalidade"],["aplicacoes","Aplicações e insumos"],["lua","Calendário Lunar"],["projecao","Projeção p/ Despesca"]]],
- ["producao","Produção",[["ciclo","Ciclo"],["povoamento","Povoamento"],["despesca","Despesca"],["historico","Histórico de ciclos"]]],
- ["estoque","Estoque",[["produtos","Produtos"],["entradas","Entradas"],["saidas","Saídas"],["balancete","Balancete"]]],
- ["financeiro","Financeiro",[["pagar","a Pagar"],["receber","a Receber"],["caixa","Caixa"],["custos","Custos e rentabilidade"]]],
- ["mais","Mais ▾",[["menu","Outras telas"]]],
- ["preparo","Preparo da água",[["passos","Dia 0 a 21"],["calc","Calculadoras"],["check","Apto a povoar?"]]],
- ["relatorios","Relatórios",[["graficos","Gráficos"],["historico","Histórico geral"]]],
- ["tecnicas","Técnicas",[["botoes","Emergências"],["lembretes","Lembretes Só Bioflocos"]]],
- ["aprenda","Aprenda",[["quando","Quando mexer na ração"],["regras","Regras do app e estudos"],["estudos","Estudos dos carrosséis"]]],
- ["cadastro","Cadastro",[["tanque","Tanque e povoamento"],["faixas","Faixas da água"],["tabela","Tabela de ração"],["doses","Doses de insumos"]]],
+ ["hoje","Hoje",[["inicio_painel","Mapa do tanque"],["diario_hoje","Agenda e anotações"],["manejo_ritual","Ritual do dia"],["diario_semana","Próximos 7 dias"],["tecnicas_botoes","🚨 Emergências"]]],
+ ["lancar","Lançar",[["manejo_racao","Ração"],["manejo_parametros","Água"],["manejo_biometria","Biometria"],["manejo_mortalidade","Mortalidade"],["manejo_aplicacoes","Aplicações e insumos"]]],
+ ["acomp","Acompanhar",[["relatorios_graficos","Gráficos"],["diario_linha","Linha do tempo"],["manejo_projecao","Projeção p/ despesca"],["manejo_lua","Calendário lunar"],["relatorios_historico","Histórico geral"]]],
+ ["gestao","Gestão",[["#","Ciclo"],["producao_ciclo","Ciclo"],["producao_povoamento","Povoamento"],["producao_despesca","Despesca"],["producao_historico","Histórico"],["#","Estoque"],["estoque_produtos","Produtos"],["estoque_entradas","Entradas"],["estoque_saidas","Saídas"],["estoque_balancete","Balancete"],["#","Financeiro"],["financeiro_pagar","a Pagar"],["financeiro_receber","a Receber"],["financeiro_caixa","Caixa"],["financeiro_custos","Custos"]]],
+ ["aprenda","Aprenda",[["aprenda_quando","Quando mexer na ração"],["tecnicas_lembretes","Lembretes Só Bioflocos"],["aprenda_regras","Regras do app e estudos"],["aprenda_estudos","Estudos dos carrosséis"]]],
+ ["ajustes","Ajustes",[["#","Preparo"],["preparo_passos","Dia 0 a 21"],["preparo_calc","Calculadoras"],["preparo_check","Apto a povoar?"],["#","Cadastro"],["cadastro_tanque","Tanque"],["cadastro_faixas","Faixas da água"],["cadastro_tabela","Tabela de ração"],["cadastro_doses","Doses"]]],
 ];
+// aceita o endereço antigo (grupo,tela) ou a chave nova; devolve [grupo do menu, chave]
+function navKey(g,s){const k=s&&s.includes("_")?s:g+"_"+s;const m=MENU.find(m=>m[2].some(x=>x[0]===k));return m?[m[0],k]:T[k]?[grp,k]:["hoje","inicio_painel"]}
 const PARAMS=[
  {k:"od",n:"Oxigênio (OD)",u:"mg/L",d:1},{k:"temp",n:"Temperatura",u:"°C",d:1},{k:"ph",n:"pH",u:"",d:2},
  {k:"sal",n:"Salinidade",u:"ppt",d:1},{k:"alc",n:"Alcalinidade",u:"mg/L CaCO₃",d:0},{k:"tan",n:"Amônia total",u:"mg/L",d:2},
@@ -271,7 +274,7 @@ const PRODUTOS=["Prebiótico (arroz fermentado)","Simbiótico (bombona)"].concat
 const TIPOS={leitura:"Parâmetros",biometria:"Biometria",mortalidade:"Mortalidade",aplicacao:"Aplicação",racao:"Trato",ritual:"Ritual"};
 
 let prep={feitos:{}},extraTratos=0,cfg=clone(DEFAULTS),recs=[],recsAll=[],gest=[],db=null,mode="local",downloads=null,grp="inicio",scr="painel",chartSel="od",racaoDia=null,pendDel=null;
-try{const t=JSON.parse(localStorage.getItem("bf_nav")||"null");if(t){grp=t[0];scr=t[1]}}catch(e){}
+try{const t=JSON.parse(localStorage.getItem("bf_nav")||"null");if(t){grp=t[0];scr=t[1]}}catch(e){} // validado em render()
 
 /* ===================== utilidades ===================== */
 function clone(o){return JSON.parse(JSON.stringify(o))}
@@ -516,7 +519,7 @@ const idb={_p:null,open(){return this._p||(this._p=new Promise((ok,er)=>{const r
   async set(k,v){try{const d=await this.open();await new Promise((ok,er)=>{const t=d.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=ok;t.onerror=()=>er(t.error)})}catch(e){lsSet("bfw_"+k,v)}}};
 function carregaScript(src){return new Promise((ok,er)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=er;document.head.appendChild(s)})}
 function webStatus(){const n=wdb?wdb.pendentes():0;
-  if(!sbUser)return "Salvo só neste aparelho · toque aqui para entrar e guardar na nuvem";
+  if(!sbUser)return "Salvo só neste aparelho · toque em Entrar";
   if(!navigator.onLine)return "Sem internet · "+(n?n+" lançamento(s) esperando sinal":"tudo guardado no aparelho");
   if(syncErro)return "Nuvem com erro ("+syncErro+") · toque para ver";
   return n?"Enviando "+n+" para a nuvem…":"Tudo salvo na nuvem ✓"}
@@ -577,11 +580,11 @@ function abrirLogin(){
   d.showModal()}
 function baixarArquivo(blob,nome){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
 if(WEB&&/[?&]teste=1/.test(location.search))window.__bf={put:(...a)=>put(...a),del:(...a)=>del(...a),recs:()=>recsAll,sync:()=>wdb.sync(),exportar:k=>exportar(k),grids:()=>Object.keys(GRID)};
-if(WEB){document.addEventListener("click",ev=>{if(ev.target.closest("#status"))abrirLogin()});
+if(WEB){document.addEventListener("click",ev=>{if(ev.target.closest("#status,#btnNuvem"))abrirLogin()});
   if("serviceWorker" in navigator&&location.protocol!=="file:")addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 
 /* ===================== banco ===================== */
-function setStatus(t){if(WEB)t=webStatus();$("#status").textContent=t}
+function setStatus(t){if(WEB){t=webStatus();const b=$("#btnNuvem");if(b){b.style.display="inline-flex";b.textContent=sbUser?"☁️ Nuvem":"🔑 Entrar"}}$("#status").textContent=t}
 async function start(){
   render();
   const timer=setTimeout(()=>{if(mode!=="db")setStatus("Salvando neste aparelho")},10000);
@@ -647,7 +650,7 @@ const ACOES={
     {html:`<div class="fg">`},{name:"qtd",label:"Quantidade",type:"number",req:true},{name:"un",label:"Unidade",type:"select",options:opt(["g","kg","mL","L"])},{html:`</div>`},{name:"obs",label:"Observação"}],
     o=>{const d=doseSug(o.produto);const e=d?[`Dose do Cadastro: ${d}`]:[];if(o.produto==="Azomite")e.push("Azomite vai na ração (3 g por kg, teto 4). Na água quase não dissolve e vira sólido no cone.");if(/fosf/i.test(o.produto)&&janelaMuda(new Date()).on)e.push("⚠ Janela de muda: evite mexer no pH hoje.");if(o.produto==="Gesso agrícola")e.push("Só o líquido leitoso de 600 g decantados num balde. Traz cálcio, não alcalinidade.");if(o.produto==="Cal hidratada")e.push("Até 200 g por vez no tanque; meça o pH 1 h depois.");if(o.produto==="Melaço")e.push("⚠ Evite melaço: no teste de Ray e Lotz (2014) teve a pior sobrevivência, 21,6%. Use farelo fermentado; açúcar só com amônia > 1.");if(o.produto==="Açúcar"){const t=leituraRecente("tan",hoje());if(!t||t.v<=1)e.push("Açúcar só com amônia acima de 1 mg/L. Hoje o carbono é o farelo fermentado.")}return e},
     async o=>{const q=num(o.qtd);if(q==null)return toast("Informe a quantidade.");await put({tipo:"aplicacao",data:o.data,produto:o.produto,qtd:q,un:o.un,obs:o.obs||""});toast("Aplicação lançada")})},
-  trato(){grp="manejo";scr="racao";render()},
+  trato(){go("manejo","racao")},
   espuma(dia,pref){dia=dia||hoje();const r=ritualDo(dia);const atual=pref||r.espuma||"";const OP=[["sprite","Fina e limpa (tipo Sprite)"],["marrom","Crespa, densa ou marrom"],["sem","Sumiu, água clara"]];
     form("Espuma do dia "+dt(dia),[{html:`<div class="f"><label>Como está a espuma? *</label><div class="stack">${OP.map(o=>`<label class="opt"><input type="radio" name="esp" value="${o[0]}" ${atual===o[0]?"checked":""}> ${esc(o[1])}</label>`).join("")}</div></div>`}],
       o=>({sprite:["Espuma boa: Nutrat na dose normal","Item 1 do ritual fica marcado como feito"],marrom:["Nutrat de hoje DOBRA (metade de manhã, metade à noite)","Antes de dobrar: conferir e esvaziar o copo do skimmer","Item 1 do ritual fica marcado como feito"],sem:["Manter ou pausar o Nutrat e reduzir o simbiótico","Item 1 do ritual fica marcado como feito"]}[o.esp]||["Escolha uma das três opções e toque em Salvar"]),
@@ -1288,7 +1291,6 @@ T.inicio_painel=()=>{
   h+=`</details>`;
   h+=`<p class="muted" style="margin-top:14px">🔔 O app não manda notificação com a página fechada: os alarmes aparecem quando você abre. Alarme a qualquer hora, só o da sonda de OD (ligada a ${f(cfg.doses.odAlarme,1)} mg/L).</p>`;
   return h};
-T.mais_menu=()=>`<h2>Outras telas</h2><div class="stack">${MENU.filter(m=>["preparo","relatorios","tecnicas","aprenda","cadastro"].includes(m[0])).map(m=>`<div class="card"><b>${esc(m[1])}</b><div class="row" style="margin-top:6px">${m[2].map(x=>`<button type="button" class="btn sm" data-go="${m[0]}.${x[0]}">${esc(x[1])}</button>`).join("")}</div></div>`).join("")}</div>`;
 T.manejo_ritual=()=>`<h2>Ritual do dia (Só Bioflocos + camarão)</h2>${ritualHtml(hoje())}<p class="muted">Cada item marcado fica salvo no dia. A espuma ajusta o Nutrat de amanhã.</p>`;
 
 /* ---------- dados de exemplo (marcados exemplo:true, apagáveis) ---------- */
@@ -1322,15 +1324,16 @@ function talvezSemear(){if(semeado||!carregou.cfg||!carregou.recs||!carregou.ges
 let sujo=false;
 document.addEventListener("focusout",()=>{if(sujo)setTimeout(()=>{const a=document.activeElement;if(!(a&&a.closest&&a.closest("#main")&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)))render()},50)});
 function render(){
-  if(!MENU.some(m=>m[0]===grp&&m[2].some(s=>s[0]===scr))){grp="inicio";scr="painel"}
+  if(!MENU.some(m=>m[0]===grp&&m[2].some(s=>s[0]===scr)))[grp,scr]=navKey(grp,scr);
   $("#hTitle").textContent=cfg.nome||"Tanque Biofloco";
-  const OCULTOS=["preparo","relatorios","tecnicas","aprenda","cadastro"];$("#nav").innerHTML=MENU.filter(m=>!OCULTOS.includes(m[0])).map(m=>`<button type="button" data-grp="${m[0]}" class="${m[0]===grp||(m[0]==="mais"&&OCULTOS.includes(grp))?"on":""}">${m[1]}</button>`).join("");
-  const g=MENU.find(m=>m[0]===grp);$("#sub").innerHTML=g[2].map(s=>`<button type="button" data-scr="${s[0]}" class="${s[0]===scr?"on":""}">${s[1]}</button>`).join("");
+  $("#nav").innerHTML=MENU.map(m=>`<button type="button" data-grp="${m[0]}" class="${m[0]===grp?"on":""}">${m[1]}</button>`).join("");
+  const g=MENU.find(m=>m[0]===grp);const bt=s=>`<button type="button" data-scr="${s[0]}" class="${s[0]===scr?"on":""}">${s[1]}</button>`;
+  $("#sub").innerHTML=g[2].some(s=>s[0]==="#")?g[2].reduce((a,s)=>{if(s[0]==="#")a.push([s[1],[]]);else a[a.length-1][1].push(s);return a},[]).map(([t,it])=>`<div class="subrow"><span class="subsep">${t}</span>${it.map(bt).join("")}</div>`).join(""):g[2].map(bt).join("");
   const a=document.activeElement;if(a&&a.closest&&a.closest("#main")&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)&&a.type!=="checkbox"&&a.type!=="radio"){sujo=true;return} // não atrapalhar quem está digitando
   sujo=false;
-  $("#main").innerHTML=T[grp+"_"+scr]();if(grp==="preparo"&&scr==="calc")updCalc();animarMarcadores();cena3d(grp==="inicio");
+  $("#main").innerHTML=(T[scr]||T.inicio_painel)();if(scr==="preparo_calc")updCalc();animarMarcadores();cena3d(scr==="inicio_painel");
 }
-function go(g,s){grp=g;scr=s;pendDel=null;lsSet("bf_nav",[g,s]);document.activeElement&&document.activeElement.blur&&document.activeElement.blur();render();window.scrollTo(0,0)}
+function go(g,s){[grp,scr]=navKey(g,s);pendDel=null;lsSet("bf_nav",[grp,scr]);document.activeElement&&document.activeElement.blur&&document.activeElement.blur();render();window.scrollTo(0,0)}
 
 /* ===================== eventos ===================== */
 document.addEventListener("click",async e=>{
@@ -1341,7 +1344,7 @@ document.addEventListener("click",async e=>{
   if(t.dataset.espcancel){const dia=t.dataset.espcancel;const r=ritualDo(dia);document.querySelectorAll(`input[name="espI_${dia}"]`).forEach(el=>el.checked=el.value===r.espuma);toast("Cancelado, nada mudou");return}
   if(t.dataset.salvarDlg){const fm=$("#dlgForm");const falta=[...fm.querySelectorAll("[required]")].find(el=>!String(el.value).trim());if(falta){toast("Preencha: "+((fm.querySelector(`label[for="${falta.id}"]`)||{}).textContent||"campo obrigatório").replace(" *",""));falta.focus();return}$("#dlg").close("ok");return}
   if(t.dataset.cancel){$("#dlg").close("cancel");return}
-  if(t.dataset.grp){const m=MENU.find(x=>x[0]===t.dataset.grp);go(m[0],m[2][0][0]);return}
+  if(t.dataset.grp){const m=MENU.find(x=>x[0]===t.dataset.grp);go(m[0],m[2].find(x=>x[0]!=="#")[0]);return}
   if(t.dataset.scr){go(grp,t.dataset.scr);return}
   if(t.dataset.go){e.preventDefault();const[g,s]=t.dataset.go.split(".");go(g,s);return}
   if(t.id==="btnLancar"){form("Lançamento",[{name:"q",label:"O que você vai lançar?",type:"select",options:opt([["parametros","💧 Água (parâmetros)"],["trato","🍤 Trato de ração"],["biometria","⚖️ Biometria"],["mortalidade","Mortalidade"],["aplicacao","Aplicação de insumo"],["entrada","Compra (entrada no estoque)"],["pagar","Conta a pagar"],["receber","Conta a receber"],["povoamento","Povoamento"],["despesca","Despesca"]])}],null,async o=>{setTimeout(()=>ACOES[o.q](),50)});return}
