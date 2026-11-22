@@ -417,9 +417,9 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     a.sulf += (a.lodo * 0.00011 * (doFundo < 3 ? (3 - doFundo) : 0.1) - a.sulf * 0.25 * (a.DO / 6)) * dtH;
     a.sulf = Math.max(0, a.sulf);
     a.nutrat = Math.max(0, a.nutrat - dtH / 24); a.cat = Math.max(0, a.cat - dtH / 48);
-    // Vibrio (log UFC/mL) [M; Samocha: 4–28 mil normal]
+    // Vibrio (log UFC/mL) [M; Samocha: 4–28 mil normal]. Calibrado em 22/11 (pedido do Wagner) para o cenário Xu 2025 a 800/m³ dar ~80% (estudo 79,8%) com troca e sólidos controlados
     const omF = (a.OMc + a.C * 0.5) / 30;
-    const dv = (0.35 * clamp(omF, 0, 3) + 0.05 * (a.T - 28) - 0.7 * clamp(a.Bac, 0, 1.5) - 0.25 * clamp(a.H / 150, 0, 1) + 0.04) / 24;
+    const dv = (0.29 * clamp(omF, 0, 3) + 0.05 * (a.T - 28) - 0.95 * clamp(a.Bac, 0, 1.5) - 0.25 * clamp(a.H / 150, 0, 1) + 0.04) / 24;
     a.vib = clamp(a.vib + dv * dtH, 2, 7.2);
 
     /* camarão */
@@ -1057,7 +1057,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       if (!P.xuIni) { P.xuIni = true; const f = X.W0 / cm.W; cm.W = X.W0; cm.biomIni = cm.n0 * X.W0 / 1000; cm.demandaHoje *= f; st.cfg.xu = { k: (X.ajuste || 1) * (idadePorPeso(X.Wf) - idadePorPeso(X.W0)) / (X.dias / 7) }; P.od5 = []; }
       if (st.estufa.aeracao !== "max") A("aeracao", { nivel: "max" });
       if (h === 5 && uma("xu5")) P.od5.push(a.DO);
-      if (h === 8 && uma("xutroca")) { const T = tss(a); if (T > 500) A("troca", { L: Math.round(a.V * Math.min(0.079, 1 - 450 / T)) }); }
+      if (h === 8 && X.troca !== false && uma("xutroca")) { const T = tss(a); if (T > 500) A("troca", { L: Math.round(a.V * Math.min(0.079, 1 - 450 / T)) }); }
       if ((st.t - cm.povoado) / 1440 >= X.dias) { A("despesca", { fracao: 1 }); return; }
     }
     const jm = pf.lua ? janelaMuda(agoraMs(st)) : null; const dc = Math.floor((st.t - cm.povoado) / 1440);
