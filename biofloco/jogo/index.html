@@ -715,7 +715,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       case "prebiotico": { const b = st.balde; if (b.on) { ok = false; msg = "O balde já está com prebiótico fermentando."; break; }
         if (!gasta(st, "farelo", 600) || !gasta(st, "acucar", 250) || !gasta(st, "bicarbonato", 75)) { ok = false; msg = "Falta farelo, açúcar ou bicarbonato."; break; }
         Object.assign(b, { on: true, t0: st.t, avisou: false });
-        msg = "Prebiótico no balde fechado, no sol: 600 g de puim + 250 g de açúcar + 75 g de bicarbonato + água madura. Fica 24 h."; min = TEMPO.bombona; logA(st, msg); break; }
+        msg = "Prebiótico no balde fechado, no sol: 600 g de puim + 250 g de açúcar + 75 g de bicarbonato + água do tanque sem cloro (madura do 2º ciclo em diante). Fica 24 h."; min = TEMPO.bombona; logA(st, msg); break; }
       case "simbio_iniciar": { const b = st.bombona, bd = st.balde; if (!bd.on || (st.t - bd.t0) < 18 * 60) { ok = false; msg = !bd.on ? "Faça o prebiótico no balde primeiro." : "O prebiótico ainda não fermentou (24 h)."; break; }
         if (b.fase !== "vazia") { ok = false; msg = "A bombona ainda tem simbiótico. Use ou descarte antes."; break; }
         if (!gasta(st, "bactrat", 30)) { ok = false; msg = "Falta Bactrat P."; break; }
