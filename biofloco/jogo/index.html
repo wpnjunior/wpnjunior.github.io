@@ -194,7 +194,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     catalisador: { n: "Catalisador de flocos", u: "mL", pack: 1000 }, azomite: { n: "Azomite", u: "g", pack: 20000 },
     oxitrat: { n: "Oxitrat (oxigênio em pó)", u: "g", pack: 1000 }, kcl: { n: "Cloreto de potássio (KCl)", u: "g", pack: 5000 },
     mgso4: { n: "Sulfato de magnésio", u: "g", pack: 5000 }, racao: { n: "Ração 40% PB", u: "g", pack: 25000 },
-    nitrificante: { n: "Nitrificante comercial", u: "un", pack: 1 }, mantas: { n: "Mantas de biofilme", u: "un", pack: 1 },
+    nitrificante: { n: "Nitrificante comercial", u: "un", pack: 1 }, mantas: { n: "Telas verticais de poliéster (substrato)", u: "un", pack: 1 },
     sonda_od: { n: "Sonda de OD com alarme", u: "un", pack: 1 }, decantador: { n: "Decantador cônico", u: "un", pack: 1 }
   };
 
@@ -204,6 +204,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
   function janelaMuda(ms) { const a = idadeLua(ms); const dN = Math.min(a, SINODICO - a), dC = Math.abs(a - 14.765); return dN <= 2 ? "lua nova" : dC <= 2 ? "lua cheia" : null; }
 
   /* ---------- química ---------- */
+  let EFIC = 0.8; // conversão alimentar na faixa dos estudos (Wagner 22/11): 500/m² dá FCA ~1,35 (Samocha 2012: 1,21–1,40; Krummenauer 2011: 1,29; Silveira 2020: 1,82). Fora do cenário Xu, que tem calibração própria
   function doSat(T, S) { // mg/L, saturação com ar pela equação de Weiss 1970 (mesma da tabela Benson e Krause). Sem bônus de coluna (Wagner, 22/11: "Tirar")
     const K = (T + 273.15) / 100;
     const lnC = -173.4292 + 249.6339 / K + 143.3483 * Math.log(K) - 21.8492 * K + S * (-0.033096 + 0.014259 * K - 0.0017 * K * K);
@@ -358,8 +359,8 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     const rAlg = (a.alg + a.ciano) * 0.012 * thetaB;
     /* nitrogênio e carbono */
     const doF = a.DO / (1.2 + a.DO);
-    const nitA = 0.5 * a.AOB * a.TAN / (0.5 + a.TAN) * doF * thetaB * phF(st) * (st.estufa.mantas ? 1.4 : 1);
-    const nitN = 0.6 * a.NOB * a.NO2 / (0.6 + a.NO2) * doF * thetaB * phF(st) * (st.estufa.mantas ? 1.4 : 1);
+    const nitA = 0.5 * a.AOB * a.TAN / (0.5 + a.TAN) * doF * thetaB * phF(st) * (st.estufa.mantas ? 1 : 1) /* telas: ganho de nitrificação sem fonte (era 1,4), desligado 22/11 até ter estudo */;
+    const nitN = 0.6 * a.NOB * a.NO2 / (0.6 + a.NO2) * doF * thetaB * phF(st) * (st.estufa.mantas ? 1 : 1) /* telas: ganho de nitrificação sem fonte (era 1,4), desligado 22/11 até ter estudo */;
     const hetCap = 0.012 * (a.H + 6 * a.Bac) * thetaB * (1 + 0.1 * clamp(a.cat, 0, 1));
     const imob = Math.min(hetCap * a.TAN / (0.3 + a.TAN) * a.C / (4 + a.C) * doF, a.TAN / dtH * 0.9, a.C / 8 / dtH);
     const minOM = 0.02 * a.OMc * thetaB * (0.3 + doF); // mineralização (mg C/L/h)
@@ -470,8 +471,8 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     hz.sulfeto = a.sulf > 0.1 ? 0.00025 * Math.pow(a.sulf / 0.85, 1.5) : 0; // crônico [E: Li 2017, 0,85 mg/L por 21 d reduz a sobrevivência; M: tamanho]
     // fome e canibalismo [M]
     hz.fome = cm.fome > 0.6 ? 0.0006 * (cm.fome - 0.6) / 0.4 : 0;
-    hz.canibalismo = 0.0006 * cm.pm * (1 - cm.casca) * (0.5 + cm.fome) * (st.cfg.densidade / 500);
-    hz.espaco = cm.W >= 6 ? interp([[0, 0], [1111, 0], [1388, 0.0097], [1667, 0.0135], [2500, 0.025]], st.cfg.densidade / TANK.depth) / 24 : 0; // [E] Fróes et al. 2013 (Pesq Agropec Bras 48:878), 6–12 g em 40 dias: até 1.111/m³ 91–95%, 1.388/m³ 63%, 1.667/m³ 54%; autores: espaço e canibalismo
+    hz.canibalismo = 0.0006 * cm.pm * (1 - cm.casca) * (0.5 + cm.fome) * (st.cfg.densidade / 500) * (st.estufa.mantas ? 0.37 : 1); // telas verticais: mortalidade 36,5% → 13,5% a 500/m² (Zhang 2010)
+    hz.espaco = cm.W >= 6 ? interp([[0, 0], [1111, 0], [1388, 0.0097], [1667, 0.0135], [2500, 0.025]], st.cfg.densidade / TANK.depth) / 24 * (st.estufa.mantas ? 0.37 : 1) : 0; // [E] Fróes et al. 2013 (Pesq Agropec Bras 48:878), 6–12 g em 40 dias: até 1.111/m³ 91–95%, 1.388/m³ 63%, 1.667/m³ 54%; autores: espaço e canibalismo
     // doenças
     const d = cm.doencas, diasCult = (st.t - cm.povoado) / 1440;
     hz.vibriose = a.vib > 4.6 ? 0.00025 * (a.vib - 4.6) * (0.5 + cm.estresse) : 0;
@@ -552,7 +553,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       const ts = tss(a), solF = ts > 750 ? 0.75 : ts > 500 ? 0.9 : 1;
       const zooBonus = 1 + 0.08 * clamp(a.zoo / 20, 0, 1);
       const W0 = cm.W;
-      cm.W += Math.max(0, pot * Math.pow(eat, 0.8) * odF * toxF * solF * zooBonus * (1 - 0.3 * cm.estresse));
+      cm.W += Math.max(0, pot * (st.cfg.xu ? 1 : EFIC) * Math.pow(eat, 0.8) * odF * toxF * solF * zooBonus * (1 - 0.3 * cm.estresse));
       cm.ganhoKg += cm.n * (cm.W - W0) / 1000;
       cm.ultimoDia = { comido: cm.comidoHoje, dado: cm.dadoHoje, demanda: cm.demandaHoje, mortos: cm.mortosDia || 0, muda: cm.mudaHoje || 0, sobra: cm.sobraHoje };
       cm.bandejaOntem = cm.bandejaCod == null ? null : cm.bandejaCod; cm.bandejaCod = null; cm.travaOntem = cm.travaHoje || 1; cm.travaHoje = 1;
@@ -750,8 +751,8 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         msg = "200 L de floco maduro do vizinho no tanque. Rápido, mas pode trazer doença."; min = 60; logA(st, msg); break; }
       case "inocular_nitrificante": { if (!precisaAgua()) break; if (!gasta(st, "nitrificante", 1)) { ok = false; msg = "Compre o nitrificante comercial (entrega em 3 dias)."; break; }
         a.AOB += 0.04; a.NOB += 0.03; msg = "Nitrificante comercial no tanque."; min = TEMPO.aplicar; logA(st, msg); break; }
-      case "mantas": { if (!precisaAgua()) break; if (st.estufa.mantas) { ok = false; msg = "As mantas já estão no tanque."; break; } if (!gasta(st, "mantas", 1)) { ok = false; msg = "Compre as mantas primeiro."; break; }
-        st.estufa.mantas = true; msg = "Mantas de biofilme instaladas: mais superfície para as nitrificantes."; min = 40; logA(st, msg); break; }
+      case "mantas": { if (!precisaAgua()) break; if (st.estufa.mantas) { ok = false; msg = "As telas já estão no tanque."; break; } if (!gasta(st, "mantas", 1)) { ok = false; msg = "Compre as telas primeiro."; break; }
+        st.estufa.mantas = true; msg = "Telas verticais de poliéster instaladas: mais superfície para as nitrificantes e abrigo para o camarão na muda (Zhang 2010; Schveitzer 2013). Tela mosquiteira não serve (Legarda 2018)."; min = 40; logA(st, msg); break; }
       case "decantador": { if (!st.estufa.temDecantador) { if (!gasta(st, "decantador", 1)) { ok = false; msg = "Compre o decantador primeiro."; break; } st.estufa.temDecantador = true; }
         st.estufa.decantador = !st.estufa.decantador; msg = `Decantador ${st.estufa.decantador ? "ligado" : "desligado"}.`; min = 3; logA(st, msg); break; }
       case "skimmer": { st.estufa.skimmer = !st.estufa.skimmer; msg = `Skimmer ${st.estufa.skimmer ? "ligado" : "desligado"}.`; min = 3; logA(st, msg); break; }
@@ -1023,7 +1024,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
 
   /* ---------- piloto: segue o app e o caderno (testes, ajudante e comparação de densidades) ---------- */
   function piloto(st, pf) {
-    pf = Object.assign({ cloro: 10, esperaCloro: true, inoculo: "nitrificante", carbono: true, bicarb: true, simbio: true, nutrat: true, sombrite: true, rodo: true, decantador: true,
+    pf = Object.assign({ telas: true, cloro: 10, esperaCloro: true, inoculo: "nitrificante", carbono: true, bicarb: true, simbio: true, nutrat: true, sombrite: true, rodo: true, decantador: true,
       aguaDoce: true, lua: true, racao: 1, aclimatar: true, dens: 500, sal: 22, alvo: 12, minerais: true, acucar: true, prep: true, tratos: true, medir: true, despescar: true, maxDias: 125, maturar: 15 }, pf || {});
     const P = st.pil || (st.pil = { fase: 0, d: {} }), a = st.agua, cm = st.camarao;
     const h = Math.floor(horaLocal(st) + 0.01), dia = diaIdx(st), V = Vm3(st);
@@ -1061,6 +1062,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       if (h === 8 && X.troca !== false && uma("xutroca")) { const T = tss(a); if (T > 500) A("troca", { L: Math.round(a.V * Math.min(0.079, 1 - 450 / T)) }); }
       if ((st.t - cm.povoado) / 1440 >= X.dias) { A("despesca", { fracao: 1 }); return; }
     }
+    if (pf.telas && !pf.xu && !st.estufa.mantas) { if (st.estoque.mantas > 0) A("mantas"); else if (!st.entregas.some(e => e.item === "mantas")) A("comprar", { item: "mantas" }); } // regra do Wagner 22/11: telas de poliéster (Zhang 2010; Schveitzer 2013)
     if (!pf.xu && (st.cfg.densidade > 600 || tss(a) > 500)) { // acima da densidade do manual ou SST > 500: manejo de maior sobrevivência dos estudos de alta densidade (Xu 2025; Samocha 2012): ar contínuo e troca para segurar SST em 200–500
       if (st.estufa.aeracao !== "max") A("aeracao", { nivel: "max" });
       if (h === 8 && uma("adtroca")) { const T = tss(a); if (T > 500) A("troca", { L: Math.round(a.V * Math.min(0.079, 1 - 450 / T)) }); } }
@@ -1096,7 +1098,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     if (pf.tratos && h === 21 && uma("bandeja")) A("bandeja");
   }
 
-  const API = { horasTrato, piloto, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
+  const API = { _efic: v => (EFIC = v), horasTrato, piloto, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
     pctTabela, tratosTabela, curvaPeso, TANK, ITENS, PRECOS, TABELA, CURVA, interp, LC_NO2, LC_NH3, SAFE };
   if (typeof module !== "undefined" && module.exports) module.exports = API; else root.BFEngine = API;
 })(typeof window !== "undefined" ? window : globalThis);
