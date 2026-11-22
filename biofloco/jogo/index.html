@@ -420,7 +420,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     a.nutrat = Math.max(0, a.nutrat - dtH / 24); a.cat = Math.max(0, a.cat - dtH / 48);
     // Vibrio (log UFC/mL) [M; Samocha: 4–28 mil normal]. Calibrado em 22/11 (pedido do Wagner) para o cenário Xu 2025 a 800/m³ dar ~80% (estudo 79,8%) com troca e sólidos controlados
     const omF = (a.OMc + a.C * 0.5) / 30;
-    const dv = (0.28 * clamp(omF, 0, 3) + 0.05 * (a.T - 28) - 0.95 * clamp(a.Bac, 0, 1.5) - 0.25 * clamp(a.H / 150, 0, 1) + 0.04) / 24;
+    const dv = (0.29 * clamp(omF, 0, 3) + 0.05 * (a.T - 28) - 0.95 * clamp(a.Bac, 0, 1.5) - 0.25 * clamp(a.H / 150, 0, 1) + 0.04) / 24;
     a.vib = clamp(a.vib + dv * dtH, 2, 7.2);
 
     /* camarão */
