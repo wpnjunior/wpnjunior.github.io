@@ -339,7 +339,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       const kill = Math.exp(-Math.min(a.Cl, 30) * 0.15 * dtH);
       a.H *= kill; a.Bac *= kill; a.AOB *= kill; a.NOB *= kill; a.alg *= kill; a.zoo *= kill; a.ciano *= kill;
       if (a.Cl < 1 && a.ClMax > 1 && !a.clResolvido) { // cloro forte por tempo suficiente mata o que veio na água crua [E: manual 10–20 ppm; Rekha et al., IJVASR 49(4): 10 ppm de cloro ativo zerou a carga bacteriana]
-        a.clResolvido = true; const pk = clamp(a.ClHoras / 6, 0, 1) * 0.97 + (a.ClHoras < 6 && a.ClMax >= 5 ? 0.2 : 0);
+        a.clResolvido = true; const pk = Math.min(0.97, clamp(a.ClHoras / 6, 0, 1) * 0.97 + (a.ClHoras < 6 && a.ClMax >= 5 ? 0.2 : 0));
         for (const k in a.patog) if (a.patog[k] && rng(st) < pk) a.patog[k] = false; a.vib = Math.min(a.vib, 3.2 - 1.2 * clamp(a.ClHoras / 6, 0, 1)); }
       if (a.Cl < 0.05 && !st.vistos.cloro_zero && a.ClMax > 1) primeira(st, "cloro_zero", "licao", "O cloro chegou perto de zero. Confirme com o teste antes de inocular ou povoar.");
     }
@@ -378,7 +378,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
 
     /* fluxos de N (mg N/L) */
     const excr = vivos ? cm._excrH || 0 : 0; // calculado na alimentação
-    a.TAN += (excr + minOM / 14 - nitA - imob - algUp) * dtH;
+    a.TAN += (excr + minOM / 14 - nitA - imob - algUp * 0.8) * dtH; /* alga tira 80% da TAN e 20% do nitrato: soma 1× o que absorve */
     a.NO2 += (nitA - nitN) * dtH;
     a.NO3 += (nitN - algUp * 0.2) * dtH;
     a.TAN = Math.max(0, a.TAN); a.NO2 = Math.max(0, a.NO2); a.NO3 = Math.max(0, a.NO3);
@@ -715,7 +715,8 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         a.AOB += 0.00002 * f; // bombona com água madura traz pouca nitrificante
         b.litros -= L; if (b.litros <= 5) { b.fase = "vazia"; b.cat = false; b.bicarb = false; }
         msg = `${L} L de simbiótico no tanque${q < 0.3 ? " (fraco: bactérias mortas ou imaturo)" : ""}${b.cat ? ", flocado pelo catalisador" : ""}.`; min = TEMPO.aplicar; logA(st, msg); break; }
-      case "prebiotico": { const b = st.balde; if (b.on) { ok = false; msg = "O balde já está com prebiótico fermentando."; break; }
+      case "prebiotico": { const b = st.balde; if (b.on && st.bombona.fase === "vazia" && (b.n || 1) < 4) { const mais = 4 - (b.n || 1); if (!gasta(st, "farelo", 600 * mais) || !gasta(st, "acucar", 250 * mais) || !gasta(st, "bicarbonato", 75 * mais)) { ok = false; msg = "Falta farelo, açúcar ou bicarbonato."; break; } b.n = 4; b.t0 = st.t; msg = `Mais ${mais} balde${mais > 1 ? "s" : ""} de prebiótico para a partida da bombona (4 baldes, rotina do Wagner). Todos ficam 24 h.`; min = TEMPO.bombona; logA(st, msg); break; }
+        if (b.on) { ok = false; msg = "O balde já está com prebiótico fermentando."; break; }
         if (a.Cl > 0.05) { ok = false; msg = "O cloro do tanque ainda não zerou: a água mataria os bacilos."; break; }
         const nb = st.bombona.fase === "vazia" ? 4 : 1; // rotina do Wagner: 4 baldes de 20 L na partida, depois 1 por dia
         if (!gasta(st, "farelo", 600 * nb) || !gasta(st, "acucar", 250 * nb) || !gasta(st, "bicarbonato", 75 * nb)) { ok = false; msg = "Falta farelo, açúcar ou bicarbonato."; break; }
@@ -723,7 +724,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         msg = `${nb === 4 ? "4 baldes" : "1 balde"} de prebiótico fechado${nb === 4 ? "s" : ""}, no sol: cada um com 600 g de puim + 250 g de açúcar + 75 g de bicarbonato + água do tanque sem cloro (madura do 2º ciclo em diante). Fica 24 h.`; min = TEMPO.bombona; logA(st, msg); break; }
       case "simbio_iniciar": { const b = st.bombona, bd = st.balde; if (!bd.on || (st.t - bd.t0) < 24 * 60) { ok = false; msg = !bd.on ? "Faça o prebiótico no balde primeiro." : "O prebiótico ainda não fermentou (24 h)."; break; }
         const nb = bd.n || 1;
-        if (b.fase === "simbio" && !b.morta) { b.litros = Math.min(100, b.litros + 20 * nb); b.Cg = (b.Cg || 0) + 331.3 * nb; b.Ng = (b.Ng || 0) + 13.03 * nb; b.tf = st.t; bd.on = false; msg = `${nb} balde${nb > 1 ? "s" : ""} novo${nb > 1 ? "s" : ""} de prebiótico na bombona (${Math.round(b.litros)} L). Depois de 24 h de ar, tire os 20 L do dia.`; min = TEMPO.bombona; logA(st, msg); break; }
+        if (b.fase === "simbio" && !b.morta) { const cab = Math.min(100, b.litros + 20 * nb) - b.litros, fr = nb > 0 ? cab / (20 * nb) : 0; b.litros += cab; b.Cg = (b.Cg || 0) + 331.3 * nb * fr; b.Ng = (b.Ng || 0) + 13.03 * nb * fr; /* só entra o carbono do que coube */ b.tf = st.t; bd.on = false; msg = `${nb} balde${nb > 1 ? "s" : ""} novo${nb > 1 ? "s" : ""} de prebiótico na bombona (${Math.round(b.litros)} L). Depois de 24 h de ar, tire os 20 L do dia.`; min = TEMPO.bombona; logA(st, msg); break; }
         if (b.fase !== "vazia") { ok = false; msg = "A bombona ainda tem simbiótico. Use ou descarte antes."; break; }
         if (!gasta(st, "bactrat", 30)) { ok = false; msg = "Falta Bactrat P."; break; }
         Object.assign(b, { fase: "simbio", t0: st.t, tf: st.t, pH: 7.2, litros: 20 * nb, Cg: 331.3 * nb, Ng: 13.03 * nb, qual: 0, bicarb: false, cat: false, avisou2: false, morta: false }); bd.on = false;
@@ -773,14 +774,15 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         const n = Math.round(dens * TANK.area); cobra(st, n * st.cfg.precos.pl);
         let perda = 0;
         const dT = Math.abs(a.T - 26), dS = Math.abs(a.S - st.cfg.salLab);
-        if (!p.aclimatar) perda = clamp(1 / (1 + Math.pow(4 / Math.max(dT, 0.01), 3)) + 1 / (1 + Math.pow(5 / Math.max(dS, 0.01), 3)) + 0.03, 0, 0.9);
+        if (!p.aclimatar) perda = clamp(1 / (1 + Math.pow(4 / Math.max(dT, 0.01), 3)) /* [M] temperatura sem estudo */ + 2.5 / (1 + Math.pow(15 / Math.max(dS, 0.01), 3)) /* limiares §15G: F = 1/(1+(15/ΔS)³), PL ×2–3 */, 0, 0.9);
         else perda = 0.01;
         const clMort = a.Cl > 0.05 ? clamp(a.Cl * 2, 0, 1) : 0;
         perda = clamp(perda + clMort, 0, 1);
         Object.assign(cm, { n0: n, n: n * (1 - perda), W: 0.02, povoado: st.t, despescado: false, mortes: { aclimatacao: n * perda * (clMort > 0 ? 0.3 : 1), cloro: n * perda * (clMort > 0 ? 0.7 : 0) }, TaclHist: [a.T], aclimatado: !!p.aclimatar,
           demandaHoje: n * 0.02 / 1000 * 1000 * pctTabela(0.02) / 100, fome: 0.2, estresse: 0.15, pm: 0, casca: 0.8, biomIni: n * 0.02 / 1000 });
         msg = `Povoado: ${n.toLocaleString("pt-BR")} PL (${dens}/m²)${p.aclimatar ? ", aclimatadas" : ", sem aclimatar"}. Perda na soltura: ${(perda * 100).toFixed(0)}%.`;
-        min = p.aclimatar ? Math.max(TEMPO.aclimatar, Math.round(dS / 2 * 60)) : 15; // manual cap. 7: até 2 ppt por hora logA(st, msg); primeira(st, "povoou", "quiz", "Você povoou o tanque.");
+        min = p.aclimatar ? Math.max(TEMPO.aclimatar, Math.round(dS / 2 * 60)) : 15; // manual cap. 7: até 2 ppt por hora
+        logA(st, msg); primeira(st, "povoou", "quiz", "Você povoou o tanque.");
         if (a.Cl > 0.05) ev(st, "alarme", "Ainda tinha cloro na água: parte das PL morreu na hora.", null);
         break;
       }
@@ -924,7 +926,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       // resultados pendentes
       if (st.pendentes && st.pendentes.length) {
         const ok = st.pendentes.filter(x => x.t <= st.t); st.pendentes = st.pendentes.filter(x => x.t > st.t);
-        ok.forEach(x => { if (x.k === "tcbs") { const ufc = Math.pow(10, x.v); ev(st, "info", `Placa TCBS: ${Math.round(ufc).toLocaleString("pt-BR")} UFC/mL${x.v > 4 ? " (alto)" : ""}.`, "tcbs"); st.leituras.push({ t: st.t, k: "vib", v: +x.v.toFixed(2) }); }
+        ok.forEach(x => { if (x.k === "tcbs") { const ufc = Math.pow(10, x.v); ev(st, "info", `Placa TCBS: ${Math.round(ufc).toLocaleString("pt-BR")} UFC/mL${x.v > 4.443 ? " (alto: acima do teto normal do Samocha, 27.750)" : ""}.`, "tcbs"); st.leituras.push({ t: st.t, k: "vib", v: +x.v.toFixed(2) }); }
           if (x.k === "pcr") { const pos = Object.keys(x.v).filter(k => x.v[k]); ev(st, "info", "Resultado do PCR: " + (pos.length ? "positivo para " + pos.map(k => ({ wssv: "mancha branca", imnv: "mionecrose", nhp: "NHP", ehp: "EHP", ahpnd: "AHPND" }[k])).join(", ") : "negativo para tudo") + ".", "pcr"); } });
       }
       // alarme da sonda
@@ -984,8 +986,8 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     let trava = 1; const add = (f, t) => { trava = Math.min(trava, f); m.push(t); };
     const od = leit(st, "od", 26), tan = leit(st, "tan", 74), no2 = leit(st, "no2", 74), cone = leit(st, "cone", 50), tp = leit(st, "temp", 26);
     if (od) { if (od.v < 3) add(0, `OD ${od.v} mg/L: SUSPENDER o trato.`); else if (od.v < 4) add(0.8, `OD ${od.v} mg/L: baixar 20% e Nutrat em dobro.`); }
-    if (tan && tan.v > 1) add(0.7, `Amônia ${tan.v} mg/L: baixar 30% e dar açúcar.`);
-    if (no2 && no2.v > 1) add(0.85, `Nitrito ${no2.v} mg/L: baixar 15%.`);
+    if (tan && tan.v > 1) { const ph = leit(st, "ph", 74), sl = leit(st, "sal", 240), x = ph ? tan.v * nh3Frac(tp ? tp.v : 28, sl ? sl.v : 25, ph.v) : null, cr = tan.v > 3 || (x != null && x > 0.1); add(cr ? 0.7 : 1, cr ? `Amônia ${tan.v} mg/L: nível crítico, baixar 30% e dar açúcar.` : `Amônia ${tan.v} mg/L: alerta, dar açúcar e manter a ração.`); } /* igual ao app: corte só acima de 3 ou NH3 > 0,1 (Lin e Chen 2001; Alune 2020) */
+    if (no2 && no2.v > 1) add(no2.v > 5 ? 0.85 : 1, no2.v > 5 ? `Nitrito ${no2.v} mg/L: nível crítico, baixar 15%.` : `Nitrito ${no2.v} mg/L: alerta, alcalinidade no alto, ração mantida.`); /* igual ao app (Lin e Chen 2003) */
     if (cone && cone.v > 20) add(0.85, `Cone ${cone.v} mL/L: baixar 15% e Nutrat em dobro.`);
     if (tp && (tp.v < 22 || tp.v > 33)) add(0.75, `Temperatura ${tp.v} °C: baixar 25%.`); else if (tp && tp.v < 26) add(0.9, `Temperatura ${tp.v} °C: baixar 10%.`);
     const jm = st.cfg.xu ? null : janelaMuda(agoraMs(st)); if (jm) add(0.6, `Janela de muda (${jm}): baixar 40% (Molina 2000).`); else if (cm.pm > 0.15 && !st.cfg.xu) add(0.6, "Muda vista (cascas boiando): baixar 40%. O camarão come menos logo antes e logo depois da muda (Bardera 2019).");
@@ -1007,7 +1009,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     out.push({ k: "simbiotico", nome: "Simbiótico da bombona", qtd: Math.round(1 * V), un: "L", txt: "Rotina do Wagner: 20 L por dia (1 L por m³), tirados da bombona de 80 L que recebe 1 balde de prebiótico por dia.", base: "campo" });
     if (kg > 0) {
       out.push({ k: "bicarbonato", nome: "Bicarbonato de rotina", qtd: Math.round(250 * kg), un: "g", txt: `0,25 kg por kg de ração × ${kg.toFixed(2)} kg.`, base: "estudo" });
-      out.push({ k: "farelo", nome: "Farelo de arroz fermentado (carbono)", qtd: Math.round(500 * kg), un: "g", txt: `0,5 kg por kg de ração × ${kg.toFixed(2)} kg, Carbono principal, como no app. Leva a relação C:N para perto de 10.`, base: "estudo" });
+      out.push({ k: "farelo", nome: "Farelo de arroz fermentado (carbono)", qtd: Math.round(500 * kg), un: "g", txt: `0,5 kg por kg de ração × ${kg.toFixed(2)} kg, Carbono principal, como no app. Leva a relação C:N para perto de 10.`, base: "campo" });
       out.push({ k: "azomite_racao", nome: "Azomite na ração", qtd: +(3 * kg).toFixed(1), un: "g", txt: "3 g por kg de ração (teto 4).", base: "estudo" });
     }
     if (alk && alk.v < 150) { const g = Math.min(1000, Math.round((160 - alk.v) * V / 0.595)); out.push({ k: "alc", nome: "Corrigir alcalinidade", qtd: g, un: "g", txt: `Alcalinidade ${alk.v}: (160 − ${alk.v}) × ${V.toFixed(1)} m³ ÷ 0,6. No máximo 1 kg de bicarbonato por dia${jm ? "" : "; ou cal hidratada em doses de até 200 g"}.`, base: "estudo" }); }
@@ -1017,7 +1019,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     if (cone) { if (cone.v > 15 && !st.estufa.decantador) out.push({ k: "decantador", nome: "Decantador", qtd: "LIGAR", un: "", txt: `Cone ${cone.v} mL/L acima de 15. Desligue quando voltar a 10.`, base: "estudo" });
       else if (cone.v <= 10 && st.estufa.decantador) out.push({ k: "decantador", nome: "Decantador", qtd: "DESLIGAR", un: "", txt: `Cone ${cone.v} mL/L: já voltou a 10 ou menos.`, base: "estudo" }); }
     { const faltaT = Math.round((TANK.vol - a.V) / 50) * 50, max2 = Math.floor(a.V * 2 / Math.max(a.S - 2, 1) / 50) * 50, falta = Math.min(faltaT, max2); // no máximo 2 ppt por vez (app: "no máximo 1–2 ppt por hora")
-      if (faltaT >= 300) out.push({ k: "agua_doce", nome: "Repor água doce", qtd: falta, un: "L", txt: `O nível baixou ${(faltaT / TANK.area / 10).toFixed(1)} cm pela evaporação e o sal concentrou. Complete com água doce sem cloro` + (falta < faltaT ? `, aos poucos: ${falta} L agora (baixa até 2 ppt) e o resto nos próximos dias.` : "."), base: "estudo" }); }
+      if (faltaT >= 300) out.push({ k: "agua_doce", nome: "Repor água doce", qtd: falta, un: "L", txt: `O nível baixou ${(faltaT / TANK.area / 10).toFixed(1)} cm pela evaporação e o sal concentrou. Complete com água doce sem cloro` + (falta < faltaT ? `, aos poucos: ${falta} L agora (baixa até 2 ppt) e o resto nos próximos dias.` : "."), base: "campo" }); }
     return out;
   }
   function appAlertas(st) {
@@ -1038,10 +1040,10 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     const uma = k => { if (P.d[k] === dia) return false; P.d[k] = dia; return true; };
     const A = (t, p) => acao(st, t, p);
     if (pf.simbio && a.cheio && h >= 6 && h <= 19) { const b = st.bombona, bd = st.balde; // rotina do balde e da bombona
-      if (!bd.on && a.Cl <= 0.05) A("prebiotico");
       if ((b.fase === "vazia" || (b.fase === "simbio" && !b.morta)) && bd.on && st.t - bd.t0 >= 24 * 60) A("simbio_iniciar");
+      if (!bd.on && a.Cl <= 0.05) { A("prebiotico"); if (bd.on) bd.t0 -= bd.t0 % 60; } // balde novo logo depois de despejar, na hora cheia: não atrasa 1 h por dia
       if (b.fase === "simbio" && !b.morta && b.pH < 7.0) A("bombona_bicarb"); // caderno: manter 7,0–7,5
-      if (b.fase === "simbio" && (b.morta || b.litros < 10)) A("bombona_descartar"); }
+      if (b.fase === "simbio" && (b.morta || b.litros < 10)) { A("bombona_descartar"); A("prebiotico"); /* recomeça com 4 baldes */ } }
     if (pf.prep) {
       if (!a.cheio) { st.salAlvo = pf.sal; A("encher", { sal: pf.sal }); if (pf.cloro > 0) A("cloro", { g: Math.round(pf.cloro * Vm3(st) / 0.65) }); A("aeracao", { nivel: "max" }); P.fase = 1; return; }
       if (P.fase === 0) P.fase = cm.n > 0 ? 3 : 1;
@@ -1175,7 +1177,7 @@ TX.quiz = {
   no2: { q: "O nitrito passou de 2 mg/L. O que isso quer dizer?", o: ["As bactérias da amônia já trabalham, as do nitrito ainda estão crescendo", "A água está suja e precisa de cloro", "Falta oxigênio"], c: 0, e: "É a segunda etapa da nitrificação atrasada. A 20–25 ppt o cloreto protege o camarão (nível seguro de 15 mg/L a 25 ppt e de 6 mg/L a 15 ppt, Lin e Chen 2003; na muda ele não ficou mais sensível, Gross 2004). Segure a ração, mantenha ar e alcalinidade acima de 150 e espere." },
   alk: { q: "A alcalinidade caiu abaixo de 120. Por quê e o que fazer?", o: ["A nitrificação gasta alcalinidade; repor com bicarbonato", "O camarão bebeu; esperar", "Falta sal; pôr sal grosso"], c: 0, e: "Cada 1 g de amônia nitrificada gasta 7 g de alcalinidade. Sem reposição o pH cai e a nitrificação para. Bicarbonato de rotina e correção até 150–180." },
   cone: { q: "O cone passou de 20 mL/L. O que fazer?", o: ["Ligar o decantador, Nutrat em dobro e ração −15%", "Dar mais simbiótico", "Nada, floco nunca é demais"], c: 0, e: "Sólido demais gasta oxigênio e entope a brânquia. Decantador ligado até voltar a 10, Nutrat em dobro (caderno) e menos ração." },
-  temp: { q: "A água passou de 32 °C. Qual o risco e o que fazer?", o: ["Cabe menos oxigênio e o camarão gasta mais: fechar o sombrite e reforçar o ar", "Nenhum, camarão gosta de calor", "Jogar gelo"], c: 0, e: "A 32 °C o teto de oxigênio cai e o consumo sobe. O crescimento começa a cair acima de 32. Sombrite fechado e ar forte." },
+  temp: { q: "A água passou de 32 °C. Qual o risco e o que fazer?", o: ["Cabe menos oxigênio e o camarão gasta mais: fechar o sombrite e reforçar o ar", "Nenhum, camarão gosta de calor", "Jogar gelo"], c: 0, e: "A 32 °C o teto de oxigênio cai e o consumo sobe. O crescimento já cai acima de 29 °C (Fóes) e o risco sobe acima de 32. Sombrite fechado e ar forte." },
   ph: { q: "O pH passou de 8,5 no meio do dia, com água verde. O que está acontecendo?", o: ["As algas consomem o CO₂ com a luz: fechar o sombrite", "Falta cal", "O kit está vencido"], c: 0, e: "Fotossíntese tira CO₂ e o pH sobe. Com pH alto a amônia fica muito mais tóxica. Menos luz segura as algas; ácido fosfórico só aos poucos e fora da janela de muda." },
   od: { q: "O oxigênio deu abaixo de 4 mg/L. Ordem certa?", o: ["Ar no máximo, suspender o trato, Oxitrat se cair de 3", "Dar ração para animar", "Desligar o decantador e dormir"], c: 0, e: "Primeiro o ar. Comida em OD baixo vira sobra e gasta mais oxigênio. Abaixo de 2,8 já é hipóxia; perto de 0,65 mata em meia hora (Vinatea 2009)." },
   janela_muda: { q: "Começou a janela de muda da lua. O que muda no manejo?", o: ["Ração −40% por 3 a 4 dias, ar reforçado, nada de ácido nem cal, sem biometria", "Dobrar a ração para dar energia", "Trocar água para limpar as cascas"], c: 0, e: "Camarão de casca mole come menos e fica 2 a 3 vezes mais sensível a amônia e oxigênio baixo. pH parado e alcalinidade em 150–180 ajudam a casca a endurecer." },
@@ -1206,23 +1208,23 @@ TX.impr = [
 ];
 TX.emerg = [
   ["Oxigênio abaixo de 4", "Ar no máximo. Suspender o trato. Abaixo de 3: Oxitrat. Depois descubra a causa: sólidos, sobra de ração, calor."],
-  ["Amônia acima de 1", "Ração −30% (Alune 2020). Açúcar: amônia × m³ × 20 g. Nutrat em dobro. Não subir o pH."],
-  ["Nitrito alto", "Ração −15%, ar, alcalinidade ≥ 150. A 25 ppt o nível seguro é 15 mg/L; a 15 ppt, 6 mg/L (Lin e Chen 2003)."],
+  ["Amônia acima de 1", "Açúcar: amônia × m³ × 20 g. Nutrat em dobro. Não subir o pH. Ração −30% só acima de 3 ou NH₃ acima de 0,1 (Alune 2020; Lin e Chen 2001)."],
+  ["Nitrito alto", "Ar e alcalinidade ≥ 150; ração −15% só acima de 5 (regra do app). A 25 ppt o nível seguro é 15 mg/L; a 15 ppt, 6 mg/L (Lin e Chen 2003)."],
   ["pH acima de 8,5 com amônia tóxica", "Fechar o sombrite. Ácido fosfórico 0,5 mL por m³ por vez até 7,5–7,8, fora da janela de muda."],
   ["Floco morto (água cinza)", "Nunca troca grande. Simbiótico em dose alta, açúcar, Nutrat, ar no máximo. Volta em 1 a 3 dias."],
   ["Mortalidade de manhã", "Meça OD, amônia, nitrito e temperatura. Faça biometria e olhe brânquia, casca e cauda. Dúvida: microscópio, TCBS ou PCR."],
   ["Água acima de 32 °C", "Sombrite fechado, ar forte, ração −25% acima de 33."]
 ];
 TX.ritual = ["Olhar a espuma e a cor da água", "Medir oxigênio, temperatura e pH", "Nutrat sobre os difusores", "Simbiótico da bombona", "Bicarbonato de rotina e puim", "Academia: 1 h de ar no máximo às 8 h", "Tratos no número da tabela (6 a 3 por dia, conforme o peso), com bandeja", "Sombrite conforme o sol", "Segunda-feira: rodo no fundo", "Balde de prebiótico e bombona em dia"];
-TX.fonte = { espaco: "Fróes et al. 2013 (densidade acima de 1.111/m³)", amonia: "Lin e Chen 2001", nitrito: "Lin e Chen 2003", oxigenio: "Vinatea 2009; FURG 2022", calor: "Kumlu e Türkmen 2010; crônico é modelo", frio: "Kumlu e Türkmen 2010", pH: "modelo do jogo (sem estudo de faixa letal)", nitrato: "Kuhn 2010; Furtado 2015", cloro: "regra de zero cloro (sem estudo)", sulfeto: "Li 2017", salinidade: "Burbano-Gallardo 2017", aclimatacao: "Burbano-Gallardo 2017; Winarni 2022", canibalismo: "modelo da muda", natural: "perda de fundo (modelo)", fome: "modelo", vibriose: "Samocha; modelo", ahpnd: "WOAH", mancha_branca: "Millard 2020; Granja 2006", mionecrose: "modelo", nhp: "modelo", bolha: "modelo", co2: "Furtado 2017", caibra: "Roy 2007", manejo_muda: "modelo da muda (manual: nada de manejo na janela)" };
+TX.fonte = { espaco: "Fróes et al. 2013 (densidade acima de 1.111/m³)", amonia: "Lin e Chen 2001", nitrito: "Lin e Chen 2003", oxigenio: "Vinatea 2009; FURG 2022", calor: "Kumlu e Türkmen 2010; crônico é modelo", frio: "Kumlu e Türkmen 2010", pH: "modelo do jogo (sem estudo de faixa letal)", nitrato: "Kuhn 2010; Furtado 2015", cloro: "regra de zero cloro (sem estudo)", sulfeto: "Li 2017", salinidade: "Burbano-Gallardo 2017", aclimatacao: "limiares §15G (proposta do modelo; Winarni 2022: passos menores, mais sobrevivência)", canibalismo: "modelo da muda", natural: "perda de fundo (modelo)", fome: "modelo", vibriose: "Samocha; modelo", ahpnd: "WOAH", mancha_branca: "Millard 2020; Granja 2006", mionecrose: "modelo", nhp: "modelo", bolha: "modelo", co2: "Furtado 2017", caibra: "Roy 2007", manejo_muda: "modelo da muda (manual: nada de manejo na janela)" };
 TX.causa = { espaco: "Falta de espaço (densidade alta)", amonia: "Amônia", nitrito: "Nitrito", oxigenio: "Falta de oxigênio", calor: "Calor", frio: "Frio", pH: "pH fora da faixa", nitrato: "Nitrato", cloro: "Cloro", sulfeto: "H₂S do fundo", salinidade: "Choque de salinidade", aclimatacao: "Soltura sem aclimatar", canibalismo: "Canibalismo na muda", natural: "Perda normal", fome: "Fome", vibriose: "Vibriose", ahpnd: "AHPND", mancha_branca: "Mancha branca", mionecrose: "Mionecrose", nhp: "NHP", bolha: "Bolha de gás", co2: "CO₂", caibra: "Cãibra", manejo_muda: "Manejo na janela de muda" };
 
 // Desafios do dia: dia de cultivo, hora de início, o que estraga, prazo e como se ganha.
 TX.desafios = [
   { id: "amonia", n: "Pico de amônia", dc: 32, h: 7, horas: 36, txt: "Dia 32. A amônia subiu durante a noite e o pH está alto. Você tem 36 horas para trazer a amônia para menos de 1 mg/L sem perder mais de 2% do lote.",
-    mut: s => { s.agua.TAN = 5.5; s.agua.CO2 *= 0.45; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 2, "Perda menor que 2% (foi " + perda.toFixed(1) + "%)"]] },
+    mut: s => { s.agua.TAN = 7; s.agua.CO2 *= 0.45; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 2, "Perda menor que 2% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "noite", n: "Madrugada pesada", dc: 88, h: 21, horas: 11, txt: "Dia 88, 21 h. O tanque está carregado de sólidos e sobrou ração. Segure o oxigênio em 5 mg/L ou mais até as 8 h.",
-    mut: s => { s.agua.OMc += 95; s.agua.H += 450; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[mn.DO >= 5, "Oxigênio mínimo de 5 (foi " + mn.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] },
+    mut: s => { s.agua.OMc += 40; s.agua.H += 450; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[mn.DO >= 5, "Oxigênio mínimo de 5 (foi " + mn.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "alc", n: "Alcalinidade despencando", dc: 60, h: 6, horas: 48, txt: "Dia 60. A alcalinidade caiu para perto de 75 e o pH vem junto. Em 48 horas leve a alcalinidade a 140 ou mais sem deixar o pH passar de 8,6.",
     mut: s => { s.agua.alk = 75; }, fim: (v, perda, mn, mx) => [[v.alk >= 140, "Alcalinidade de 140 ou mais (ficou " + v.alk.toFixed(0) + ")"], [mx.pH <= 8.6, "pH máximo de 8,6 (foi " + mx.pH.toFixed(2) + ")"], [perda < 1, "Perda menor que 1%"]] },
   { id: "calor", n: "Onda de calor", dc: 50, h: 9, horas: 48, txt: "Dia 50. Três dias de sol forte pela frente e o sombrite está aberto. Em 48 horas a água não pode passar de 32,5 °C depois das primeiras 6 horas.",
@@ -1234,7 +1236,7 @@ TX.desafios = [
   { id: "floco", n: "Floco morto", dc: 55, h: 6, horas: 36, txt: "Dia 55. O floco morreu: água acinzentada e amônia em 5 mg/L. Em 36 horas traga a amônia para menos de 1 sem perder mais de 5% do lote.",
     mut: s => { s.agua.H *= 0.2; s.agua.Bac = 0; s.agua.AOB *= 0.25; s.agua.NOB *= 0.25; s.agua.C = 0; s.agua.TAN = 5; s.agua.colapso = 1; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 5, "Perda menor que 5% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "od3h", n: "Oxigênio caindo às 3 da manhã", dc: 80, h: 3, horas: 1, txt: "Dia 80, 3 h da manhã. O alarme tocou: oxigênio em 2,2 mg/L e camarão subindo para a borda. Cada minuto conta. Em 1 hora o oxigênio tem que estar em 5 ou mais, sem perder mais de 1% do lote.",
-    mut: s => { s.agua.DO = 2.2; s.agua.OMc = 130; s.agua.H = 470; s.agua.T = 28; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda) => [[v.DO >= 5, "Oxigênio em 5 ou mais às 4 h (ficou " + v.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
+    mut: s => { s.agua.DO = 2.2; s.agua.OMc = 150; s.agua.H = 470; s.agua.T = 28; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda) => [[v.DO >= 5, "Oxigênio em 5 ou mais às 4 h (ficou " + v.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "sal", n: "Salinidade subiu com a evaporação", dc: 45, h: 7, horas: 24, txt: "Dia 45. Semanas de sol sem repor água: o nível baixou e a salinidade foi a 30 ppt. Em 24 horas traga a salinidade para 28,5 ou menos, sem perder mais de 1% do lote. Baixe devagar: no máximo 1 a 2 ppt por hora.",
     mut: s => { const f = 0.82; s.agua.S /= f; s.agua.V *= f; s.agua.S = Math.max(s.agua.S, 30); s.agua.SHist = s.agua.SHist.map(() => s.agua.S); } /* subiu em semanas: sem choque */, fim: (v, perda) => [[v.S <= 28.5, "Salinidade de 28,5 ou menos (ficou " + v.S.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "caibra", n: "Cãibra: falta potássio", dc: 65, h: 7, horas: 30, txt: "Dia 65. Na biometria apareceram camarões com o corpo dobrado e duro. Descubra o que falta e corrija em 30 horas: o potássio tem que chegar a pelo menos 80% do valor da água do mar na sua salinidade.",
@@ -1245,7 +1247,7 @@ TX.desafios = [
     mut: s => { s.agua.Cl = 0.4; }, fim: (v, perda) => [[v.Cl < 0.03, "Cloro zerado (ficou " + v.Cl.toFixed(2) + ")"], [perda < 5, "Perda menor que 5% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "nitrito", n: "Pico de nitrito", dc: 22, h: 7, horas: 72, txt: "Dia 22. O nitrito disparou para 14 mg/L e a alcalinidade está em 100. Nitrito demora a cair: o desafio é segurar o lote. Em 72 horas: alcalinidade em 150 ou mais, nitrito sem passar de 15 (o nível seguro a 25 ppt, Lin e Chen 2003) e perda menor que 2%.",
     mut: s => { s.agua.NO2 = 14; s.agua.alk = 100; }, fim: (v, perda) => [[v.NO2 <= 15, "Nitrito sem passar de 15 (ficou " + v.NO2.toFixed(1) + ")"], [v.alk >= 150, "Alcalinidade de 150 ou mais (ficou " + v.alk.toFixed(0) + ")"], [perda < 2, "Perda menor que 2% (foi " + perda.toFixed(1) + "%)"]] }
-  ,{ id: "vibrio", n: "Fios brancos e Vibrio alto", dc: 60, h: 7, horas: 96, txt: "Dia 60. A bombona azedou e ninguém viu: o tanque ficou dias sem simbiótico bom, sobrou ração no fundo e apareceram fios brancos. O Vibrio subiu. Em 96 horas baixe o Vibrio (a placa TCBS mostra) sem perder mais de 4% do lote.",
+  ,{ id: "vibrio", n: "Fios brancos e Vibrio alto", dc: 60, h: 7, horas: 120, txt: "Dia 60. A bombona azedou e ninguém viu: o tanque ficou dias sem simbiótico bom, sobrou ração no fundo e apareceram fios brancos. O Vibrio subiu. Em 5 dias (120 horas) baixe o Vibrio (a placa TCBS mostra) sem perder mais de 4% do lote.",
     mut: s => { s.agua.vib = 5.6; s.agua.OMc += 50; s.agua.Bac = 0; s.bombona.morta = true; s.camarao.doencas.fezes = 1; }, fim: (v, perda) => [[v.vib < 4.6, "Vibrio abaixo de 40 mil UFC/mL (ficou em " + Math.round(Math.pow(10, v.vib) / 1000) + " mil)"], [perda < 4, "Perda menor que 4% (foi " + perda.toFixed(1) + "%)"]] }
 ];
 // Ajuda de cada desafio: o que fazer, na ordem, e por quê.
@@ -1257,7 +1259,7 @@ TX.ajuda = {
   cone: [["Ligue o decantador.", "É o que tira floco de verdade."], ["Nutrat em dobro (manhã e tarde) e ar no máximo.", "Sólido alto gasta oxigênio."], ["Ração −15% e sem puim extra.", "Menos comida, menos sólido novo."], ["Meça o cone todo dia.", "Desligue o decantador quando chegar a 10 para não tirar o floco bom."]],
   verde: [["Feche o sombrite e deixe fechado.", "Sem luz a alga para de consumir CO₂ e o pH para de subir."], ["Meça o pH às 10 e às 13 h.", "É a hora do pico."], ["Com pH acima de 8,5 e amônia tóxica acima de 0,1: ácido fosfórico 0,5 mL por m³ por vez, até 7,5 a 7,8.", "Baixa o pH na hora; gasta alcalinidade e deixa fósforo, por isso em dose pequena."], ["Amônia acima de 1: menos ração e açúcar (20 g por grama de amônia por m³).", "Tira a amônia sem mexer no pH."], ["Siga com simbiótico e puim.", "O floco de bactéria toma o lugar da alga."], ["Nada de ácido se for janela de muda.", "pH mexido estressa o camarão de casca mole."]],
   floco: [["Nada de troca grande de água.", "Você jogaria fora as poucas bactérias que sobraram."], ["Açúcar: amônia × m³ × 20 g.", "Carbono para as bactérias novas pegarem a amônia."], ["Simbiótico na dose de formação (1 L por m³ por dia) e Nutrat.", "Repõe as bactérias que morreram."], ["Ar no máximo e ração −30%.", "Menos carga enquanto o floco volta."], ["Meça a amônia a cada 6 a 12 horas e repita o açúcar se preciso.", "Costuma voltar em 1 a 3 dias."]],
-  od3h: [["Ar no máximo agora.", "Cada minuto abaixo de 3 mata camarão."], ["Oxitrat: 2 copos sobre a água.", "Sobe o oxigênio na hora enquanto o ar faz efeito."], ["Ligue o decantador e aplique Nutrat.", "O decantador tira carga; o Nutrat ajuda as bactérias a quebrar a gordura (não põe oxigênio)."], ["Não dê trato antes de medir 6 ou mais.", "Comida em oxigênio baixo vira sobra."], ["De dia, descubra a causa: cone alto, sobra de ração, rodo atrasado.", "Senão volta amanhã."]],
+  od3h: [["Ar no máximo agora.", "Abaixo de 2,8 mg/L o camarão entra em hipóxia; perto de 0,65 morre (Vinatea 2009)."], ["Oxitrat: 2 copos sobre a água.", "Sobe o oxigênio na hora enquanto o ar faz efeito."], ["Ligue o decantador e aplique Nutrat.", "O decantador tira carga; o Nutrat ajuda as bactérias a quebrar a gordura (não põe oxigênio)."], ["Não dê trato antes de medir 6 ou mais.", "Comida em oxigênio baixo vira sobra."], ["De dia, descubra a causa: cone alto, sobra de ração, rodo atrasado.", "Senão volta amanhã."]],
   sal: [["Meça a salinidade.", "Para confirmar e saber quanto repor."], ["No registro de água, reponha com água doce SEM cloro na dose do celular (até 2 ppt por vez).", "A evaporação leva água e deixa o sal. Repor o volume devolve a salinidade."], ["Não use água da torneira.", "O cloro mata camarão e floco."], ["Meça de novo.", "Mudança de salinidade tem que ser conferida."]],
   caibra: [["Meça potássio, magnésio e salinidade com a maleta.", "Corpo dobrado e duro é sinal de falta de potássio ou magnésio."], ["Cloreto de potássio (estante de preparo): (meta − medido) × m³ ÷ 0,52. A meta é 399 × salinidade ÷ 35.", "Leva o potássio para perto do da água do mar na sua salinidade."], ["Aplique em 2 doses e meça de novo.", "Corrigir no escuro desequilibra com o magnésio."], ["Mantenha Azomite 3 g por kg na ração.", "Ajuda o camarão a repor minerais na muda."]],
   sulfeto: [["Ar no máximo antes de mexer no fundo.", "O rodo solta lodo e sulfeto na água."], ["Passe o rodo (Ferramentas).", "Acaba com a zona morta: cada rodo corta o sulfeto pela metade."], ["Ligue o decantador e aplique Nutrat.", "Tira o lodo que subiu."], ["No dia seguinte, rodo de novo.", "Uma vez só não limpa seis semanas."], ["Daqui para frente, rodo toda semana.", "É o que evita o problema."]],
@@ -1351,7 +1353,7 @@ function tarefas() {
   if (!j.bombona) {
     if (!bd.on && b.fase === "vazia") add("Fazer o prebiótico no balde (fica 24 h).", "Bombona e balde");
     if (bd.on && b.fase === "vazia") { const hb = (st.t - bd.t0) / 60; add(hb >= 24 ? "Montar o simbiótico: leve o Bactrat P até a bombona." : "Prebiótico fermentando: faltam " + nf(24 - hb, 0) + " h para montar o simbiótico.", "Estante Só Bioflocos e bombona"); }
-    if (b.fase === "simbio") { const p = E.leit(st, "phBomb"), novo = p && p.t >= b.t0 ? p : null; if (!novo || st.t - novo.t > 8 * 60) add("Medir o pH da bombona.", "Bombona e balde"); else if (novo.v < 6.2) add("pH da bombona em " + nf(novo.v, 1) + ": pôr 80 g de bicarbonato.", "Bombona e balde", 1);
+    if (b.fase === "simbio") { const p = E.leit(st, "phBomb"), novo = p && p.t >= b.t0 ? p : null; if (!novo || st.t - novo.t > 8 * 60) add("Medir o pH da bombona.", "Bombona e balde"); else if (novo.v < 7) add("pH da bombona em " + nf(novo.v, 1) + ": pôr 80 g de bicarbonato (faixa 7,0–7,5 do caderno; dose regra do app).", "Bombona e balde", 1);
       if (!bd.on) add("Deixar um balde novo de prebiótico fermentando.", "Bombona e balde"); }
   }
   if (!(cm.n > 0) && !cm.despescado) { // preparo da água
