@@ -724,7 +724,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         msg = `${nb === 4 ? "4 baldes" : "1 balde"} de prebiótico fechado${nb === 4 ? "s" : ""}, no sol: cada um com 600 g de puim + 250 g de açúcar + 75 g de bicarbonato + água do tanque sem cloro (madura do 2º ciclo em diante). Fica 24 h.`; min = TEMPO.bombona; logA(st, msg); break; }
       case "simbio_iniciar": { const b = st.bombona, bd = st.balde; if (!bd.on || (st.t - bd.t0) < 24 * 60) { ok = false; msg = !bd.on ? "Faça o prebiótico no balde primeiro." : "O prebiótico ainda não fermentou (24 h)."; break; }
         const nb = bd.n || 1;
-        if (b.fase === "simbio" && !b.morta) { const cab = Math.min(100, b.litros + 20 * nb) - b.litros, fr = nb > 0 ? cab / (20 * nb) : 0; b.litros += cab; b.Cg = (b.Cg || 0) + 331.3 * nb * fr; b.Ng = (b.Ng || 0) + 13.03 * nb * fr; /* só entra o carbono do que coube */ b.tf = st.t; bd.on = false; msg = `${nb} balde${nb > 1 ? "s" : ""} novo${nb > 1 ? "s" : ""} de prebiótico na bombona (${Math.round(b.litros)} L). Depois de 24 h de ar, tire os 20 L do dia.`; min = TEMPO.bombona; logA(st, msg); break; }
+        if (b.fase === "simbio" && !b.morta) { if (!gasta(st, "bactrat", 30 * nb)) { ok = false; msg = "Falta Bactrat P (30 g a cada balde, rotina do Wagner)."; break; } const cab = Math.min(100, b.litros + 20 * nb) - b.litros, fr = nb > 0 ? cab / (20 * nb) : 0; b.litros += cab; b.Cg = (b.Cg || 0) + 331.3 * nb * fr; b.Ng = (b.Ng || 0) + 13.03 * nb * fr; /* só entra o carbono do que coube */ b.tf = st.t; bd.on = false; msg = `${nb} balde${nb > 1 ? "s" : ""} novo${nb > 1 ? "s" : ""} de prebiótico na bombona (${Math.round(b.litros)} L). Depois de 24 h de ar, tire os 20 L do dia.`; min = TEMPO.bombona; logA(st, msg); break; }
         if (b.fase !== "vazia") { ok = false; msg = "A bombona ainda tem simbiótico. Use ou descarte antes."; break; }
         if (!gasta(st, "bactrat", 30)) { ok = false; msg = "Falta Bactrat P."; break; }
         Object.assign(b, { fase: "simbio", t0: st.t, tf: st.t, pH: 7.2, litros: 20 * nb, Cg: 331.3 * nb, Ng: 13.03 * nb, qual: 0, bicarb: false, cat: false, avisou2: false, morta: false }); bd.on = false;
@@ -986,7 +986,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     let trava = 1; const add = (f, t) => { trava = Math.min(trava, f); m.push(t); };
     const od = leit(st, "od", 26), tan = leit(st, "tan", 74), no2 = leit(st, "no2", 74), cone = leit(st, "cone", 50), tp = leit(st, "temp", 26);
     if (od) { if (od.v < 3) add(0, `OD ${od.v} mg/L: SUSPENDER o trato.`); else if (od.v < 4) add(0.8, `OD ${od.v} mg/L: baixar 20% e Nutrat em dobro.`); }
-    if (tan && tan.v > 1) { const ph = leit(st, "ph", 74), sl = leit(st, "sal", 240), x = ph ? tan.v * nh3Frac(tp ? tp.v : 28, sl ? sl.v : 25, ph.v) : null, cr = tan.v > 3 || (x != null && x > 0.1); add(cr ? 0.7 : 1, cr ? `Amônia ${tan.v} mg/L: nível crítico, baixar 30% e dar açúcar.` : `Amônia ${tan.v} mg/L: alerta, dar açúcar e manter a ração.`); } /* igual ao app: corte só acima de 3 ou NH3 > 0,1 (Lin e Chen 2001; Alune 2020) */
+    if (tan && (tan.v > 1 || (() => { const p = leit(st, "ph", 74), sl = leit(st, "sal", 240); return p && tan.v * nh3Frac(tp ? tp.v : 28, sl ? sl.v : 25, p.v) > 0.1; })())) { const ph = leit(st, "ph", 74), sl = leit(st, "sal", 240), x = ph ? tan.v * nh3Frac(tp ? tp.v : 28, sl ? sl.v : 25, ph.v) : null, cr = tan.v > 3 || (x != null && x > 0.1); add(cr ? 0.7 : 1, cr ? `Amônia ${tan.v} mg/L: nível crítico, baixar 30% e dar açúcar.` : `Amônia ${tan.v} mg/L: alerta, dar açúcar e manter a ração.`); } /* igual ao app: corte só acima de 3 ou NH3 > 0,1 (Lin e Chen 2001; Alune 2020) */
     if (no2 && no2.v > 1) add(no2.v > 5 ? 0.85 : 1, no2.v > 5 ? `Nitrito ${no2.v} mg/L: nível crítico, baixar 15%.` : `Nitrito ${no2.v} mg/L: alerta, alcalinidade no alto, ração mantida.`); /* igual ao app (Lin e Chen 2003) */
     if (cone && cone.v > 20) add(0.85, `Cone ${cone.v} mL/L: baixar 15% e Nutrat em dobro.`);
     if (tp && (tp.v < 22 || tp.v > 33)) add(0.75, `Temperatura ${tp.v} °C: baixar 25%.`); else if (tp && tp.v < 26) add(0.9, `Temperatura ${tp.v} °C: baixar 10%.`);
@@ -1562,7 +1562,7 @@ function bombona() {
       c.appendChild(bt("Encher o balde de simbiótico e levar ao tanque", () => pega("simb"), hb >= 24 ? "p" : ""));
       let arm = false; const d = bt("Descartar e lavar a bombona", () => { if (!arm) { arm = true; d.textContent = "Toque de novo para confirmar"; return; } faz("bombona_descartar"); bombona(); }, "r"); c.appendChild(d);
     }
-    if (G.modo === "aprender") P(c, "Dica: o pH da bombona cai a cada hora. Abaixo de 5 as bactérias morrem. Mantenha entre 7,0 e 7,5: abaixo de 7, ponha 80 g de bicarbonato (caderno). Rotina: 4 baldes na partida, depois 1 balde por dia; 24 h depois saem 20 L para o tanque.", "nota");
+    if (G.modo === "aprender") P(c, "Dica: o pH da bombona cai a cada hora. Abaixo de 5 as bactérias morrem. Mantenha entre 7,0 e 7,5: abaixo de 7, ponha 80 g de bicarbonato (faixa do caderno; a dose é regra do app). Rotina: 4 baldes na partida, depois 1 balde por dia; 24 h depois saem 20 L para o tanque.", "nota");
   });
 }
 function registroAgua() {
