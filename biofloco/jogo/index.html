@@ -471,6 +471,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     // fome e canibalismo [M]
     hz.fome = cm.fome > 0.6 ? 0.0006 * (cm.fome - 0.6) / 0.4 : 0;
     hz.canibalismo = 0.0006 * cm.pm * (1 - cm.casca) * (0.5 + cm.fome) * (st.cfg.densidade / 500);
+    hz.espaco = cm.W >= 6 ? interp([[0, 0], [1111, 0], [1388, 0.0097], [1667, 0.0135], [2500, 0.025]], st.cfg.densidade / TANK.depth) / 24 : 0; // [E] Fróes et al. 2013 (Pesq Agropec Bras 48:878), 6–12 g em 40 dias: até 1.111/m³ 91–95%, 1.388/m³ 63%, 1.667/m³ 54%; autores: espaço e canibalismo
     // doenças
     const d = cm.doencas, diasCult = (st.t - cm.povoado) / 1440;
     hz.vibriose = a.vib > 4.6 ? 0.00025 * (a.vib - 4.6) * (0.5 + cm.estresse) : 0;
@@ -701,7 +702,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       case "acucar": { if (!precisaAgua()) break; const g = p.g || 0; if (!gasta(st, "acucar", g)) { ok = false; msg = "Falta açúcar."; break; }
         a.C += 0.42 * g / V; msg = `${g} g de açúcar dissolvido: carbono rápido para as bactérias.`; min = TEMPO.aplicar; logA(st, msg); break; }
       case "farelo": { if (!precisaAgua()) break; const g = p.g || 0; if (!gasta(st, "farelo", g)) { ok = false; msg = "Falta farelo."; break; }
-        a.C += 0.4 * g * 0.6 / V; a.OMc += 0.4 * g * 0.25 / V; a.H += 0.25 * g / V; a.TAN += 0.02 * g * 0.2 / V;
+        a.C += 0.43 * g * 0.6 / V; a.OMc += 0.43 * g * 0.25 / V; a.H += 0.25 * g / V; a.TAN += 0.02 * g * 0.2 / V;
         msg = `${g} g de farelo de arroz (puim) espalhado.`; min = TEMPO.aplicar; logA(st, msg); break; }
       case "simbiotico": { if (!precisaAgua()) break; const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Não há simbiótico na bombona."; break; }
         const L = Math.min(p.L || 20, 75); const q = b.morta ? 0.05 : b.qual; const f = L / V;
@@ -781,7 +782,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         const pH = pHcalc(a.alk, a.CO2), nh3 = a.TAN * nh3Frac(a.T, a.S, pH);
         const apT = interp(APT, a.T); // Zhang 2025 [E]
         const apOD = a.DO < 3 ? 0.2 : a.DO < 4 ? 0.6 : 1;
-        const ap = apT * apOD * (janelaMuda(agoraMs(st)) ? 0.8 : 1) * (nh3 > 0.3 ? 0.7 : 1) * (1 - 0.4 * cm.estresse) * (cm.doencas.wssv > 0.3 ? 0.3 : 1) * (cm.doencas.fezes ? 0.8 : 1);
+        const ap = apT * apOD * (janelaMuda(agoraMs(st)) && !(st.cfg.xu) ? 0.6 : 1) /* Molina 2000: consumo cai 35–50% na muda */ * (nh3 > 0.3 ? 0.7 : 1) * (1 - 0.4 * cm.estresse) * (cm.doencas.wssv > 0.3 ? 0.3 : 1) * (cm.doencas.fezes ? 0.8 : 1);
         const porTrato = cm.demandaHoje / horasTrato(cm.W).length * 1.25; // tratos da tabela do app
         const capac = porTrato * ap * (0.95 + cm.fome); // [M] apetite calibrado para a conversão cair em 1,25–2 (limiares-e-fontes.md §15: FAO 583, Fóes)
         const comido = Math.min(g, capac); const sobra = g - comido;
@@ -979,7 +980,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     if (no2 && no2.v > 1) add(0.85, `Nitrito ${no2.v} mg/L: baixar 15%.`);
     if (cone && cone.v > 20) add(0.85, `Cone ${cone.v} mL/L: baixar 15% e Nutrat em dobro.`);
     if (tp && (tp.v < 22 || tp.v > 33)) add(0.75, `Temperatura ${tp.v} °C: baixar 25%.`); else if (tp && tp.v < 26) add(0.9, `Temperatura ${tp.v} °C: baixar 10%.`);
-    const jm = janelaMuda(agoraMs(st)); if (jm) add(0.8, `Janela de muda (${jm}): baixar 20%.`); else if (cm.pm > 0.15) add(0.85, "Muda vista (cascas boiando): baixar 15%. O camarão come menos logo antes e logo depois da muda (Bardera 2019).");
+    const jm = st.cfg.xu ? null : janelaMuda(agoraMs(st)); if (jm) add(0.6, `Janela de muda (${jm}): baixar 40% (Molina 2000).`); else if (cm.pm > 0.15 && !st.cfg.xu) add(0.6, "Muda vista (cascas boiando): baixar 40%. O camarão come menos logo antes e logo depois da muda (Bardera 2019).");
     cm.travaHoje = trava > 0 ? trava : 1;
     const final = Math.round(base * trava);
     return { L, pct, tabela, final, porTrato: Math.round(final / horasTrato(L.W).length), nt: horasTrato(L.W).length, horas: horasTrato(L.W), motivos: m, janela: jm };
@@ -1060,6 +1061,9 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       if (h === 8 && X.troca !== false && uma("xutroca")) { const T = tss(a); if (T > 500) A("troca", { L: Math.round(a.V * Math.min(0.079, 1 - 450 / T)) }); }
       if ((st.t - cm.povoado) / 1440 >= X.dias) { A("despesca", { fracao: 1 }); return; }
     }
+    if (!pf.xu && (st.cfg.densidade > 600 || tss(a) > 500)) { // acima da densidade do manual ou SST > 500: manejo de maior sobrevivência dos estudos de alta densidade (Xu 2025; Samocha 2012): ar contínuo e troca para segurar SST em 200–500
+      if (st.estufa.aeracao !== "max") A("aeracao", { nivel: "max" });
+      if (h === 8 && uma("adtroca")) { const T = tss(a); if (T > 500) A("troca", { L: Math.round(a.V * Math.min(0.079, 1 - 450 / T)) }); } }
     const jm = pf.lua ? janelaMuda(agoraMs(st)) : null; const dc = Math.floor((st.t - cm.povoado) / 1440);
     if (h === 6 && uma("manha")) {
       if (pf.medir) { st.obsEspuma = espuma(st); medir(st, "od"); medir(st, "temp"); medir(st, "ph"); if (dc % 2 === 0) { medir(st, "tan"); medir(st, "no2"); medir(st, "cone"); } if (dc % 2 === 1) medir(st, "alk"); if (dc % 5 === 0) medir(st, "sal"); if (dc % 10 === 0) medir(st, "no3"); }
@@ -1081,7 +1085,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       if (pf.despescar && ((pw && pw.t > cm.povoado && pw.v >= pf.alvo) || (est && est.W >= pf.alvo + 1) || dc >= pf.maxDias)) { A("despesca", { fracao: 1 }); return; }
     }
     if (h === 8 && uma("acad")) A("aeracao", { nivel: "max" });
-    if (h === 9 && uma("acad2") && !(jm && pf.lua) && !pf.xu) A("aeracao", { nivel: "normal" });
+    if (h === 9 && uma("acad2") && !(jm && pf.lua) && !pf.xu && st.cfg.densidade <= 600) A("aeracao", { nivel: "normal" });
     if (h === 17 && uma("tarde") && pf.nutrat && P.nut2 > 0) A("nutrat", { mL: P.nut2 });
     if (pf.sombrite && [6, 9, 12, 15, 18].includes(h) && uma("somb" + h)) { const t = pf.medir ? medir(st, "temp").v : a.T, sol = st.clima.tipo === "sol";
       const phA = leit(st, "ph", 8); if (pf.medir && h >= 9) medir(st, "ph");
@@ -1106,7 +1110,7 @@ TX.itens = {
   nutrat: { n: "Nutrat", d: "Biossurfactante emulsificante: solta a gordura e a matéria orgânica para as bactérias. Espuma tipo Sprite.", cor: "#3aa0c8", onde: "tanque", un: "mL", max: 80, passo: 5, ac: "nutrat", par: "mL", t: "1 mL por m³ por dia, diluído em 2 L, sobre os difusores. Em dobro com espuma crespa, cone alto ou lua. Age como emulsificante (quebra gordura e ajuda a degradar a sujeira); não aumenta o oxigênio. O tamanho do efeito não tem estudo." },
   bactrat: { n: "Bactrat P", d: "Probiótico: 4 Bacillus. Vai na bombona.", cor: "#d8d2c2", onde: "bombona" },
   catalisador: { n: "Catalisador de flocos", d: "Flocula o simbiótico na bombona.", cor: "#8a6fb3", onde: "bombona" },
-  farelo: { n: "Farelo de arroz (puim)", d: "Farelo de arroz peneirado, fermentado como no app: carbono.", cor: "#c9a36a", onde: "tanque", un: "g", max: 3000, passo: 50, ac: "farelo", par: "g", t: "Carbono para as bactérias que comem amônia. O app calcula 0,5 kg por kg de ração." },
+  farelo: { n: "Farelo de arroz (puim)", d: "Farelo de arroz peneirado, fermentado como no app: carbono (43% de carbono, Serra 2013; 1 kg de melaço = 0,86 kg de puim). Assenta: precisa de ar forte.", cor: "#c9a36a", onde: "tanque", un: "g", max: 3000, passo: 50, ac: "farelo", par: "g", t: "Carbono para as bactérias que comem amônia. O app calcula 0,5 kg por kg de ração." },
   acucar: { n: "Açúcar", d: "Carbono rápido para pico de amônia.", cor: "#f1efe6", onde: "tanque", un: "g", max: 3000, passo: 50, ac: "acucar", par: "g", t: "20 g para cada 1 g de amônia: amônia (mg/L) × volume (m³) × 20." },
   cal_hidratada: { n: "Cal hidratada", d: "Sobe alcalinidade e pH. Até 200 g por vez.", cor: "#e9e9e9", onde: "tanque", un: "g", max: 200, passo: 25, ac: "cal_hidratada", par: "g", t: "De manhã, quando o pH caiu. Dose pequena: muita cal de uma vez dispara o pH e a amônia fica tóxica." },
   gesso: { n: "Gesso agrícola", d: "Decantado no balde: só o líquido leitoso.", cor: "#b9c2c9", onde: "tanque", un: "balde", max: 3, passo: 1, min: 1, ac: "gesso", par: "g", mult: 600, t: "600 g por balde com água do tanque. Passe de um balde para outro e jogue só o leitoso sobre os difusores." },
@@ -1165,7 +1169,7 @@ TX.quiz = {
   temp: { q: "A água passou de 32 °C. Qual o risco e o que fazer?", o: ["Cabe menos oxigênio e o camarão gasta mais: fechar o sombrite e reforçar o ar", "Nenhum, camarão gosta de calor", "Jogar gelo"], c: 0, e: "A 32 °C o teto de oxigênio cai e o consumo sobe. O crescimento começa a cair acima de 32. Sombrite fechado e ar forte." },
   ph: { q: "O pH passou de 8,5 no meio do dia, com água verde. O que está acontecendo?", o: ["As algas consomem o CO₂ com a luz: fechar o sombrite", "Falta cal", "O kit está vencido"], c: 0, e: "Fotossíntese tira CO₂ e o pH sobe. Com pH alto a amônia fica muito mais tóxica. Menos luz segura as algas; ácido fosfórico só aos poucos e fora da janela de muda." },
   od: { q: "O oxigênio deu abaixo de 4 mg/L. Ordem certa?", o: ["Ar no máximo, suspender o trato, Oxitrat se cair de 3", "Dar ração para animar", "Desligar o decantador e dormir"], c: 0, e: "Primeiro o ar. Comida em OD baixo vira sobra e gasta mais oxigênio. Abaixo de 2,8 já é hipóxia; perto de 0,65 mata em meia hora (Vinatea 2009)." },
-  janela_muda: { q: "Começou a janela de muda da lua. O que muda no manejo?", o: ["Ração −20%, ar reforçado, nada de ácido nem cal, sem biometria", "Dobrar a ração para dar energia", "Trocar água para limpar as cascas"], c: 0, e: "Camarão de casca mole come menos e fica 2 a 3 vezes mais sensível a amônia e oxigênio baixo. pH parado e alcalinidade em 150–180 ajudam a casca a endurecer." },
+  janela_muda: { q: "Começou a janela de muda da lua. O que muda no manejo?", o: ["Ração −40% por 3 a 4 dias, ar reforçado, nada de ácido nem cal, sem biometria", "Dobrar a ração para dar energia", "Trocar água para limpar as cascas"], c: 0, e: "Camarão de casca mole come menos e fica 2 a 3 vezes mais sensível a amônia e oxigênio baixo. pH parado e alcalinidade em 150–180 ajudam a casca a endurecer." },
   povoou: { q: "Larvas no tanque. O que elas mais precisam nos primeiros dias?", o: ["Tratos pequenos e frequentes, ar e simbiótico todo dia", "Muita ração para crescer logo", "Sombrite sempre fechado"], c: 0, e: "A biomassa é minúscula: sobra de ração suja a água antes de o floco existir. O simbiótico diário forma o floco e segura o Vibrio." }
 };
 
@@ -1201,13 +1205,13 @@ TX.emerg = [
   ["Água acima de 32 °C", "Sombrite fechado, ar forte, ração −25% acima de 33."]
 ];
 TX.ritual = ["Olhar a espuma e a cor da água", "Medir oxigênio, temperatura e pH", "Nutrat sobre os difusores", "Simbiótico da bombona", "Bicarbonato de rotina e puim", "Academia: 1 h de ar no máximo às 8 h", "Tratos no número da tabela (6 a 3 por dia, conforme o peso), com bandeja", "Sombrite conforme o sol", "Segunda-feira: rodo no fundo", "Balde de prebiótico e bombona em dia"];
-TX.fonte = { amonia: "Lin e Chen 2001", nitrito: "Lin e Chen 2003", oxigenio: "Vinatea 2009; FURG 2022", calor: "Kumlu e Türkmen 2010; crônico é modelo", frio: "Kumlu e Türkmen 2010", pH: "modelo do jogo (sem estudo de faixa letal)", nitrato: "Kuhn 2010; Furtado 2015", cloro: "regra de zero cloro (sem estudo)", sulfeto: "Li 2017", salinidade: "Burbano-Gallardo 2017", aclimatacao: "Burbano-Gallardo 2017; Winarni 2022", canibalismo: "modelo da muda", natural: "perda de fundo (modelo)", fome: "modelo", vibriose: "Samocha; modelo", ahpnd: "WOAH", mancha_branca: "Millard 2020; Granja 2006", mionecrose: "modelo", nhp: "modelo", bolha: "modelo", co2: "Furtado 2017", caibra: "Roy 2007", manejo_muda: "modelo da muda (manual: nada de manejo na janela)" };
-TX.causa = { amonia: "Amônia", nitrito: "Nitrito", oxigenio: "Falta de oxigênio", calor: "Calor", frio: "Frio", pH: "pH fora da faixa", nitrato: "Nitrato", cloro: "Cloro", sulfeto: "H₂S do fundo", salinidade: "Choque de salinidade", aclimatacao: "Soltura sem aclimatar", canibalismo: "Canibalismo na muda", natural: "Perda normal", fome: "Fome", vibriose: "Vibriose", ahpnd: "AHPND", mancha_branca: "Mancha branca", mionecrose: "Mionecrose", nhp: "NHP", bolha: "Bolha de gás", co2: "CO₂", caibra: "Cãibra", manejo_muda: "Manejo na janela de muda" };
+TX.fonte = { espaco: "Fróes et al. 2013 (densidade acima de 1.111/m³)", amonia: "Lin e Chen 2001", nitrito: "Lin e Chen 2003", oxigenio: "Vinatea 2009; FURG 2022", calor: "Kumlu e Türkmen 2010; crônico é modelo", frio: "Kumlu e Türkmen 2010", pH: "modelo do jogo (sem estudo de faixa letal)", nitrato: "Kuhn 2010; Furtado 2015", cloro: "regra de zero cloro (sem estudo)", sulfeto: "Li 2017", salinidade: "Burbano-Gallardo 2017", aclimatacao: "Burbano-Gallardo 2017; Winarni 2022", canibalismo: "modelo da muda", natural: "perda de fundo (modelo)", fome: "modelo", vibriose: "Samocha; modelo", ahpnd: "WOAH", mancha_branca: "Millard 2020; Granja 2006", mionecrose: "modelo", nhp: "modelo", bolha: "modelo", co2: "Furtado 2017", caibra: "Roy 2007", manejo_muda: "modelo da muda (manual: nada de manejo na janela)" };
+TX.causa = { espaco: "Falta de espaço (densidade alta)", amonia: "Amônia", nitrito: "Nitrito", oxigenio: "Falta de oxigênio", calor: "Calor", frio: "Frio", pH: "pH fora da faixa", nitrato: "Nitrato", cloro: "Cloro", sulfeto: "H₂S do fundo", salinidade: "Choque de salinidade", aclimatacao: "Soltura sem aclimatar", canibalismo: "Canibalismo na muda", natural: "Perda normal", fome: "Fome", vibriose: "Vibriose", ahpnd: "AHPND", mancha_branca: "Mancha branca", mionecrose: "Mionecrose", nhp: "NHP", bolha: "Bolha de gás", co2: "CO₂", caibra: "Cãibra", manejo_muda: "Manejo na janela de muda" };
 
 // Desafios do dia: dia de cultivo, hora de início, o que estraga, prazo e como se ganha.
 TX.desafios = [
   { id: "amonia", n: "Pico de amônia", dc: 32, h: 7, horas: 36, txt: "Dia 32. A amônia subiu durante a noite e o pH está alto. Você tem 36 horas para trazer a amônia para menos de 1 mg/L sem perder mais de 2% do lote.",
-    mut: s => { s.agua.TAN = 4; s.agua.CO2 *= 0.45; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 2, "Perda menor que 2% (foi " + perda.toFixed(1) + "%)"]] },
+    mut: s => { s.agua.TAN = 4.5; s.agua.CO2 *= 0.45; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 2, "Perda menor que 2% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "noite", n: "Madrugada pesada", dc: 88, h: 21, horas: 11, txt: "Dia 88, 21 h. O tanque está carregado de sólidos e sobrou ração. Segure o oxigênio em 5 mg/L ou mais até as 8 h.",
     mut: s => { s.agua.OMc += 95; s.agua.H += 450; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[mn.DO >= 5, "Oxigênio mínimo de 5 (foi " + mn.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "alc", n: "Alcalinidade despencando", dc: 60, h: 6, horas: 48, txt: "Dia 60. A alcalinidade caiu para perto de 75 e o pH vem junto. Em 48 horas leve a alcalinidade a 140 ou mais sem deixar o pH passar de 8,6.",
@@ -1356,7 +1360,7 @@ function tarefas() {
   // camarão no tanque
   const AC = { od: "ar no máximo, suspender o trato e Oxitrat se cair de 3", temp: "fechar o sombrite e reforçar o ar", ph: "fechar o sombrite; ácido fosfórico aos poucos fora da lua", sal: "repor água doce sem cloro", alk: "bicarbonato", tan: "baixar a ração e dar açúcar", no2: "segurar a ração, ar e alcalinidade acima de 150", no3: "troca parcial de água", cone: "ligar o decantador e Nutrat em dobro" };
   E.appAlertas(st).forEach(x => add(x.txt + ". O que fazer: " + AC[x.k] + ".", "Celular › Socorro", x.nivel === "crit" ? 2 : 1));
-  const jm = E.janelaMuda(E.agoraMs(st)); if (jm) add("Janela de muda (" + jm + "): ração −20%, ar no máximo, nada de ácido, cal ou biometria.", "", 1);
+  const jm = E.janelaMuda(E.agoraMs(st)); if (jm) add("Janela de muda (" + jm + "): ração −40%, ar no máximo, nada de ácido, cal ou biometria.", "", 1);
   if (!j.medir) { if (!le("od", 12) || !le("temp", 12) || !le("ph", 12)) add("Medir oxigênio, temperatura e pH.", "Bancada de análises", 1);
     if (!le("tan", 48) || !le("no2", 48)) add("Medir amônia e nitrito.", "Bancada de análises"); if (!le("alk", 72)) add("Medir a alcalinidade.", "Bancada de análises"); if (!le("cone", 48)) add("Medir o cone Imhoff.", "Bancada de análises");
     const pw = E.leit(st, "peso"), dc = (st.t - cm.povoado) / 1440; if (dc >= 7 && !jm && (!pw || pw.t < cm.povoado || st.t - pw.t > 7 * 1440)) add("Fazer a biometria da semana.", "Ferramentas: puçá e balança"); }
@@ -1599,7 +1603,7 @@ function celular(ini) {
     } else if (i === 1) {
       const ds = E.appDoses(st); if (!ds.length) P(b, "Encha o tanque primeiro.");
       ds.forEach(d => { const x = el("div", "dose"); x.appendChild(el("b", "", d.nome + ": " + (typeof d.qtd === "number" ? nf(d.qtd) + " " + d.un : d.qtd))); x.appendChild(el("div", "nota", d.txt)); x.appendChild(el("span", "tag", d.base === "estudo" ? "estudo" : "prática de campo")); b.appendChild(x); });
-    } else if (i === 2) { TX.ritual.forEach((t, n) => P(b, (n + 1) + ". " + t)); P(b, "Na janela da lua: ração −20%, ar no máximo, sem biometria, sem mexer no pH.", "nota"); }
+    } else if (i === 2) { TX.ritual.forEach((t, n) => P(b, (n + 1) + ". " + t)); P(b, "Na janela da lua: ração −40%, ar no máximo, sem biometria, sem mexer no pH.", "nota"); }
     else if (i === 3) TX.emerg.forEach(([t, x]) => { const d = el("div", "dose"); d.appendChild(el("b", "", t)); d.appendChild(el("div", "", x)); b.appendChild(d); });
     else {
       P(b, "O ajudante repete as tarefas que você já fez pelo menos uma vez. Ele segue o celular, então depende das medidas em dia. Enquanto ele trabalha o relógio anda.");
