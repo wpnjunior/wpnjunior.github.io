@@ -204,9 +204,10 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
   function janelaMuda(ms) { const a = idadeLua(ms); const dN = Math.min(a, SINODICO - a), dC = Math.abs(a - 14.765); return dN <= 2 ? "lua nova" : dC <= 2 ? "lua cheia" : null; }
 
   /* ---------- química ---------- */
-  function doSat(T, S) { // mg/L, água doce × fator de salinidade [E aprox.]
-    const f = 14.62 - 0.3898 * T + 0.006969 * T * T - 0.00005897 * T * T * T;
-    return f * (1 - 0.0034 * S) * 1.08; // ~7,2 mg/L a 28 °C e 25 ppt, +8% pela coluna de 0,87 m [decisão do Wagner]
+  function doSat(T, S) { // mg/L, saturação com ar pela equação de Weiss 1970 (mesma da tabela Benson e Krause). Sem bônus de coluna (Wagner, 22/11: "Tirar")
+    const K = (T + 273.15) / 100;
+    const lnC = -173.4292 + 249.6339 / K + 143.3483 * Math.log(K) - 21.8492 * K + S * (-0.033096 + 0.014259 * K - 0.0017 * K * K);
+    return Math.exp(lnC) * 1.429; // mL/L → mg/L
   }
   function pHcalc(alk, co2) { const pK1 = 5.95; const r = (Math.max(alk, 1) / 50) / (Math.max(co2, 0.05) / 44); return clamp(pK1 + Math.log10(r), 5.0, 9.9); }
   function nh3Frac(T, S, pH) { // Emerson + força iônica [E: EPA 1989]
@@ -347,7 +348,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     // difusores do tanque (pedido do Wagner, 22/11): disco de membrana de 260 mm, bolha fina de 1 a 3 mm, soltos no fundo, 1 por m² (~22 no tanque; regra do caderno Só Bioflocos).
     // Duas funções: oxigenar e manter os sólidos em suspensão. Vazão do modelo não confirmada: o kLa segue a calibração de 1 difusor/m² [M].
     // O Nutrat NÃO mexe no kLa: surfactante na bolha baixa a troca de oxigênio (Rosso 2006) e, a 1 mL/m³, o efeito deve ser pequeno (pesquisa-oxigenio §B).
-    let kla = st.estufa.aeracao === "max" ? 4.4 : 2.8; // /h [M calibrado: 1 difusor/m²]
+    let kla = st.estufa.aeracao === "max" ? 6.6 : 4.2; // /h [M calibrado: 1 difusor/m²]. ×1,5 em 22/11 quando a saturação passou para a tabela (sem os 8%): mantém a mesma entrada de oxigênio com OD 5 mg/L e baixa só o teto
     if (a.diasSemRodo > 10) kla *= 0.93;
     const TSS = tss(a);
     // respirações (mg O2/L/h)
@@ -1173,7 +1174,7 @@ TX.gloss = [
   ["Nitrito", "Segunda etapa da nitrificação. Em água salgada o cloreto protege o camarão."],
   ["Nitrato", "Produto final. Acumula no fim do ciclo; até 177 mg/L foi aceitável (Furtado 2015)."],
   ["Alcalinidade", "Reserva que segura o pH. Meta 150 a 180 mg/L."],
-  ["Oxigênio dissolvido (OD)", "Só com ar o teto é cerca de 7,2 mg/L a 28 °C e 25 ppt. Os difusores de disco (bolha fina, 1 por m²) chegam perto do teto. O Nutrat não mexe no oxigênio: ele limpa a matéria orgânica que o gasta."],
+  ["Oxigênio dissolvido (OD)", "Só com ar o teto é cerca de 6,8 mg/L a 28 °C e 25 ppt (tabela de saturação). Os difusores de disco (bolha fina, 1 por m²) chegam perto do teto. O Nutrat não mexe no oxigênio: ele limpa a matéria orgânica que o gasta."],
   ["Cone Imhoff", "Mede o volume de floco em 1 litro. Meta 10 a 15 mL/L."],
   ["Floco", "Grumos de bactérias, algas e restos. Come amônia e vira alimento."],
   ["Prebiótico", "Farelo, açúcar e bicarbonato fermentando 24 h no balde fechado."],
@@ -1219,8 +1220,8 @@ TX.desafios = [
     mut: s => { s.agua.alg = 115; s.agua.TAN = Math.max(s.agua.TAN, 1.5); s.estufa.sombrite = false; s.clima.tipo = "sol"; }, fim: (v, perda, mn, mx) => [[mx.nh3fim <= 0.1, "Amônia tóxica até 0,1 mg/L no segundo dia (foi " + mx.nh3fim.toFixed(2) + ")"], [perda < 1, "Perda menor que 1%"]] },
   { id: "floco", n: "Floco morto", dc: 55, h: 6, horas: 36, txt: "Dia 55. O floco morreu: água acinzentada e amônia em 5 mg/L. Em 36 horas traga a amônia para menos de 1 sem perder mais de 5% do lote.",
     mut: s => { s.agua.H *= 0.2; s.agua.Bac = 0; s.agua.AOB *= 0.25; s.agua.NOB *= 0.25; s.agua.C = 0; s.agua.TAN = 5; s.agua.colapso = 1; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 5, "Perda menor que 5% (foi " + perda.toFixed(1) + "%)"]] }
-  ,{ id: "od3h", n: "Oxigênio caindo às 3 da manhã", dc: 80, h: 3, horas: 1, txt: "Dia 80, 3 h da manhã. O alarme tocou: oxigênio em 2,2 mg/L e camarão subindo para a borda. Cada minuto conta. Em 1 hora o oxigênio tem que estar em 6 ou mais, sem perder mais de 1% do lote.",
-    mut: s => { s.agua.DO = 2.2; s.agua.OMc += 100; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda) => [[v.DO >= 6, "Oxigênio em 6 ou mais às 4 h (ficou " + v.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
+  ,{ id: "od3h", n: "Oxigênio caindo às 3 da manhã", dc: 80, h: 3, horas: 1, txt: "Dia 80, 3 h da manhã. O alarme tocou: oxigênio em 2,2 mg/L e camarão subindo para a borda. Cada minuto conta. Em 1 hora o oxigênio tem que estar em 5 ou mais, sem perder mais de 1% do lote.",
+    mut: s => { s.agua.DO = 2.2; s.agua.OMc = 130; s.agua.H = 470; s.agua.T = 28; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda) => [[v.DO >= 5, "Oxigênio em 5 ou mais às 4 h (ficou " + v.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "sal", n: "Salinidade subiu com a evaporação", dc: 45, h: 7, horas: 24, txt: "Dia 45. Semanas de sol sem repor água: o nível baixou e a salinidade foi a 30 ppt. Em 24 horas traga a salinidade para 28,5 ou menos, sem perder mais de 1% do lote. Baixe devagar: no máximo 1 a 2 ppt por hora.",
     mut: s => { const f = 0.82; s.agua.S /= f; s.agua.V *= f; s.agua.S = Math.max(s.agua.S, 30); s.agua.SHist = s.agua.SHist.map(() => s.agua.S); } /* subiu em semanas: sem choque */, fim: (v, perda) => [[v.S <= 28.5, "Salinidade de 28,5 ou menos (ficou " + v.S.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "caibra", n: "Cãibra: falta potássio", dc: 65, h: 7, horas: 30, txt: "Dia 65. Na biometria apareceram camarões com o corpo dobrado e duro. Descubra o que falta e corrija em 30 horas: o potássio tem que chegar a pelo menos 80% do valor da água do mar na sua salinidade.",
