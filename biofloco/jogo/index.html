@@ -707,7 +707,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         msg = `${g} g de farelo de arroz (puim) espalhado.`; min = TEMPO.aplicar; logA(st, msg); break; }
       case "simbiotico": { if (!precisaAgua()) break; const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Não há simbiótico na bombona."; break; }
         const L = Math.min(p.L || 20, 75); const q = b.morta ? 0.05 : b.qual; const f = L / V;
-        a.Bac += 0.5 * f * q; a.H += 0.8 * f * q; a.C += (st.cfg.xu ? 0.9 : 2.7) * f; a.OMc += (st.cfg.xu ? 0.6 : 1.1) * f; /* cenário Xu mantém a calibração antiga (o estudo não usou nosso simbiótico).  carbono como no app: 1 balde (600 g puim × 43% + 250 g açúcar × 42%) em ~80 L = 4,5 g C/L; 60% solúvel, 25% matéria orgânica, como o puim (regra do app) */
+        a.Bac += 0.5 * f * q; a.H += 0.8 * f * q; a.C += (st.cfg.xu ? 0.9 : 10.9) * f; a.OMc += (st.cfg.xu ? 0.6 : 4.5) * f; /* cenário Xu mantém a calibração antiga (o estudo não usou nosso simbiótico).  carbono como no app: 1 balde (600 g puim × 43% + 250 g açúcar × 42%) por balde de 20 L = 18,2 g C/L (rotina do Wagner: 4 baldes na partida, depois 1 balde por dia e saem 20 L); 60% solúvel, 25% matéria orgânica, como o puim (regra do app) */
         if (b.cat) { a.cat = 1; }
         a.AOB += 0.00002 * f; // bombona com água madura traz pouca nitrificante
         b.litros -= L; if (b.litros <= 5) { b.fase = "vazia"; b.cat = false; b.bicarb = false; }
@@ -997,7 +997,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     const nb = Math.round(V);
     out.push({ k: "nutrat", nome: "Nutrat", qtd: mot.length ? nb * 2 : nb, un: "mL", dobra: mot.length > 0, txt: mot.length ? `Em dobro (${nb} mL de manhã + ${nb} mL à tarde) porque: ${mot.join(", ")}.` : "1 mL por m³, diluído em 2 L, sobre os difusores.", base: "campo" });
     const form = dias == null || dias < 30;
-    out.push({ k: "simbiotico", nome: "Simbiótico da bombona", qtd: Math.round((form ? 1 : 0.75) * V), un: "L", txt: form ? "Formação do floco: 1 L por m³ por dia." : "Manutenção: 0,5 a 1 L por m³ por dia.", base: "campo" });
+    out.push({ k: "simbiotico", nome: "Simbiótico da bombona", qtd: Math.round(1 * V), un: "L", txt: "Rotina do Wagner: 20 L por dia (1 L por m³), tirados da bombona de 80 L que recebe 1 balde de prebiótico por dia.", base: "campo" });
     if (kg > 0) {
       out.push({ k: "bicarbonato", nome: "Bicarbonato de rotina", qtd: Math.round(250 * kg), un: "g", txt: `0,25 kg por kg de ração × ${kg.toFixed(2)} kg.`, base: "estudo" });
       out.push({ k: "farelo", nome: "Farelo de arroz fermentado (carbono)", qtd: Math.round(500 * kg), un: "g", txt: `0,5 kg por kg de ração × ${kg.toFixed(2)} kg, Carbono principal, como no app. Leva a relação C:N para perto de 10.`, base: "estudo" });
@@ -1213,7 +1213,7 @@ TX.causa = { espaco: "Falta de espaço (densidade alta)", amonia: "Amônia", nit
 // Desafios do dia: dia de cultivo, hora de início, o que estraga, prazo e como se ganha.
 TX.desafios = [
   { id: "amonia", n: "Pico de amônia", dc: 32, h: 7, horas: 36, txt: "Dia 32. A amônia subiu durante a noite e o pH está alto. Você tem 36 horas para trazer a amônia para menos de 1 mg/L sem perder mais de 2% do lote.",
-    mut: s => { s.agua.TAN = 4.5; s.agua.CO2 *= 0.45; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 2, "Perda menor que 2% (foi " + perda.toFixed(1) + "%)"]] },
+    mut: s => { s.agua.TAN = 5.5; s.agua.CO2 *= 0.45; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 2, "Perda menor que 2% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "noite", n: "Madrugada pesada", dc: 88, h: 21, horas: 11, txt: "Dia 88, 21 h. O tanque está carregado de sólidos e sobrou ração. Segure o oxigênio em 5 mg/L ou mais até as 8 h.",
     mut: s => { s.agua.OMc += 95; s.agua.H += 450; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[mn.DO >= 5, "Oxigênio mínimo de 5 (foi " + mn.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "alc", n: "Alcalinidade despencando", dc: 60, h: 6, horas: 48, txt: "Dia 60. A alcalinidade caiu para perto de 75 e o pH vem junto. Em 48 horas leve a alcalinidade a 140 ou mais sem deixar o pH passar de 8,6.",
@@ -1222,8 +1222,8 @@ TX.desafios = [
     mut: s => { s.clima.calor = 4; s.clima.solForcado = 3; s.clima.frente = 0; s.clima.tMedDia = Math.max(s.clima.tMedDia, 26); s.clima.tipo = "sol"; s.estufa.sombrite = false; s.agua.T = 32.2; }, fim: (v, perda, mn, mx) => [[mx.Ttarde <= 32.5, "Água até 32,5 °C (chegou a " + mx.Ttarde.toFixed(1) + ")"], [perda < 1, "Perda menor que 1%"]] },
   { id: "cone", n: "Cone alto e espuma crespa", dc: 75, h: 6, horas: 72, txt: "Dia 75. Floco demais: cone perto de 30. Em 72 horas traga o cone para menos de 22 sem deixar o oxigênio cair de 4.",
     mut: s => { s.agua.H = 650; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[v.cone < 22, "Cone abaixo de 22 (ficou " + v.cone.toFixed(0) + ")"], [mn.DO >= 4, "Oxigênio mínimo de 4 (foi " + mn.DO.toFixed(1) + ")"]] },
-  { id: "verde", n: "Água verde demais", dc: 20, h: 9, horas: 48, txt: "Dia 20. A água esverdeou forte e o pH dispara à tarde. A amônia está em 3 e, com pH alto, vira tóxica (NH₃). No segundo dia a amônia tóxica não pode passar de 0,1 mg/L.",
-    mut: s => { s.agua.alg = 115; s.agua.TAN = Math.max(s.agua.TAN, 3); s.estufa.sombrite = false; s.clima.tipo = "sol"; }, fim: (v, perda, mn, mx) => [[mx.nh3fim <= 0.1, "Amônia tóxica até 0,1 mg/L no segundo dia (foi " + mx.nh3fim.toFixed(2) + ")"], [perda < 1, "Perda menor que 1%"]] },
+  { id: "verde", n: "Água verde demais", dc: 20, h: 9, horas: 48, txt: "Dia 20. A água esverdeou forte e o pH dispara à tarde. A amônia está em 6 e, com pH alto, vira tóxica (NH₃). No segundo dia a amônia tóxica não pode passar de 0,1 mg/L.",
+    mut: s => { s.agua.alg = 115; s.agua.TAN = Math.max(s.agua.TAN, 6); s.estufa.sombrite = false; s.clima.tipo = "sol"; }, fim: (v, perda, mn, mx) => [[mx.nh3fim <= 0.1, "Amônia tóxica até 0,1 mg/L no segundo dia (foi " + mx.nh3fim.toFixed(2) + ")"], [perda < 1, "Perda menor que 1%"]] },
   { id: "floco", n: "Floco morto", dc: 55, h: 6, horas: 36, txt: "Dia 55. O floco morreu: água acinzentada e amônia em 5 mg/L. Em 36 horas traga a amônia para menos de 1 sem perder mais de 5% do lote.",
     mut: s => { s.agua.H *= 0.2; s.agua.Bac = 0; s.agua.AOB *= 0.25; s.agua.NOB *= 0.25; s.agua.C = 0; s.agua.TAN = 5; s.agua.colapso = 1; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 5, "Perda menor que 5% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "od3h", n: "Oxigênio caindo às 3 da manhã", dc: 80, h: 3, horas: 1, txt: "Dia 80, 3 h da manhã. O alarme tocou: oxigênio em 2,2 mg/L e camarão subindo para a borda. Cada minuto conta. Em 1 hora o oxigênio tem que estar em 5 ou mais, sem perder mais de 1% do lote.",
