@@ -707,7 +707,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         msg = `${g} g de farelo de arroz (puim) espalhado.`; min = TEMPO.aplicar; logA(st, msg); break; }
       case "simbiotico": { if (!precisaAgua()) break; const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Não há simbiótico na bombona."; break; }
         const L = Math.min(p.L || 20, 75); const q = b.morta ? 0.05 : b.qual; const f = L / V;
-        a.Bac += 0.5 * f * q; a.H += 0.8 * f * q; a.C += 0.9 * f; a.OMc += 0.6 * f;
+        a.Bac += 0.5 * f * q; a.H += 0.8 * f * q; a.C += (st.cfg.xu ? 0.9 : 2.7) * f; a.OMc += (st.cfg.xu ? 0.6 : 1.1) * f; /* cenário Xu mantém a calibração antiga (o estudo não usou nosso simbiótico).  carbono como no app: 1 balde (600 g puim × 43% + 250 g açúcar × 42%) em ~80 L = 4,5 g C/L; 60% solúvel, 25% matéria orgânica, como o puim (regra do app) */
         if (b.cat) { a.cat = 1; }
         a.AOB += 0.00002 * f; // bombona com água madura traz pouca nitrificante
         b.litros -= L; if (b.litros <= 5) { b.fase = "vazia"; b.cat = false; b.bicarb = false; }
@@ -1222,8 +1222,8 @@ TX.desafios = [
     mut: s => { s.clima.calor = 4; s.clima.solForcado = 3; s.clima.frente = 0; s.clima.tMedDia = Math.max(s.clima.tMedDia, 26); s.clima.tipo = "sol"; s.estufa.sombrite = false; s.agua.T = 32.2; }, fim: (v, perda, mn, mx) => [[mx.Ttarde <= 32.5, "Água até 32,5 °C (chegou a " + mx.Ttarde.toFixed(1) + ")"], [perda < 1, "Perda menor que 1%"]] },
   { id: "cone", n: "Cone alto e espuma crespa", dc: 75, h: 6, horas: 72, txt: "Dia 75. Floco demais: cone perto de 30. Em 72 horas traga o cone para menos de 22 sem deixar o oxigênio cair de 4.",
     mut: s => { s.agua.H = 650; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[v.cone < 22, "Cone abaixo de 22 (ficou " + v.cone.toFixed(0) + ")"], [mn.DO >= 4, "Oxigênio mínimo de 4 (foi " + mn.DO.toFixed(1) + ")"]] },
-  { id: "verde", n: "Água verde demais", dc: 20, h: 9, horas: 48, txt: "Dia 20. A água esverdeou forte e o pH dispara à tarde. A amônia está em 1,5 e, com pH alto, vira tóxica (NH₃). No segundo dia a amônia tóxica não pode passar de 0,1 mg/L.",
-    mut: s => { s.agua.alg = 115; s.agua.TAN = Math.max(s.agua.TAN, 1.5); s.estufa.sombrite = false; s.clima.tipo = "sol"; }, fim: (v, perda, mn, mx) => [[mx.nh3fim <= 0.1, "Amônia tóxica até 0,1 mg/L no segundo dia (foi " + mx.nh3fim.toFixed(2) + ")"], [perda < 1, "Perda menor que 1%"]] },
+  { id: "verde", n: "Água verde demais", dc: 20, h: 9, horas: 48, txt: "Dia 20. A água esverdeou forte e o pH dispara à tarde. A amônia está em 3 e, com pH alto, vira tóxica (NH₃). No segundo dia a amônia tóxica não pode passar de 0,1 mg/L.",
+    mut: s => { s.agua.alg = 115; s.agua.TAN = Math.max(s.agua.TAN, 3); s.estufa.sombrite = false; s.clima.tipo = "sol"; }, fim: (v, perda, mn, mx) => [[mx.nh3fim <= 0.1, "Amônia tóxica até 0,1 mg/L no segundo dia (foi " + mx.nh3fim.toFixed(2) + ")"], [perda < 1, "Perda menor que 1%"]] },
   { id: "floco", n: "Floco morto", dc: 55, h: 6, horas: 36, txt: "Dia 55. O floco morreu: água acinzentada e amônia em 5 mg/L. Em 36 horas traga a amônia para menos de 1 sem perder mais de 5% do lote.",
     mut: s => { s.agua.H *= 0.2; s.agua.Bac = 0; s.agua.AOB *= 0.25; s.agua.NOB *= 0.25; s.agua.C = 0; s.agua.TAN = 5; s.agua.colapso = 1; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 5, "Perda menor que 5% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "od3h", n: "Oxigênio caindo às 3 da manhã", dc: 80, h: 3, horas: 1, txt: "Dia 80, 3 h da manhã. O alarme tocou: oxigênio em 2,2 mg/L e camarão subindo para a borda. Cada minuto conta. Em 1 hora o oxigênio tem que estar em 5 ou mais, sem perder mais de 1% do lote.",
