@@ -344,8 +344,10 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
 
     /* oxigênio */
     const sat = doSat(a.T, a.S);
+    // difusores do tanque (pedido do Wagner, 22/11): disco de membrana de 260 mm, bolha fina de 1 a 3 mm, soltos no fundo, 1 por m² (~22 no tanque; regra do caderno Só Bioflocos).
+    // Duas funções: oxigenar e manter os sólidos em suspensão. Vazão do modelo não confirmada: o kLa segue a calibração de 1 difusor/m² [M].
+    // O Nutrat NÃO mexe no kLa: surfactante na bolha baixa a troca de oxigênio (Rosso 2006) e, a 1 mL/m³, o efeito deve ser pequeno (pesquisa-oxigenio §B).
     let kla = st.estufa.aeracao === "max" ? 4.4 : 2.8; // /h [M calibrado: 1 difusor/m²]
-    kla *= 1 + st.cfg.nutratForca * clamp(a.nutrat, 0, 1.5); // Nutrat: promessa do canal, força ajustável
     if (a.diasSemRodo > 10) kla *= 0.93;
     const TSS = tss(a);
     // respirações (mg O2/L/h)
@@ -386,7 +388,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     const yA = 0.054, yN = 0.0192;
     a.AOB += (yA * nitA - 0.002 * a.AOB) * dtH; a.NOB += (yN * nitN - 0.0015 * a.NOB) * dtH;
     a.AOB = Math.max(a.AOB, 2e-5); a.NOB = Math.max(a.NOB, 2e-5);
-    let decH = 0.0013 + (a.DO < 1 ? 0.03 : 0) + 0.002 * st.cfg.nutratForca * 5 * clamp(a.nutrat, 0, 1.5); // Nutrat acelera a oxidação [C]
+    let decH = 0.0013 + (a.DO < 1 ? 0.03 : 0) + 0.002 * st.cfg.nutratForca * 5 * clamp(a.nutrat, 0, 1.5); // Nutrat = biossurfactante emulsificante: solta gordura e matéria orgânica e acelera a oxidação/renovação do floco (Nadella 2020: emulsificante; caderno: sólidos caem em 12–36 h). Tamanho SEM FONTE (aposta do Wagner), força em cfg.nutratForca
     a.H += (imob * 8 * 0.7 - decH * a.H) * dtH; a.H = Math.max(a.H, 0.05);
     a.OMc += decH * a.H * 0.25 * dtH;
     a.Bac = Math.max(0, a.Bac - 0.025 * a.Bac * dtH);
@@ -407,7 +409,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     // sólidos: decantador, skimmer, lodo
     if (st.estufa.decantador) { a.H *= Math.exp(-0.12 / 24 * dtH); a.OMc *= Math.exp(-0.2 / 24 * dtH); }
     if (st.estufa.skimmer) { a.OMc *= Math.exp(-0.06 / 24 * dtH); }
-    const sedim = 0.0006 * TSS * (a.cat > 0.2 ? 0.5 : 1) * (1 + a.diasSemRodo / 10) * dtH; // g/m³ para o fundo
+    const sedim = 0.0006 * TSS * /* os difusores de disco mantêm o floco suspenso; sem rodo ficam pontos mortos e o lodo acumula */ (a.cat > 0.2 ? 0.5 : 1) * (1 + a.diasSemRodo / 10) * dtH; // g/m³ para o fundo
     a.lodo += sedim; a.H -= sedim * 0.5; a.OMc -= sedim * 0.25; a.H = Math.max(a.H, 0.05); a.OMc = Math.max(a.OMc, 0);
     // sulfeto: lodo + pouco oxigênio no fundo [M]
     const doFundo = a.DO - 0.6 - Math.min(a.diasSemRodo, 40) * 0.1;
@@ -1004,7 +1006,8 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       if (nh3 > 0.1) out.push({ k: "acido_fosforico", nome: "Ácido fosfórico", qtd: Math.round(0.5 * V), un: "mL", txt: `pH ${ph.v} com amônia tóxica ${nh3.toFixed(2)} mg/L: comece com 0,5 mL por m³, diluído em 10 L, longe dos camarões. Meça o pH 1 h depois; alvo 7,5–7,8. Repita em doses pequenas.`, base: "campo" }); }
     if (cone) { if (cone.v > 15 && !st.estufa.decantador) out.push({ k: "decantador", nome: "Decantador", qtd: "LIGAR", un: "", txt: `Cone ${cone.v} mL/L acima de 15. Desligue quando voltar a 10.`, base: "estudo" });
       else if (cone.v <= 10 && st.estufa.decantador) out.push({ k: "decantador", nome: "Decantador", qtd: "DESLIGAR", un: "", txt: `Cone ${cone.v} mL/L: já voltou a 10 ou menos.`, base: "estudo" }); }
-    { const falta = Math.round((TANK.vol - a.V) / 50) * 50; if (falta >= 300) out.push({ k: "agua_doce", nome: "Repor água doce", qtd: falta, un: "L", txt: `O nível baixou ${(falta / TANK.area / 10).toFixed(1)} cm pela evaporação e o sal concentrou. Complete com água doce sem cloro.`, base: "estudo" }); }
+    { const faltaT = Math.round((TANK.vol - a.V) / 50) * 50, max2 = Math.floor(a.V * 2 / Math.max(a.S - 2, 1) / 50) * 50, falta = Math.min(faltaT, max2); // no máximo 2 ppt por vez (app: "no máximo 1–2 ppt por hora")
+      if (faltaT >= 300) out.push({ k: "agua_doce", nome: "Repor água doce", qtd: falta, un: "L", txt: `O nível baixou ${(faltaT / TANK.area / 10).toFixed(1)} cm pela evaporação e o sal concentrou. Complete com água doce sem cloro` + (falta < faltaT ? `, aos poucos: ${falta} L agora (baixa até 2 ppt) e o resto nos próximos dias.` : "."), base: "estudo" }); }
     return out;
   }
   function appAlertas(st) {
@@ -1090,7 +1093,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
 const TX = {};
 // Itens que o boneco pega. onde: tanque | bombona | racao. cor: cor da embalagem.
 TX.itens = {
-  nutrat: { n: "Nutrat", d: "Biossurfactante: bolhas menores, espuma tipo Sprite.", cor: "#3aa0c8", onde: "tanque", un: "mL", max: 80, passo: 5, ac: "nutrat", par: "mL", t: "1 mL por m³ por dia, diluído em 2 L, sobre os difusores. Em dobro com espuma crespa, cone alto ou lua." },
+  nutrat: { n: "Nutrat", d: "Biossurfactante emulsificante: solta a gordura e a matéria orgânica para as bactérias. Espuma tipo Sprite.", cor: "#3aa0c8", onde: "tanque", un: "mL", max: 80, passo: 5, ac: "nutrat", par: "mL", t: "1 mL por m³ por dia, diluído em 2 L, sobre os difusores. Em dobro com espuma crespa, cone alto ou lua. Age como emulsificante (quebra gordura e ajuda a degradar a sujeira); não aumenta o oxigênio. O tamanho do efeito não tem estudo." },
   bactrat: { n: "Bactrat P", d: "Probiótico: 4 Bacillus. Vai na bombona.", cor: "#d8d2c2", onde: "bombona" },
   catalisador: { n: "Catalisador de flocos", d: "Flocula o simbiótico na bombona.", cor: "#8a6fb3", onde: "bombona" },
   farelo: { n: "Farelo de arroz (puim)", d: "Farelo de arroz peneirado, fermentado como no app: carbono.", cor: "#c9a36a", onde: "tanque", un: "g", max: 3000, passo: 50, ac: "farelo", par: "g", t: "Carbono para as bactérias que comem amônia. O app calcula 0,5 kg por kg de ração." },
@@ -1109,7 +1112,7 @@ TX.itens = {
   vizinho: { n: "Floco do vizinho", d: "200 L de água madura. Rápido, com risco.", cor: "#7a5a33", onde: "tanque", fixo: "inocular_vizinho", t: "Traz floco pronto, mas pode trazer doença junto." },
   maleta: { n: "Bancada de análises", d: "Sonda, kits, cone, microscópio.", cor: "#e0a13a", onde: "tanque" },
   racao: { n: "Balde de ração", d: "Ração 40% de proteína.", cor: "#6b4a2b", onde: "tanque" },
-  rodo: { n: "Rodo", d: "Varre o fundo e mexe os difusores.", cor: "#3d6b8a", onde: "tanque" },
+  rodo: { n: "Rodo", d: "Varre o fundo e mexe os difusores de disco (22 no fundo, 1 por m²).", cor: "#3d6b8a", onde: "tanque" },
   puca: { n: "Puçá e balança", d: "Biometria de 30 camarões.", cor: "#557a55", onde: "tanque" },
   sonda: { n: "Sonda fixa de OD", d: "Fica no tanque e toca alarme em 4,5.", cor: "#222", onde: "tanque" },
   pl: { n: "Saco de pós-larvas", d: "Larva boa, do laboratório a 28 ppt.", cor: "#9fd0e8", onde: "tanque" },
@@ -1161,7 +1164,7 @@ TX.gloss = [
   ["Nitrito", "Segunda etapa da nitrificação. Em água salgada o cloreto protege o camarão."],
   ["Nitrato", "Produto final. Acumula no fim do ciclo; até 177 mg/L foi aceitável (Furtado 2015)."],
   ["Alcalinidade", "Reserva que segura o pH. Meta 150 a 180 mg/L."],
-  ["Oxigênio dissolvido (OD)", "Só com ar o teto é cerca de 7,2 mg/L a 28 °C e 25 ppt. O Nutrat ajuda a chegar no teto, não sobe o teto."],
+  ["Oxigênio dissolvido (OD)", "Só com ar o teto é cerca de 7,2 mg/L a 28 °C e 25 ppt. Os difusores de disco (bolha fina, 1 por m²) chegam perto do teto. O Nutrat não mexe no oxigênio: ele limpa a matéria orgânica que o gasta."],
   ["Cone Imhoff", "Mede o volume de floco em 1 litro. Meta 10 a 15 mL/L."],
   ["Floco", "Grumos de bactérias, algas e restos. Come amônia e vira alimento."],
   ["Prebiótico", "Farelo, açúcar e bicarbonato fermentando 24 h no balde fechado."],
@@ -1196,7 +1199,7 @@ TX.desafios = [
   { id: "amonia", n: "Pico de amônia", dc: 32, h: 7, horas: 36, txt: "Dia 32. A amônia subiu durante a noite e o pH está alto. Você tem 36 horas para trazer a amônia para menos de 1 mg/L sem perder mais de 2% do lote.",
     mut: s => { s.agua.TAN = 4; s.agua.CO2 *= 0.45; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 2, "Perda menor que 2% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "noite", n: "Madrugada pesada", dc: 88, h: 21, horas: 11, txt: "Dia 88, 21 h. O tanque está carregado de sólidos e sobrou ração. Segure o oxigênio em 5 mg/L ou mais até as 8 h.",
-    mut: s => { s.agua.OMc += 110; s.agua.H += 520; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[mn.DO >= 5, "Oxigênio mínimo de 5 (foi " + mn.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] },
+    mut: s => { s.agua.OMc += 95; s.agua.H += 450; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[mn.DO >= 5, "Oxigênio mínimo de 5 (foi " + mn.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "alc", n: "Alcalinidade despencando", dc: 60, h: 6, horas: 48, txt: "Dia 60. A alcalinidade caiu para perto de 75 e o pH vem junto. Em 48 horas leve a alcalinidade a 140 ou mais sem deixar o pH passar de 8,6.",
     mut: s => { s.agua.alk = 75; }, fim: (v, perda, mn, mx) => [[v.alk >= 140, "Alcalinidade de 140 ou mais (ficou " + v.alk.toFixed(0) + ")"], [mx.pH <= 8.6, "pH máximo de 8,6 (foi " + mx.pH.toFixed(2) + ")"], [perda < 1, "Perda menor que 1%"]] },
   { id: "calor", n: "Onda de calor", dc: 50, h: 9, horas: 48, txt: "Dia 50. Três dias de sol forte pela frente e o sombrite está aberto. Em 48 horas a água não pode passar de 32,5 °C depois das primeiras 6 horas.",
@@ -1209,8 +1212,8 @@ TX.desafios = [
     mut: s => { s.agua.H *= 0.2; s.agua.Bac = 0; s.agua.AOB *= 0.25; s.agua.NOB *= 0.25; s.agua.C = 0; s.agua.TAN = 5; s.agua.colapso = 1; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 5, "Perda menor que 5% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "od3h", n: "Oxigênio caindo às 3 da manhã", dc: 80, h: 3, horas: 1, txt: "Dia 80, 3 h da manhã. O alarme tocou: oxigênio em 2,2 mg/L e camarão subindo para a borda. Cada minuto conta. Em 1 hora o oxigênio tem que estar em 6 ou mais, sem perder mais de 1% do lote.",
     mut: s => { s.agua.DO = 2.2; s.agua.OMc += 100; s.estufa.aeracao = "normal"; s.estufa.decantador = false; }, fim: (v, perda) => [[v.DO >= 6, "Oxigênio em 6 ou mais às 4 h (ficou " + v.DO.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
-  ,{ id: "sal", n: "Salinidade subiu com a evaporação", dc: 45, h: 7, horas: 24, txt: "Dia 45. Semanas de sol sem repor água: o nível baixou e a salinidade foi a 30 ppt. Em 24 horas traga a salinidade para 26 ou menos, sem perder mais de 1% do lote.",
-    mut: s => { const f = 0.82; s.agua.S /= f; s.agua.V *= f; s.agua.S = Math.max(s.agua.S, 30); }, fim: (v, perda) => [[v.S <= 26, "Salinidade de 26 ou menos (ficou " + v.S.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
+  ,{ id: "sal", n: "Salinidade subiu com a evaporação", dc: 45, h: 7, horas: 24, txt: "Dia 45. Semanas de sol sem repor água: o nível baixou e a salinidade foi a 30 ppt. Em 24 horas traga a salinidade para 28,5 ou menos, sem perder mais de 1% do lote. Baixe devagar: no máximo 1 a 2 ppt por hora.",
+    mut: s => { const f = 0.82; s.agua.S /= f; s.agua.V *= f; s.agua.S = Math.max(s.agua.S, 30); s.agua.SHist = s.agua.SHist.map(() => s.agua.S); } /* subiu em semanas: sem choque */, fim: (v, perda) => [[v.S <= 28.5, "Salinidade de 28,5 ou menos (ficou " + v.S.toFixed(1) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "caibra", n: "Cãibra: falta potássio", dc: 65, h: 7, horas: 30, txt: "Dia 65. Na biometria apareceram camarões com o corpo dobrado e duro. Descubra o que falta e corrija em 30 horas: o potássio tem que chegar a pelo menos 80% do valor da água do mar na sua salinidade.",
     mut: s => { s.agua.K = 0.18 * 399 * s.agua.S / 35; }, fim: (v, perda) => [[v.K >= 0.8 * 399 * v.S / 35, "Potássio em " + v.K.toFixed(0) + " mg/L (meta " + (0.8 * 399 * v.S / 35).toFixed(0) + ")"], [perda < 1.5, "Perda menor que 1,5% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "sulfeto", n: "Cheiro de ovo podre no fundo", dc: 70, h: 7, horas: 48, txt: "Dia 70. Faz quase seis semanas que ninguém passa o rodo. Há lodo preto parado e cheiro de ovo podre. Em 48 horas o sulfeto tem que sair, sem perder mais de 3% do lote.",
@@ -1225,7 +1228,7 @@ TX.desafios = [
 // Ajuda de cada desafio: o que fazer, na ordem, e por quê.
 TX.ajuda = {
   amonia: [["Meça amônia, pH e oxigênio com a maleta.", "O celular só calcula a dose com a medida feita."], ["Dê açúcar dissolvido: amônia × m³ × 20 g (o celular mostra em Aplicar).", "O carbono faz as bactérias do floco comerem a amônia em poucas horas."], ["Nutrat em dobro e ar no máximo.", "Bactéria trabalhando gasta oxigênio."], ["Baixe a ração em 20% e aplique o simbiótico do dia.", "Menos proteína entrando é menos amônia amanhã."], ["Não suba o pH: nada de cal. Com água verde, feche o sombrite.", "Com pH alto mais amônia vira NH₃, a forma que mata."], ["Passe o tempo de 6 em 6 horas e meça de novo.", "Repita o açúcar só se a medida ainda estiver acima de 1."]],
-  noite: [["Abra o ar no máximo no soprador.", "É o que mais põe oxigênio na água."], ["Ligue o decantador.", "Tira sólidos, que respiram a noite inteira."], ["Nutrat sobre os difusores.", "Bolha menor troca mais oxigênio."], ["Não dê trato à noite.", "Digestão e sobra gastam oxigênio."], ["Meça o oxigênio de 2 em 2 horas. Abaixo de 3: Oxitrat, 1 a 2 copos.", "É socorro: sobe na hora, mas dura pouco."]],
+  noite: [["Abra o ar no máximo no soprador.", "É o que mais põe oxigênio na água."], ["Ligue o decantador.", "Tira sólidos, que respiram a noite inteira."], ["Nutrat sobre os difusores.", "Emulsiona a gordura e ajuda as bactérias a limpar a sujeira que gasta oxigênio. Não põe oxigênio na água."], ["Não dê trato à noite.", "Digestão e sobra gastam oxigênio."], ["Meça o oxigênio de 2 em 2 horas. Abaixo de 3: Oxitrat, 1 a 2 copos.", "É socorro: sobe na hora, mas dura pouco."]],
   alc: [["Meça alcalinidade e pH.", "Para saber quanto falta."], ["Bicarbonato: (160 − alcalinidade) × m³ ÷ 0,6. Divida em 2 ou 3 aplicações no dia.", "Bicarbonato sobe a reserva sem dar pico de pH."], ["Se usar cal hidratada, no máximo 200 g por vez.", "Cal demais dispara o pH e passa de 8,6."], ["No dia seguinte, meça e complete.", "A nitrificação continua gastando alcalinidade."]],
   calor: [["Feche o sombrite já.", "Corta metade da luz e do calor que entra."], ["Ar no máximo.", "Água quente segura menos oxigênio e o camarão gasta mais."], ["Meça a temperatura às 9, 12 e 15 h.", "Para ver se está cedendo."], ["Baixe a ração em 10 a 25% enquanto passar de 32 °C.", "Acima de 32 o apetite cai e a sobra vira problema."], ["Mantenha o sombrite fechado nos três dias.", "Abrir à tarde devolve o calor."]],
   cone: [["Ligue o decantador.", "É o que tira floco de verdade."], ["Nutrat em dobro (manhã e tarde) e ar no máximo.", "Sólido alto gasta oxigênio."], ["Ração −15% e sem puim extra.", "Menos comida, menos sólido novo."], ["Meça o cone todo dia.", "Desligue o decantador quando chegar a 10 para não tirar o floco bom."]],
@@ -1795,7 +1798,10 @@ const borda = new T.Mesh(new T.TorusGeometry(2.73, 0.07, 10, 48), M(0x2f6f8f)); 
 const fundo = new T.Mesh(new T.CircleGeometry(2.74, 44), M(0x11181c)); fundo.rotation.x = -Math.PI / 2; fundo.position.y = 0.04; tq.add(fundo);
 const agua = new T.Mesh(new T.CircleGeometry(2.72, 44), new T.MeshPhongMaterial({ color: 0x4d93a6, transparent: true, opacity: 0.6, shininess: 90 })); agua.rotation.x = -Math.PI / 2; agua.position.y = 0.87; tq.add(agua);
 const esp = new T.Mesh(new T.RingGeometry(1.9, 2.72, 44), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2, depthWrite: false })); esp.rotation.x = -Math.PI / 2; esp.position.y = 0.875; tq.add(esp);
-const NB = 110, bolhaG = new T.BufferGeometry(), bolhaP = new Float32Array(NB * 3), bolhaD = []; for (let i = 0; i < NB; i++) bolhaD.push([Math.random() * 6.28, 0.5 + Math.random() * 2, Math.random()]);
+// difusores de disco de membrana (260 mm, bolha fina 1–3 mm), soltos no fundo, 1 por m²: 22 no tanque (caderno Só Bioflocos)
+const DISCOS = [[0, 0]]; for (let i = 0; i < 6; i++) DISCOS.push([i * Math.PI / 3, 0.95]); for (let i = 0; i < 15; i++) DISCOS.push([i * 2 * Math.PI / 15 + 0.2, 1.95]);
+DISCOS.forEach(q => { const d = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.03, 20), M(0x2b2b2b)); d.position.set(Math.cos(q[0]) * q[1], 0.06, Math.sin(q[0]) * q[1]); tq.add(d); });
+const NB = 110, bolhaG = new T.BufferGeometry(), bolhaP = new Float32Array(NB * 3), bolhaD = []; for (let i = 0; i < NB; i++) { const q = DISCOS[i % DISCOS.length]; bolhaD.push([q[0] + (Math.random() - 0.5) * 0.08, q[1] + (Math.random() - 0.5) * 0.1, Math.random()]); }
 bolhaG.setAttribute("position", new T.BufferAttribute(bolhaP, 3)); const bolhas = new T.Points(bolhaG, new T.PointsMaterial({ color: 0xffffff, size: 0.05, transparent: true, opacity: 0.8, depthWrite: false })); tq.add(bolhas);
 const NC = 46, cams = new T.InstancedMesh(new T.SphereGeometry(0.5, 6, 4), M(0xf0b9a0), NC), camD = [], mtx = new T.Object3D(); for (let i = 0; i < NC; i++) camD.push([Math.random() * 6.28, 0.5 + Math.random() * 2, 0.15 + Math.random() * 0.3, Math.random() < 0.5 ? 1 : -1]); tq.add(cams);
 // placas
@@ -1962,7 +1968,7 @@ function quadro(agora) {
     agua.material.color.lerp(corAlvo, 0.05); agua.material.opacity += ((0.55 + 0.4 * Math.max(g, b)) - agua.material.opacity) * 0.05;
     const e = E.espuma(st), oe = e === "crespa" ? 0.85 : e === "Sprite" ? 0.4 : e === "fina" ? 0.25 : 0.06; esp.material.opacity += (oe - esp.material.opacity) * 0.05; esp.material.color.setHex(e === "crespa" ? 0xc9b28a : 0xffffff);
     const forte = st.estufa.aeracao === "max" ? 1.8 : 1; bolhas.material.size = 0.045 * forte;
-    for (let i = 0; i < NB; i++) { const d = bolhaD[i]; d[2] += dt * (1.5 + (i % 5) * 0.3) * forte; if (d[2] > 1) { d[2] = 0; d[0] = Math.random() * 6.28; } bolhaP[i * 3] = Math.cos(d[0]) * d[1]; bolhaP[i * 3 + 1] = 0.88 + d[2] * 0.06 * forte; bolhaP[i * 3 + 2] = Math.sin(d[0]) * d[1]; } bolhaG.attributes.position.needsUpdate = true;
+    for (let i = 0; i < NB; i++) { const d = bolhaD[i]; d[2] += dt * (1.5 + (i % 5) * 0.3) * forte; if (d[2] > 1) { d[2] = 0; const q = DISCOS[(Math.random() * DISCOS.length) | 0]; d[0] = q[0] + (Math.random() - 0.5) * 0.08; d[1] = q[1] + (Math.random() - 0.5) * 0.1; } bolhaP[i * 3] = Math.cos(d[0]) * d[1]; bolhaP[i * 3 + 1] = 0.88 + d[2] * 0.06 * forte; bolhaP[i * 3 + 2] = Math.sin(d[0]) * d[1]; } bolhaG.attributes.position.needsUpdate = true;
     if (cams.visible) { const cm = st.camarao, n = Math.max(3, Math.round(NC * clamp(cm.n / Math.max(cm.n0, 1), 0, 1))), len = 0.07 + Math.min(cm.W, 18) * 0.011, sufoco = a.DO < 3;
       for (let i = 0; i < NC; i++) { const d = camD[i]; d[0] += dt * d[2] * d[3] * (sufoco ? 0.3 : 1); const r = sufoco ? 2.5 : d[1]; mtx.position.set(Math.cos(d[0]) * r, sufoco ? 0.885 : 0.862, Math.sin(d[0]) * r); mtx.rotation.y = -d[0] + (d[3] > 0 ? 0 : Math.PI) + Math.PI / 2; const s = i < n ? len : 0.0001; mtx.scale.set(s * 0.32, s * 0.3, s); mtx.updateMatrix(); cams.setMatrixAt(i, mtx.matrix); }
       cams.instanceMatrix.needsUpdate = true; }
