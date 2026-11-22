@@ -389,7 +389,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     const yA = 0.054, yN = 0.0192;
     a.AOB += (yA * nitA - 0.002 * a.AOB) * dtH; a.NOB += (yN * nitN - 0.0015 * a.NOB) * dtH;
     a.AOB = Math.max(a.AOB, 2e-5); a.NOB = Math.max(a.NOB, 2e-5);
-    let decH = 0.0013 + (a.DO < 1 ? 0.03 : 0) + 0.002 * st.cfg.nutratForca * 5 * clamp(a.nutrat, 0, 1.5); // Nutrat = biossurfactante emulsificante: solta gordura e matéria orgânica e acelera a oxidação/renovação do floco (Nadella 2020: emulsificante; caderno: sólidos caem em 12–36 h). Tamanho SEM FONTE (aposta do Wagner), força em cfg.nutratForca
+    let decH = 0.003 /* calibrado 22/11 pelo Nunes & Castro (sem remoção de sólidos: 79,4%, SST até 783) */ + (a.DO < 1 ? 0.03 : 0) + 0.002 * st.cfg.nutratForca * 5 * clamp(a.nutrat, 0, 1.5); // Nutrat = biossurfactante emulsificante: solta gordura e matéria orgânica e acelera a oxidação/renovação do floco (Nadella 2020: emulsificante; caderno: sólidos caem em 12–36 h). Tamanho SEM FONTE (aposta do Wagner), força em cfg.nutratForca
     a.H += (imob * 8 * 0.7 - decH * a.H) * dtH; a.H = Math.max(a.H, 0.05);
     a.OMc += decH * a.H * 0.25 * dtH;
     a.Bac = Math.max(0, a.Bac - 0.025 * a.Bac * dtH);
@@ -419,7 +419,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     a.nutrat = Math.max(0, a.nutrat - dtH / 24); a.cat = Math.max(0, a.cat - dtH / 48);
     // Vibrio (log UFC/mL) [M; Samocha: 4–28 mil normal]. Calibrado em 22/11 (pedido do Wagner) para o cenário Xu 2025 a 800/m³ dar ~80% (estudo 79,8%) com troca e sólidos controlados
     const omF = (a.OMc + a.C * 0.5) / 30;
-    const dv = (0.29 * clamp(omF, 0, 3) + 0.05 * (a.T - 28) - 0.95 * clamp(a.Bac, 0, 1.5) - 0.25 * clamp(a.H / 150, 0, 1) + 0.04) / 24;
+    const dv = (0.28 * clamp(omF, 0, 3) + 0.05 * (a.T - 28) - 0.95 * clamp(a.Bac, 0, 1.5) - 0.25 * clamp(a.H / 150, 0, 1) + 0.04) / 24;
     a.vib = clamp(a.vib + dv * dtH, 2, 7.2);
 
     /* camarão */
@@ -1250,7 +1250,7 @@ TX.ajuda = {
   sulfeto: [["Ar no máximo antes de mexer no fundo.", "O rodo solta lodo e sulfeto na água."], ["Passe o rodo (Ferramentas).", "Acaba com a zona morta: cada rodo corta o sulfeto pela metade."], ["Ligue o decantador e aplique Nutrat.", "Tira o lodo que subiu."], ["No dia seguinte, rodo de novo.", "Uma vez só não limpa seis semanas."], ["Daqui para frente, rodo toda semana.", "É o que evita o problema."]],
   cloro: [["Pegue o tiossulfato na estante de preparo e aplique 60 g no tanque.", "7 g por m³ para cada 1 mg/L: tira o cloro na hora."], ["Ar no máximo.", "Ajuda o resto do cloro a sair."], ["Meça o cloro: tem que dar zero.", "Só o teste confirma."], ["Aplique simbiótico.", "O cloro também matou parte do floco."]],
   nitrito: [["Meça nitrito, alcalinidade e salinidade.", "O cloreto protege: nível seguro de 15 mg/L a 25 ppt e de 6 mg/L a 15 ppt (Lin e Chen 2003)."], ["Bicarbonato até a alcalinidade passar de 150.", "As bactérias do nitrito param sem alcalinidade."], ["Ração −15% e ar no máximo.", "Menos amônia entrando e mais oxigênio para a nitrificação."], ["Não troque água nem aplique cloro.", "Você perderia as bactérias que estão resolvendo."], ["Paciência: meça todo dia.", "O nitrito cai quando a segunda turma de bactérias cresce."]],
-  vibrio: [["Baixe a ração em 30 a 40% e confira a bandeja.", "Vibrio vive de sobra de ração e matéria orgânica."], ["Simbiótico em dose alta (40 L) todo dia, nos quatro dias.", "Os bacilos do simbiótico tomam o lugar do Vibrio. É o que mais pesa."], ["Não passe o rodo nem tire floco agora.", "O rodo levanta matéria orgânica e o floco bom segura o Vibrio."], ["Ar no máximo e Nutrat.", "Camarão estressado adoece mais."], ["Semeie a placa TCBS para acompanhar (resultado no dia seguinte).", "É a única medida de Vibrio que você tem."]]
+  vibrio: [["Baixe a ração em 30 a 40% e confira a bandeja.", "Vibrio vive de sobra de ração e matéria orgânica."], ["Simbiótico em dose alta (40 L) todo dia, nos quatro dias (regra do app, decisão do Wagner; sem estudo da dose).", "Os bacilos do simbiótico tomam o lugar do Vibrio. É o que mais pesa."], ["Não passe o rodo nem tire floco agora.", "O rodo levanta matéria orgânica e o floco bom segura o Vibrio."], ["Ar no máximo e Nutrat.", "Camarão estressado adoece mais."], ["Semeie a placa TCBS para acompanhar (resultado no dia seguinte).", "É a única medida de Vibrio que você tem."]]
 };
 
 </script>
