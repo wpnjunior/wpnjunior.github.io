@@ -543,7 +543,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       // a curva de Fóes já traz o apetite menor da água fria: a fome é medida contra o que ele consegue comer nessa temperatura (senão a temperatura pesaria duas vezes)
       const eat = cm.demandaHoje > 0 ? clamp(cm.comidoHoje / (cm.demandaHoje * 0.97 * interp(APT, mediaT(cm))), 0, 1.1) : 0.3;
       const age = idadePorPeso(cm.W);
-      const pot = (curvaPeso(age + 1 / 7) - curvaPeso(age)) * interp(GTEMP, mediaT(cm)) / interp(GTEMP, 28); // curva do manual (tabela 8.3) vale a 28 °C; a temperatura mexe pela curva de Fóes [E]
+      const pot = (curvaPeso(age + (st.cfg.xu ? st.cfg.xu.k : 1) / 7) - curvaPeso(age)) * interp(GTEMP, mediaT(cm)) / interp(GTEMP, 28); // curva do manual (tabela 8.3) vale a 28 °C; a temperatura mexe pela curva de Fóes [E]
       const odF = clamp((minDOdia(st) - 1.5) / 2.5, 0, 1);
       const pH = pHcalc(a.alk, a.CO2), nh3 = a.TAN * nh3Frac(a.T, a.S, pH);
       const toxF = (nh3 > SAFE.nh3 ? 0.8 : 1) * (a.NO2 > interp(LC_NO2, a.S) * 0.085 ? 0.8 : 1) * (a.NO3 > 300 ? 0.85 : 1) * (a.CO2 > 15 ? 0.85 : 1);
@@ -1051,6 +1051,14 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         return; }
     }
     if (!(cm.n > 0) || cm.despescado) return;
+    if (pf.xu) { // cenário Xu et al. 2025 (Fishes 10:326): PL de 0,36 g, 56 dias, aeração contínua, troca de 0,6 a 7,9%/dia para segurar SST em 200–500. O peso final é o do estudo; a forma da curva é a do manual, só mais rápida
+      const X = pf.xu;
+      if (!P.xuIni) { P.xuIni = true; const f = X.W0 / cm.W; cm.W = X.W0; cm.biomIni = cm.n0 * X.W0 / 1000; cm.demandaHoje *= f; st.cfg.xu = { k: (X.ajuste || 1) * (idadePorPeso(X.Wf) - idadePorPeso(X.W0)) / (X.dias / 7) }; P.od5 = []; }
+      if (st.estufa.aeracao !== "max") A("aeracao", { nivel: "max" });
+      if (h === 5 && uma("xu5")) P.od5.push(a.DO);
+      if (h === 8 && uma("xutroca")) { const T = tss(a); if (T > 500) A("troca", { L: Math.round(a.V * Math.min(0.079, 1 - 450 / T)) }); }
+      if ((st.t - cm.povoado) / 1440 >= X.dias) { A("despesca", { fracao: 1 }); return; }
+    }
     const jm = pf.lua ? janelaMuda(agoraMs(st)) : null; const dc = Math.floor((st.t - cm.povoado) / 1440);
     if (h === 6 && uma("manha")) {
       if (pf.medir) { st.obsEspuma = espuma(st); medir(st, "od"); medir(st, "temp"); medir(st, "ph"); if (dc % 2 === 0) { medir(st, "tan"); medir(st, "no2"); medir(st, "cone"); } if (dc % 2 === 1) medir(st, "alk"); if (dc % 5 === 0) medir(st, "sal"); if (dc % 10 === 0) medir(st, "no3"); }
@@ -1072,13 +1080,14 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       if (pf.despescar && ((pw && pw.t > cm.povoado && pw.v >= pf.alvo) || (est && est.W >= pf.alvo + 1) || dc >= pf.maxDias)) { A("despesca", { fracao: 1 }); return; }
     }
     if (h === 8 && uma("acad")) A("aeracao", { nivel: "max" });
-    if (h === 9 && uma("acad2") && !(jm && pf.lua)) A("aeracao", { nivel: "normal" });
+    if (h === 9 && uma("acad2") && !(jm && pf.lua) && !pf.xu) A("aeracao", { nivel: "normal" });
     if (h === 17 && uma("tarde") && pf.nutrat && P.nut2 > 0) A("nutrat", { mL: P.nut2 });
     if (pf.sombrite && [6, 9, 12, 15, 18].includes(h) && uma("somb" + h)) { const t = pf.medir ? medir(st, "temp").v : a.T, sol = st.clima.tipo === "sol";
       const phA = leit(st, "ph", 8); if (pf.medir && h >= 9) medir(st, "ph");
       if (!st.estufa.sombrite && phA && phA.v >= 8.5 && h >= 9 && h <= 15) A("sombrite", { fechar: true }); else
       if (!st.estufa.sombrite && (t >= 30.3 || (sol && t >= 29.6 && h < 15))) A("sombrite", { fechar: true }); else if (st.estufa.sombrite && (t <= 28.6 || (!sol && t < 29.3))) A("sombrite", { fechar: false }); }
-    if (pf.tratos && horasTrato(cm.W).includes(h) && uma("trato" + h)) { const r = appRacao(st); if (r && r.porTrato > 0) A("trato", { g: Math.max(1, Math.round(r.porTrato * pf.racao)) }); }
+    if (pf.tratos && horasTrato(cm.W).includes(h) && uma("trato" + h)) { const r = appRacao(st); if (r && r.porTrato > 0) { let mult = pf.racao; if (pf.xu && pf.xu.fca && cm.racaoTotal > 0) mult *= clamp(pf.xu.fca * cm.ganhoKg * 1000 / cm.racaoTotal, 0.8, 2); // cenário Xu: ração total segue a conversão medida no estudo
+      A("trato", { g: Math.max(1, Math.round(r.porTrato * mult)) }); } }
     if (pf.tratos && h === 21 && uma("bandeja")) A("bandeja");
   }
 
@@ -1721,6 +1730,21 @@ function comparar() {
   })(0);
 }
 
+function cenarioXu() { // Xu et al. 2025, Fishes 10:326: 200 e 800 camarões por m³, PL 0,36 g, 56 dias
+  const XU = [[200, 19.1, 1.12, 94.6, 6.7], [800, 14.1, 1.29, 79.8, 5.1]], linhas = []; let pr;
+  abre("Cenário do estudo Xu", c => { pr = P(c, "Rodando o manejo do Xu nas duas densidades…"); });
+  (function prox(i) {
+    if (i >= XU.length) return abre("Cenário do estudo Xu", c => {
+      P(c, "Manejo do Xu 2025: pós-larva de 0,36 g, 56 dias, ar no máximo o tempo todo e troca de até 7,9% da água por dia para segurar os sólidos em 200 a 500. Peso final e conversão seguem o que o estudo mediu; a sobrevivência e o oxigênio saem do jogo.");
+      tabela(c, ["Por m³", "Sobrev. jogo", "Sobrev. Xu", "Peso jogo", "Peso Xu", "OD 5 h jogo", "OD médio Xu"], linhas);
+      P(c, "O oxigênio das 5 h é estimativa do jogo: o Xu publicou só a média do ciclo. O Xu não informa a ração, só a conversão.", "nota"); });
+    const [d3, Wf, fca, sobXu, odXu] = XU[i];
+    simula({ dens: Math.round(d3 * 0.87), despescar: false, xu: { W0: 0.36, Wf, dias: 56, ajuste: 1.2, fca } }, s => s.camarao.despescado, s => { pr.textContent = d3 + " por m³: dia " + (E.diaIdx(s) + 1) + "…"; }, s => {
+      const r = s.fim || E.relatorio(s), o = (s.pil && s.pil.od5) || [], od = o.length ? o.reduce((a, b) => a + b, 0) / o.length : NaN, mn = o.length ? Math.min(...o) : NaN;
+      linhas.push([d3, { t: nf(r.sobrevivencia, 1) + "%", cls: Math.abs(r.sobrevivencia - sobXu) <= 5 ? "ok" : "crit" }, nf(sobXu, 1) + "%", nf(r.pesoFinal, 1) + " g", nf(Wf, 1) + " g", nf(od, 1) + " (mín " + nf(mn, 1) + ")", nf(odXu, 1)]); prox(i + 1); });
+  })(0);
+}
+
 /* ---------- capa ---------- */
 function capa() {
   st = null; G = null; skip = null; desf = null; $("bDesf").hidden = true; ["topo", "missao", "joy", "acoes"].forEach(i => $(i).hidden = true); $("capa").hidden = false;
@@ -1736,7 +1760,7 @@ function capa() {
   c.appendChild(bt("Novo ciclo guiado (Aprender)", novo("aprender"), tem ? "" : "p"));
   c.appendChild(bt("Novo ciclo real, sem dicas", novo("real")));
   if (tem) c.appendChild(el("div", "nota", "Um ciclo novo não apaga os salvos: cabem " + NS + " jogos."));
-  c.appendChild(bt("Desafio do dia", desafios)); c.appendChild(bt("Comparar densidades", comparar));
+  c.appendChild(bt("Desafio do dia", desafios)); c.appendChild(bt("Comparar densidades", comparar)); c.appendChild(bt("Cenário do estudo Xu", cenarioXu));
 }
 function carrega(s) { try { const j = JSON.parse(localStorage.getItem(KEY + s)); st = j.st; G = j.G; G.slot = s; liga(); entra(); } catch (e) { aviso("Não consegui abrir este jogo salvo.", "alarme"); } }
 function entra() { $("bAjuda").hidden = G.modo !== "desafio"; $("bGuia").hidden = G.modo === "desafio";
