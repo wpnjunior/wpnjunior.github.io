@@ -41,6 +41,7 @@ nav button.on{background:var(--accent);color:var(--accent-ink)}
 #sub .subrow{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;align-items:center;gap:0;flex-basis:100%}
 #sub .subsep{flex:none;width:74px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
 #btnNuvem{display:none}
+.pessoas{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pessoa{padding:14px 10px;font-size:16px;text-align:left}
 .top .btn{white-space:nowrap}
 @media (max-width:700px){header{position:static}}
 @media (max-width:440px){nav{gap:2px;padding:0 8px 8px}nav button{padding:8px 5px;font-size:14px}#sub button{padding:5px 7px}}
@@ -230,7 +231,7 @@ const MENU=[
  ["lancar","Lançar",[["manejo_racao","Ração"],["manejo_parametros","Água"],["manejo_biometria","Biometria"],["manejo_mortalidade","Mortalidade"],["manejo_aplicacoes","Aplicações e insumos"]]],
  ["acomp","Acompanhar",[["relatorios_graficos","Gráficos"],["diario_linha","Linha do tempo"],["manejo_projecao","Projeção p/ despesca"],["manejo_lua","Calendário lunar"],["relatorios_historico","Histórico geral"]]],
  ["gestao","Gestão",[["#","Ciclo"],["producao_ciclo","Ciclo"],["producao_povoamento","Povoamento"],["producao_despesca","Despesca"],["producao_historico","Histórico"],["#","Estoque"],["estoque_produtos","Produtos"],["estoque_entradas","Entradas"],["estoque_saidas","Saídas"],["estoque_balancete","Balancete"],["#","Financeiro"],["financeiro_pagar","a Pagar"],["financeiro_receber","a Receber"],["financeiro_caixa","Caixa"],["financeiro_custos","Custos"]]],
- ["aprenda","Aprenda",[["aprenda_quando","Quando mexer na ração"],["tecnicas_lembretes","Lembretes Só Bioflocos"],["aprenda_regras","Regras do app e estudos"],["aprenda_estudos","Estudos dos carrosséis"]]],
+ ["aprenda","Aprenda",[["aprenda_quando","Quando mexer na ração"],["tecnicas_lembretes","Lembretes Só Bioflocos"],["aprenda_regras","Regras do app e estudos"],["aprenda_estudos","Estudos dos carrosséis"],["aprenda_tcbs","Placa TCBS (Vibrio)"]]],
  ["ajustes","Ajustes",[["#","Preparo"],["preparo_passos","Dia 0 a 21"],["preparo_calc","Calculadoras"],["preparo_check","Apto a povoar?"],["#","Cadastro"],["cadastro_tanque","Tanque"],["cadastro_faixas","Faixas da água"],["cadastro_tabela","Tabela de ração"],["cadastro_doses","Doses"]]],
 ];
 // aceita o endereço antigo (grupo,tela) ou a chave nova; devolve [grupo do menu, chave]
@@ -238,8 +239,9 @@ function navKey(g,s){const k=s&&s.includes("_")?s:g+"_"+s;const m=MENU.find(m=>m
 const PARAMS=[
  {k:"od",n:"Oxigênio (OD)",u:"mg/L",d:1},{k:"temp",n:"Temperatura",u:"°C",d:1},{k:"ph",n:"pH",u:"",d:2},
  {k:"sal",n:"Salinidade",u:"ppt",d:1},{k:"alc",n:"Alcalinidade",u:"mg/L CaCO₃",d:0},{k:"tan",n:"Amônia total",u:"mg/L",d:2},
- {k:"no2",n:"Nitrito",u:"mg/L",d:2},{k:"no3",n:"Nitrato",u:"mg/L",d:0},{k:"ss",n:"Sólidos (cone Imhoff)",u:"mL/L",d:1},{k:"dur",n:"Dureza total",u:"mg/L CaCO₃",d:0},
- {k:"ca",n:"Cálcio",u:"mg/L",d:0},{k:"mg",n:"Magnésio",u:"mg/L",d:0},{k:"k",n:"Potássio",u:"mg/L",d:0}
+ {k:"no2",n:"Nitrito",u:"mg/L",d:2},{k:"no3",n:"Nitrato",u:"mg/L",d:0},{k:"ss",n:"Sólidos (cone Imhoff)",u:"mL/L",d:1},
+ {k:"ca",n:"Cálcio",u:"mg/L",d:0},{k:"mg",n:"Magnésio",u:"mg/L",d:0},{k:"k",n:"Potássio",u:"mg/L",d:0},
+ {k:"cl",n:"Cloro residual (kit de piscina)",u:"mg/L",d:2},{k:"vibV",n:"Vibrio verdes (TCBS)",u:"UFC/mL",d:0},{k:"vibA",n:"Vibrio amarelas (TCBS)",u:"UFC/mL",d:0},{k:"phb",n:"pH do lote de simbiótico",u:"",d:2}
 ];
 /* íons: faixa pela salinidade (água do mar a 35 ppt: Ca 412, Mg 1290, K 399 mg/L) */
 const ION={ca:412,mg:1290,k:399};
@@ -247,15 +249,15 @@ function ionAlvo(k){const s=leituraRecente("sal",hoje());const S=s?s.v:25;return
 function ionSemFaixa(k){const x=cfg.faixas[k]||{};return ION[k]&&x.min==null&&x.max==null&&x.cmin==null&&x.cmax==null}
 const DEFAULTS={
   nome:"Tanque Biofloco",diametro:5.4,profundidade:0.9,densidade:500,dataPovoamento:"",pesoInicial:0.02,
-  sobrevivencia:85,pesoAlvo:15,fcr:1.3,salLab:"",
+  sobrevivencia:85,pesoAlvo:15,fcr:1.5,salLab:"",
   faixas:{od:{min:5,max:null,cmin:3,cmax:null},temp:{min:26,max:30,cmin:22,cmax:33},ph:{min:7.5,max:8.0,cmin:7,cmax:8.5},sal:{min:20,max:25,cmin:10,cmax:35},
     alc:{min:150,max:200,cmin:100,cmax:null},tan:{min:null,max:1,cmin:null,cmax:3},no2:{min:null,max:1,cmin:null,cmax:5},no3:{min:null,max:150,cmin:null,cmax:250},
-    ss:{min:10,max:15,cmin:null,cmax:25},dur:{min:null,max:null,cmin:null,cmax:null},
+    ss:{min:10,max:15,cmin:null,cmax:25},cl:{min:null,max:0.05,cmin:null,cmax:null},phb:{min:7,max:7.5,cmin:5,cmax:null},/* caderno Só Bioflocos: bombona 7,0–7,5; abaixo de 5 as bactérias morreram *//* povoar só com cloro < 0,05 (limiares J; toxicidade sem estudo, regra do app) */vibV:{min:null,max:1000,cmin:null,cmax:10000},vibA:{min:null,max:27750,cmin:null,cmax:null},/* TCBS: verdes acima de 1.000 = alerta (doencas-modelo; FAU/UF: Vibrio < 1.000 e sem verdes); 10.000 = regra de campo NÃO CONFERIDA (regra do app). Amarelas: Samocha, total normal 5.300–27.750 */dur:{min:null,max:null,cmin:null,cmax:null},
     ca:{min:null,max:null,cmin:null,cmax:null},mg:{min:null,max:null,cmin:null,cmax:null},k:{min:null,max:null,cmin:null,cmax:null}},
   tabela:[[0,15,6],[0.2,12,5],[0.5,10,5],[1,6,5],[3,5,4],[5,4,4],[10,3.5,3],[15,3,3]],
   curva:[0.02,0.05,0.15,0.4,0.8,1.5,3,4.5,6,7.5,9,10.5,12,13.5,15],
   eco:{preco:null,kw:0.75,tarifa:0.85},
-  doses:{azomite:3,bicarb:0.25,acucar:20,alcAlvo:160,nutrat:1,simbForm:1,simbMan:0.75,probBombona:30,farelo:0.5,odAlarme:4.5,cnAlvo:10,prot:null,catalisador:null}
+  doses:{azomite:3,bicarb:0.25,acucar:20,alcAlvo:160,nutrat:1,simbForm:1,simbMan:0.75,probBombona:30,probLote:0.3,farelo:0.5,odAlarme:4.5,cnAlvo:10,prot:null,catalisador:null}
 };
 /* Produtos do manejo: a mesma lista do jogo Simulador Tanque Biofloco (engine.js ITENS). Aplicação com o mesmo nome baixa do Estoque. */
 const PROD_SUG=[["Ração 40% PB","RACAO","kg"],
@@ -270,7 +272,7 @@ function precoRef(p){if(!p)return 0;if(p.precoRef!=null&&p.precoRef!=="")return 
 function temCompra(pid){return G("entrada").some(e=>e.produto===pid&&e.qtd>0)}
 function precoVendaRef(W){return W<8?18:W<10?22:W<12?26:W<15?30:W<18?34:38}
 function faltaProd(){return PROD_SUG.filter(s=>!produtos().some(p=>normTxt(p.nome)===normTxt(s[0]))&&!(s[1]==="RACAO"&&produtos().some(p=>p.grupo==="RACAO")))}
-const PRODUTOS=["Prebiótico (arroz fermentado)","Simbiótico (bombona)"].concat(PROD_SUG.filter(x=>x[1]!=="RACAO"&&!/^(Kit|Reagente|Placa|Mantas|Nitrificante)/.test(x[0])).map(x=>x[0])).concat(["Melaço","Outro"]);
+const PRODUTOS=["Simbiótico (lote da tese)","Cloreto de amônio (maturação)"].concat(PROD_SUG.filter(x=>x[1]!=="RACAO"&&!/^(Kit|Reagente|Placa|Mantas|Nitrificante)/.test(x[0])).map(x=>x[0])).concat(["Melaço","Outro"]);
 const TIPOS={leitura:"Parâmetros",biometria:"Biometria",mortalidade:"Mortalidade",aplicacao:"Aplicação",racao:"Trato",ritual:"Ritual"};
 
 let prep={feitos:{}},extraTratos=0,cfg=clone(DEFAULTS),recs=[],recsAll=[],gest=[],db=null,mode="local",downloads=null,grp="inicio",scr="painel",chartSel="od",racaoDia=null,pendDel=null;
@@ -329,21 +331,27 @@ function pesoEstimado(dia){const bs=biometriasAte(dia);const dc=diaCultivo(dia);
   if(bs.length>=2){const cs=crescimentoSemanal(dia);const d=Math.max(0,diasEntre(bs[0].data,dia));return{p:bs[0].peso+cs.g*d/7,origem:"biometria de "+dt(bs[0].data)+(d?" + "+d+" dia(s) no ritmo das biometrias":"")}}
   if(bs.length===1){if(dc==null)return{p:bs[0].peso,origem:"biometria de "+dt(bs[0].data)};const db=diaCultivo(bs[0].data.slice(0,10));const d=dc-db;return{p:Math.max(bs[0].peso,bs[0].peso+curva(dc)-curva(db)),origem:"biometria de "+dt(bs[0].data)+(d>0?" + "+d+" dia(s) pela curva do manual":"")}}
   if(dc==null)return{p:cfg.pesoInicial,origem:"peso inicial da PL"};return{p:curva(Math.max(0,dc)),origem:"curva do manual, dia "+Math.max(0,dc)}}
-function sobrevivenciaAtual(dia){const bs=biometriasAte(dia).find(b=>b.sobrev!=null);return bs?{s:bs.sobrev,o:"biometria"}:{s:cfg.sobrevivencia,o:"estimativa do Cadastro"}}
+function sobrevContada(){/* regra do app: mortos recolhidos e testemunha; morto comido some, então é teto */const t=tanque(),pv=(typeof gest!=="undefined"?gest:[]).filter(g=>g.k==="povoamento"&&g.ciclo===cicloAtual()).pop();const pls=t&&t.pls;if(!pls)return sobrevivenciaAtual(hoje()).s;let sv=Math.max(0,(pls-mortosAte(hoje()))/pls*100);if(pv&&pv.testemunha!=null&&pv.testemunha>=0&&pv.testemunha<=100)sv=sv*pv.testemunha/100;return Math.round(sv*10)/10}
+function sobrevivenciaAtual(dia){const bs=biometriasAte(dia).find(b=>b.sobrev!=null);if(bs)return{s:bs.sobrev,o:"biometria"};const dc=diaCultivo(dia);return dc==null?{s:cfg.sobrevivencia,o:"estimativa do Cadastro"}:{s:espSobrev(dc),o:"linha do plano (100% no povoamento até "+n0(cfg.sobrevivencia)+"% na despesca, tabela 8.3 do manual)"}}
 function lote(dia){const t=tanque();const pe=pesoEstimado(dia);const sv=sobrevivenciaAtual(dia);const mortos=mortosAte(dia);
   const tirados=(typeof gest!=="undefined"?gest:[]).filter(g=>g.k==="despesca"&&g.tipo==="PARCIAL"&&g.ciclo===(cfg.cicloId||"c1")&&g.data<=dia&&g.peso>0).reduce((s,g)=>s+g.kg*1000/g.peso,0);const vivos=Math.max(0,Math.min(t.pls-mortos,t.pls*sv.s/100)-tirados);const biomKg=vivos*pe.p/1000;return{t,peso:pe.p,origemPeso:pe.origem,sobrev:sv,mortos,vivos,biomKg}}
 function tratosDoDia(dia){return tipo("racao").filter(r=>r.dia===dia).sort((a,b)=>(a.trato||0)-(b.trato||0))}
 function leituraRecente(k,ate){for(const r of recs){if(r.tipo==="leitura"&&r.valores&&r.valores[k]!=null&&r.data.slice(0,10)<=ate)return{v:r.valores[k],data:r.data}}return null}
+/* oxigênio em % → mg/L: saturação com ar pela equação de Weiss 1970 (a mesma do jogo; limiares §20) */
+function odSatMgL(T,S){const K=(T+273.15)/100;return Math.exp(-173.4292+249.6339/K+143.3483*Math.log(K)-21.8492*K+S*(-0.033096+0.014259*K-0.0017*K*K))*1.429}
+function odSat(o){const T=num(o.temp)??(leituraRecente("temp",hoje())||{}).v,S=num(o.sal)??(leituraRecente("sal",hoje())||{}).v;return T==null||S==null?null:odSatMgL(T,S)}
+function odT(v){const s=odSat({});return s?n0(v/s*100)+"% ("+f(v,1)+" mg/L)":f(v,1)+" mg/L"}/* Wagner lê OD em %: mostrar % com mg/L entre parênteses */
+function odDePct(o){const p=num(o.odp);if(p==null||num(o.od)!=null)return;const sat=odSat(o);if(sat)o.od=String(+(p/100*sat).toFixed(2))}
 function nivel(k,v){const x=cfg.faixas[k]||{};if(v==null)return null;if(ionSemFaixa(k)){const r=v/ionAlvo(k);return r<0.6?"crit":(r<0.8||r>1.3)?"aten":"ok"}if((x.cmin!=null&&v<x.cmin)||(x.cmax!=null&&v>x.cmax))return"crit";if((x.min!=null&&v<x.min)||(x.max!=null&&v>x.max))return"aten";return"ok"}
 function fora(k,v){const x=cfg.faixas[k]||{};const n=nivel(k,v);if(!n||n==="ok")return null;if(ionSemFaixa(k))return v<ionAlvo(k)?"baixo":"alto";return(x.min!=null&&v<x.min)?"baixo":"alto"}
-function faixaTxt(k){const x=cfg.faixas[k]||{},d=k==="ph"?1:0;if(ionSemFaixa(k)){const a=ionAlvo(k);return n0(a*0.8)+"–"+n0(a*1.3)+" (pela salinidade)"}if(x.min!=null&&x.max!=null)return f(x.min,d)+"–"+f(x.max,d);if(x.min!=null)return"≥ "+f(x.min,d);if(x.max!=null)return"< "+f(x.max,k==="no3"?0:1);return"sem faixa"}
-function critTxt(k){const x=cfg.faixas[k]||{},d=k==="ph"?1:0;const a=[];if(x.cmin!=null)a.push("< "+f(x.cmin,d));if(x.cmax!=null)a.push("> "+f(x.cmax,d));return a.join(" ou ")}
-function nh3(tan,ph,temp){if(tan==null||ph==null)return null;const T=(temp==null?28:temp)+273.15;const pka=0.09018+2729.92/T;return tan/(1+Math.pow(10,pka-ph))}
+function faixaTxt(k){const x=cfg.faixas[k]||{},d=(k==="ph"||k==="phb")?1:0;if(ionSemFaixa(k)){const a=ionAlvo(k);return n0(a*0.8)+"–"+n0(a*1.3)+" (pela salinidade)"}if(x.min!=null&&x.max!=null)return f(x.min,d)+"–"+f(x.max,d);if(x.min!=null)return"≥ "+f(x.min,d);if(x.max!=null)return"< "+f(x.max,(k==="no3"||k.startsWith("vib"))?0:k==="cl"?2:1);return"sem faixa"}
+function critTxt(k){const x=cfg.faixas[k]||{},d=(k==="ph"||k==="phb")?1:0;const a=[];if(x.cmin!=null)a.push("< "+f(x.cmin,d));if(x.cmax!=null)a.push("> "+f(x.cmax,d));return a.join(" ou ")}
+function nh3(tan,ph,temp,sal){if(tan==null||ph==null)return null;const T=(temp==null?28:temp)+273.15;const S=sal??(leituraRecente("sal",hoje())||{}).v??0,I=19.9273*S/(1000-1.005109*S);const pka=0.09018+2729.92/T+(0.1552-0.000314*T)*I;/* Emerson + força iônica (EPA 1989), igual ao jogo */return tan/(1+Math.pow(10,pka-ph))}
 /* Recomendação de ração do dia (regras do manual, cap. 8): tabela → bandeja de ontem → travas da água, muda e lua */
 /* Lição do jogo: a trava de ontem (OD, amônia, lua…) não pode virar a base de hoje, senão a ração encolhe em cascata. */
 function travaDe(dia){const rec=(k,d)=>{const u=leituraRecente(k,dia);return u&&diasEntre(u.data,dia)<=d?u:null};const od=rec("od",1),tan=rec("tan",3),no2=rec("no2",3),ss=rec("ss",2),tp=rec("temp",1);let t=1;
-  if(od){if(od.v<3)t=0;else if(od.v<4)t=Math.min(t,0.8)}if(tan&&tan.v>1)t=Math.min(t,0.8);if(no2&&no2.v>1)t=Math.min(t,0.85);if(ss&&ss.v>20)t=Math.min(t,0.85);
-  if(tp&&(tp.v<22||tp.v>33))t=Math.min(t,0.75);else if(tp&&tp.v<26)t=Math.min(t,0.9);if(janelaMuda(toDate(dia)).on)t=Math.min(t,0.8);return t}
+  if(od){if(od.v<3)t=0;else if(od.v<4)t=Math.min(t,0.8)}if(tan){const _p=rec("ph",3),_x=_p?nh3(tan.v,_p.v,tp&&tp.v):null;if(tan.v>3||(_x!=null&&_x>0.1))t=Math.min(t,0.7)}if(no2&&no2.v>5)t=Math.min(t,0.85);/* mesmos níveis críticos da recomendação */if(ss&&ss.v>20)t=Math.min(t,0.85);
+  if(tp&&(tp.v<22||tp.v>33))t=Math.min(t,0.75);else if(tp&&(tp.v<26||tp.v>=32))t=Math.min(t,0.9);if(janelaMuda(toDate(dia)).on)t=Math.min(t,0.6);return t}
 function recomendacao(dia){
   const L=lote(dia);const pt=pctTabela(L.peso);const nt=tratosPara(L.peso);const tabela=L.biomKg*1000*pt/100;const motivos=[];
   motivos.push({ef:"eq",t:`Tabela: ${f(L.biomKg,2)} kg de biomassa × ${f(pt,1)}% = ${n0(tabela)} g em ${nt} tratos`,p:`Biomassa = ${n0(L.vivos)} vivos × ${f(L.peso,L.peso<1?3:2)} g (${L.origemPeso}). A % sai da faixa de peso da tabela do manual: camarão pequeno come uma parte maior do próprio peso. A biometria semanal é o que muda a faixa.`});
@@ -359,7 +367,7 @@ function recomendacao(dia){
   if(totOntem>0){ref=totOntem;
     const bj=tr.map(r=>r.bandeja).filter(Boolean);const muita=bj.filter(b=>b==="Muita").length,vazia=bj.filter(b=>b==="Vazia").length;
     let fat=1,txt,por;
-    if(!bj.length){txt="Bandeja de ontem não conferida: repeti o total de ontem";por="Sem a bandeja não dá para saber se sobrou ou faltou. Confira 1 a 2 horas depois de cada trato."}
+    if(!bj.length){txt="Bandeja de ontem não conferida: repeti o total de ontem";por="Sem a bandeja não dá para saber se sobrou ou faltou. Use 2 bandejas com cerca de 2% de cada trato (manual 8.4) e confira 1 a 2 horas depois."}
     else if(muita>=2){fat=0.8;txt=`${muita} tratos com MUITA sobra ontem: baixar 20%`;por="Sobra é ração que apodrece no fundo: gasta oxigênio, vira amônia e engorda o floco. Além de dinheiro perdido."}
     else if(muita===1){fat=0.9;txt="1 trato com muita sobra ontem: baixar 10%";por="Um trato com sobra já mostra oferta acima do apetite. Corte leve e confira de novo."}
     else if(vazia===bj.length){
@@ -370,21 +378,22 @@ function recomendacao(dia){
     {const tO=travaDe(ontem);if(tO>0&&tO<1&&!muita){base=Math.min(totOntem/tO,tabela*1.3)*fat;var semTrava=tO}}
     motivos.push({ef:fat>1?"up":fat<1?"dn":"eq",t:`Ontem: ${n0(totOntem)} g em ${tr.length} tratos. ${txt}`,p:por});
     if(typeof semTrava!=="undefined")motivos.push({ef:"eq",t:`Ontem a ração estava travada em ${pct(semTrava)} pela água ou pela lua: parti do total sem a trava (${n0(base/fat)} g)`,p:"A trava vale só para o dia em que a água pede. Se o corte de ontem virasse a base de hoje, a ração encolheria um pouco a cada dia mesmo com a água já boa. Lição do simulador."});
+    if(bj.length&&vazia===bj.length&&!bloqueios.length&&base<tabela){base=tabela;motivos.push({ef:"up",t:"Bandejas vazias e ração abaixo da tabela: voltei para a tabela do manual",p:"Camarão pequeno cresce mais de 7% ao dia. Subindo só 7% sobre ontem, a ração ficava presa perto de 70% da tabela por semanas, mesmo com bandeja limpa e água boa (achado da revisão de 21/11 no simulador). Com bandeja vazia e água boa, a referência é a tabela de hoje."})}
     if(base<tabela*0.7&&!muita){base=tabela*0.7;motivos.push({ef:"up",t:"Segurei em 70% da tabela",p:"Sem sobra na bandeja, ficar muito abaixo da tabela por dias seguidos atrasa o crescimento. Confira a biometria."})}
     if(base>tabela*1.3){base=tabela*1.3;motivos.push({ef:"dn",t:"Limitei a 130% da tabela",p:"Passar muito da tabela costuma ser erro de biometria ou de contagem. Faça uma biometria para confirmar."})}
   } else motivos.push({ef:"eq",t:"Sem tratos lançados ontem: usei a tabela",p:"Lance cada trato com a bandeja em Digitação de Ração. Daí em diante a ração de cada dia sai do que o camarão comeu no dia anterior."});
   let trava=1;const add=(fator,t,p)=>{trava=Math.min(trava,fator);motivos.push({ef:"dn",t,p})};
-  if(od){if(od.v<3)add(0,`OD ${f(od.v,1)} mg/L: SUSPENDER o trato`,"Abaixo de 3 mg/L o camarão para de comer e digerir gasta oxigênio que ele não tem. Ligue toda a aeração, o soprador reserva e o cilindro de O₂ com pedra porosa.");
-    else if(od.v<4)add(0.8,`OD ${f(od.v,1)} mg/L: baixar 20% e Nutrat em dobro`,"Com oxigênio baixo o apetite cai e a sobra consome mais oxigênio ainda. Reforce o ar e corte o trato da madrugada. O Nutrat em dobro entra pela promessa do fabricante de melhorar o oxigênio (sem estudo independente).");}
-  if(tan&&tan.v>1)add(0.8,`Amônia ${f(tan.v,2)} mg/L: baixar 20% e dar açúcar`,`A amônia vem da proteína da ração. Menos ração, menos amônia. Açúcar: ${f(tan.v,2)} × ${f(tanque().vol,0)} m³ × ${n0(cfg.doses.acucar)} g = ${n0(tan.v*tanque().vol*cfg.doses.acucar)} g ao longo do dia.`);
-  if(no2&&no2.v>1)add(0.85,`Nitrito ${f(no2.v,2)} mg/L: baixar 15%`,"As bactérias nitrificantes não estão dando conta da carga. Menos ração e alcalinidade no alto da faixa.");
+  if(od){if(od.v<3)add(0,`OD ${odT(od.v)}: SUSPENDER o trato`,"Abaixo de 3 mg/L o camarão para de comer e digerir gasta oxigênio que ele não tem. Ligue toda a aeração, o soprador reserva e o cilindro de O₂ com pedra porosa.");
+    else if(od.v<4)add(0.8,`OD ${odT(od.v)}: baixar 20% e Nutrat em dobro`,"Com oxigênio baixo o apetite cai e a sobra consome mais oxigênio ainda. Reforce o ar e corte o trato da madrugada. O Nutrat age como emulsificante (ajuda as bactérias a quebrar gordura); não põe oxigênio.");}
+  if(tan&&(tan.v>1||(()=>{const p=leituraRecente("ph",hoje()),t=leituraRecente("temp",hoje()),x=p?nh3(tan.v,p.v,t&&t.v):null;return x!=null&&x>0.1})())){const _ph=leituraRecente("ph",hoje()),_tp=leituraRecente("temp",hoje()),_x=_ph?nh3(tan.v,_ph.v,_tp&&_tp.v):null,_crit=tan.v>3||(_x!=null&&_x>0.1);add(_crit?0.7:1,_crit?`Amônia ${f(tan.v,2)} mg/L${_x!=null?" (NH₃ "+f(_x,3)+")":""}: nível crítico, baixar 30% e dar açúcar`:`Amônia ${f(tan.v,2)} mg/L: alerta, dar açúcar e manter a ração`,`${_crit?"Passou do nível crítico (amônia acima de 3 ou NH₃ acima de 0,1 mg/L, perto dos níveis seguros de Lin e Chen 2001: 3,55 de amônia total e 0,16 de NH₃ a 25 ppt): agora sim corta a ração. Menos ração, menos amônia (Alune 2020, The Fish Site: reduzir 30 a 40%).":"Entre 1 e 3 o app só avisa e corrige com carbono: o corte de ração fica para o nível crítico (amônia acima de 3 ou NH₃ acima de 0,1), que está perto dos níveis seguros de Lin e Chen 2001: 3,55 de amônia total e 0,16 de NH₃ a 25 ppt. Cortar cedo demais atrasa o crescimento."} Açúcar: ${f(tan.v,2)} × ${f(tanque().vol,0)} m³ × ${n0(cfg.doses.acucar)} g = ${n0(tan.v*tanque().vol*cfg.doses.acucar)} g ao longo do dia.`)}
+  if(no2&&no2.v>1)add(no2.v>5?0.85:1,no2.v>5?`Nitrito ${f(no2.v,2)} mg/L: nível crítico, baixar 15%`:`Nitrito ${f(no2.v,2)} mg/L: alerta, manter a ração`,no2.v>5?"Acima de 5 mg/L, perto do nível seguro de Lin e Chen 2003: 15,2 a 25 ppt e 6,1 a 15 ppt para a nossa salinidade: menos ração e alcalinidade no alto da faixa. O tamanho do corte (15%) é regra do app.":"Entre 1 e 5 as bactérias nitrificantes estão atrasadas: alcalinidade no alto da faixa e Nutrat em dobro. O corte de ração fica para acima de 5 (perto do nível seguro de Lin e Chen 2003: 15,2 a 25 ppt e 6,1 a 15 ppt).");
   if(ss&&ss.v>20)add(0.85,`Cone ${f(ss.v,1)} mL/L: baixar 15% e Nutrat em dobro`,`Floco demais gasta oxigênio e entope brânquias. Sem dreno, o Só Bioflocos dobra o biossurfactante (${n0(cfg.doses.nutrat*tanque().vol)} mL de manhã e ${n0(cfg.doses.nutrat*tanque().vol)} à noite) e os sólidos caem em 12–36 h.`);;
-  if(tp&&(tp.v<22||tp.v>33))add(0.75,`Temperatura ${f(tp.v,1)} °C: baixar 25%`,"Fora de 22–33 °C o metabolismo e o apetite despencam.");
+  if(tp&&(tp.v<22||tp.v>33))add(0.75,`Temperatura ${f(tp.v,1)} °C: baixar 25%`,"Fora de 22–33 °C o metabolismo e o apetite despencam.");else if(tp&&tp.v>=32)add(0.9,`Temperatura ${f(tp.v,1)} °C: baixar 10% e não subir a ração`,"A 32 °C o camarão ainda come, mas converte pior e a água pesa: no bioflocos da FURG o ganho caiu de 1,00 para 0,90 g/semana e a conversão subiu de 2,0 para 2,5 (Fóes/Marchetti); ração atrás do apetite no calor deu 65% contra 92% (Limsuwan e Ching 2012). Feche o sombrite.");
   else if(tp&&tp.v<26)add(0.9,`Temperatura ${f(tp.v,1)} °C, abaixo de 26: baixar 10%`,"Estudo (Zhang et al. 2025, Animals, laboratório): o consumo de ração em 30 min foi de 0,95 g a 32 °C para 0,46 g a 20 °C; a temperatura foi o fator que mais mexeu no apetite. Água fria, camarão come menos: corte leve e confirme pela bandeja.");
   const mo=tipo("mortalidade").filter(m=>m.data.slice(0,10)===ontem).reduce((s,m)=>s+(m.qtd||0),0);
   if(mo>0&&L.vivos&&mo/L.vivos>0.005)add(0.8,`${n0(mo)} mortos ontem (${f(mo/L.vivos*100,1)}%): baixar 20%`,"Acima de 0,5% ao dia é sinal de estresse ou doença: comer menos alivia a água enquanto você investiga.");
-  if(jm.on)add(0.8,`Janela de muda (${jm.qual}): baixar 20%`,"Perto da lua cheia e da nova muitos camarões mudam juntos e comem menos. O manual manda baixar cerca de 20% e reforçar o ar. É estimativa de campo; confirme pela bandeja.");
-  else if(mudaVista)add(0.85,"Muda vista ontem: baixar 15%","Na muda o camarão quase não come por 1–2 dias, até a casca endurecer.");
+  if(jm.on)add(0.6,`Janela de muda (${jm.qual}): baixar 40%`,"Na muda o consumo cai 35 a 50% por 3 a 4 dias (Molina 2000); a lua só ajuda a prever esses dias (decisão do Wagner, 22/11). Antes o manual mandava baixar cerca de 20% e reforçar o ar. É estimativa de campo; confirme pela bandeja.");
+  else if(mudaVista)add(0.6,"Muda vista ontem: baixar 40%","Na muda o consumo cai 35 a 50% por 3 a 4 dias, até a casca endurecer (Molina 2000).");
   const final=Math.round(base*trava);
   let acao="Manter";if(trava===0)acao="Suspender";else if(final>ref*1.02)acao="Aumentar";else if(final<ref*0.98)acao="Reduzir";
   return{dia,L,pt,nt,tabela,purdue,base,trava,final,acao,ref,motivos,totOntem,porTrato:final/nt}}
@@ -395,8 +404,8 @@ function nutratPlano(dia){const base=cfg.doses.nutrat*tanque().vol;const rit=rit
   if(ss&&ss.v>20)m.push(`cone ${f(ss.v,1)} mL/L acima de 20 (junto com o decantador ligado e ração −10 a −20%)`);
   if(tan&&tan.v>1)m.push(`amônia ${f(tan.v,2)} mg/L acima de 1 (junto: açúcar ~20 g por g de N, simbiótico e ar no máximo)`);
   if(no2&&no2.v>1)m.push(`nitrito ${f(no2.v,2)} mg/L acima de 1 (junto: ar no máximo e alcalinidade ≥ 150)`);
-  if(od&&od.v<4){antes.push("PRIMEIRO abrir todos os registros e ligar o soprador reserva");if(od.v<3)antes.push("abaixo de 3 mg/L: cilindro de O₂ na pedra porosa e Oxitrat");m.push(`OD ${f(od.v,1)} mg/L abaixo de 4, só depois do ar`)}
-  if(jm.on)m.push(`janela da ${jm.qual} (junto: ar reforçado e ração −20%)`);
+  if(od&&od.v<4){antes.push("PRIMEIRO abrir todos os registros e ligar o soprador reserva");if(od.v<3)antes.push("abaixo de 3 mg/L: cilindro de O₂ na pedra porosa e Oxitrat");m.push(`OD ${odT(od.v)} abaixo de 4, só depois do ar`)}
+  if(jm.on)m.push(`janela da ${jm.qual} (junto: ar reforçado e ração −40%)`);
   if(rit.espuma==="sem")return{ml:base,pausa:true,motivos:["espuma sumiu e água clara: manter a dose ou pausar, e reduzir a bactéria (menos simbiótico)"],antes};
   return{ml:m.length?base*2:base,dobra:m.length>0,motivos:m,antes}}
 function decantadorAcao(dia){const ss=leituraRecente("ss",dia);const st=prep.decantador||{};const on=!!st.on;
@@ -413,38 +422,41 @@ function correcoes(dia){const v=tanque().vol;const r=recomendacao(dia);const kg=
   const tan=leituraRecente("tan",dia);if(tan&&tan.v>1)out.push(["Açúcar contra amônia",`${n0(tan.v*v*cfg.doses.acucar)} g`,`${f(tan.v,2)} mg/L × ${f(v,1)} m³ × ${n0(cfg.doses.acucar)} g. Dissolvido, ao longo do dia.`,"estudo"]);
   const np=nutratPlano(dia);
   out.push(["Nutrat (biossurfactante)",np.pausa?`${n0(np.ml)} mL ou pausar`:np.dobra?`${n0(np.ml/2)} + ${n0(np.ml/2)} mL`:`${n0(np.ml)} mL`,(np.antes.length?"Antes: "+np.antes.join("; ")+". ":"")+(np.dobra?"Dobrado (manhã + noite), diluído em 2 L, porque: "+np.motivos.join("; ")+".":np.pausa?np.motivos[0]+".":"Dose base do Só Bioflocos, diluída em 2 L, 1 vez por dia."),"campo"]);
-  {const vol=tanque().vol;const form=dc==null||dc<30;out.push(["Simbiótico da bombona",form?`${n0(cfg.doses.simbForm*vol)} L`:`${n0(0.5*vol)}–${n0(1*vol)} L`,form?`Formação dos flocos: ${f(cfg.doses.simbForm,1)} L por m³ × ${f(vol,1)} m³ (pode ir a ${n0(2*vol)} L para acelerar). Faça 1 balde novo de prebiótico. Meça o pH da bombona: perto de 6, ponha 80 g de bicarbonato; abaixo de 5 as bactérias morrem.`:`Manutenção: 0,5 a 1 L por m³ × ${f(vol,1)} m³. Faça 1 balde novo de prebiótico. Meça o pH da bombona: perto de 6, ponha 80 g de bicarbonato; abaixo de 5 as bactérias morrem.`,"campo"])}
+  {if(simbHoje(hoje()))out.push(["Simbiótico (lote do dia)","1 lote",`${loteTxt()}. ${dc==null||dc<0?"Maturação: todo dia, junto com o cloreto de amônio.":dc<15?"Todo dia nos 15 primeiros dias depois de povoar.":"Agora 3 vezes por semana (seg, qua e sex; os dias são regra do app)."} Receita da tese do Pimentel (FURG 2025, cap. III–V); escolha do Wagner em 23/11.`,"estudo"]);else out.push(["Simbiótico","hoje não",`Depois do dia 15 o lote vai 3 vezes por semana (seg, qua e sex). Pimentel 2025: a adição contínua de fertilizante deve ser evitada.`,"estudo"])}
   out.push(["Farelo de arroz fermentado",`${f(cfg.doses.farelo*kg,2)} kg`,`Carbono principal: ${f(cfg.doses.farelo,2)} kg por kg de ração × ${f(kg,2)} kg. Açúcar só quando a amônia passar de 1. Melaço não (pior sobrevivência no teste de Ray e Lotz, 21,6%).`,"estudo"]);
-  if(kg>0){const cn=cnDoDia(kg);out.push(["Relação C:N do dia (conta)",`≈ ${f(cn.cn,1)} : 1`,`Ração ${f(kg,2)} kg com ${n0(cn.pr.v)}% de proteína (${cn.pr.o}) + ${f(cn.fa,2)} kg de farelo. Estimativa: ração 45% de carbono, farelo 40% de carbono e 2% de nitrogênio. Referência ${n0(cn.alvo)} : 1 (Halim et al. 2025, conferido: C:N 10 deu o melhor retorno, 95% de sobrevivência e conversão 1,58; Cao et al. 2025 cita 15–20, ainda não conferido).${cn.faltaC>0.001?` Para chegar a ${n0(cn.alvo)} faltariam ${f(cn.faltaC,2)} kg de carbono (≈ ${f(cn.acucarKg,2)} kg de açúcar${cn.fareloKg!=null?" ou "+f(cn.fareloKg,2)+" kg a mais de farelo":""}).`:""} Mais carbono favorece as bactérias que comem amônia, mas também engrossa o floco e gasta oxigênio. Use junto com a amônia e o cone; o app não muda a dose sozinho.`,"estudo"])}
+  if(kg>0){const cn=cnDoDia(kg,simbHoje(hoje())?1:0);out.push(["Relação C:N do dia (ração + farelo + lote de simbiótico)",`≈ ${f(cn.cn,1)} : 1`,`Ração ${f(kg,2)} kg com ${n0(cn.pr.v)}% de proteína (${cn.pr.o}) + ${f(cn.fa,2)} kg de farelo + ${cn.sL?"1 lote de simbiótico":"sem lote de simbiótico hoje"}. Carbono: ração ${f(cn.cR,2)} kg, farelo ${f(cn.cF,2)} kg, simbiótico ${f(cn.cS,2)} kg (o lote da tese leva por m³ 20 g de farelo + 2 g de açúcar ≈ 8,4 g de carbono e 0,43 g de nitrogênio; conta máxima, sem descontar o que a fermentação gasta, regra do app). Estimativa: ração 45% de carbono, farelo (puim) 37,7% de carbono e 2,17% de nitrogênio na matéria natural (Leite et al. 2020: 41,8% e 2,41% na matéria seca, com 90,1% de matéria seca; Serra 2013 deu 43,4% sem dizer a base) e açúcar 42,1% (fórmula da sacarose). Referência ${n0(cn.alvo)} : 1 (Xu et al. 2022, lido na íntegra: 30 m³, C:N 8, 12 e 16 deram 92,8, 92,4 e 89,7% de sobrevivência, sem diferença; a C:N controla o nitrogênio. Apoio: Halim et al. 2025, lido só pelo resumo, C:N 10 com 95%; Cao et al. 2025 cita 15–20, não conferido).${cn.faltaC>0.001?` Para chegar a ${n0(cn.alvo)} faltariam ${f(cn.faltaC,2)} kg de carbono (≈ ${f(cn.acucarKg,2)} kg de açúcar${cn.fareloKg!=null?" ou "+f(cn.fareloKg,2)+" kg a mais de farelo":""}).`:""} Mais carbono favorece as bactérias que comem amônia, mas também engrossa o floco e gasta oxigênio. Use junto com a amônia e o cone; o app não muda a dose sozinho.`,"estudo"])}
   const dec=decantadorAcao(dia);if(dec)out.push(["Decantador",dec.t,dec.p,"estudo"]);
-  {const sl=leituraRecente("sal",dia);const mx=(cfg.faixas.sal||{}).max||25;if(sl&&diasEntre(sl.data,dia)<=2&&sl.v>mx+1){const L=v*1000*(1-mx/sl.v);out.push(["Repor água doce",`até ${n0(Math.round(L/50)*50)} L`,`Salinidade ${f(sl.v,1)} ppt medida em ${dt(sl.data)}: o sal concentrou pela evaporação. Reponha só o que o nível baixou (1 cm de lâmina = ${n0(tanque().area*10)} L), com água doce sem cloro, e meça a salinidade de novo depois. Não repita esta dose com medida velha: no simulador isso diluiu o tanque dia após dia.`,"estudo"])}}
+  {const sl=leituraRecente("sal",dia);const mx=(cfg.faixas.sal||{}).max||25;if(sl&&diasEntre(sl.data,dia)<=2&&sl.v>mx+1){const alvoS=Math.max(mx,sl.v-2);/* no máximo 2 ppt por vez, como no jogo (regra do app; manual: acima de 3 ppt/dia é crítico) */const L=v*1000*(1-alvoS/sl.v);out.push(["Repor água doce",`até ${n0(Math.round(L/50)*50)} L`,`Salinidade ${f(sl.v,1)} ppt medida em ${dt(sl.data)}: o sal concentrou pela evaporação. Reponha só o que o nível baixou (1 cm de lâmina = ${n0(tanque().area*10)} L), com água doce sem cloro, e meça a salinidade de novo depois. Não repita esta dose com medida velha: no simulador isso diluiu o tanque dia após dia. No máximo 2 ppt por vez (regra do app; o manual chama de crítica a mudança acima de 3 ppt por dia).`,"app"])}}
   out.push(["Puim",`${f(r.L.biomKg/10,1)} g`,`10 g por 100 kg de biomassa (${f(r.L.biomKg,1)} kg).`,"campo"]);
   out.push(["Azomite na ração",`${f(cfg.doses.azomite*kg,1)} g`,`${f(cfg.doses.azomite,1)} g por kg de ração × ${f(kg,2)} kg. Estudo Tan 2014: 2–4 g/kg funcionou; 6–8 g/kg não.`,"estudo"]);
   return out}
 
 function protRacao(){const d=num(cfg.doses.prot);if(d)return{v:d,o:"Cadastro › Doses"};const p=(typeof gest!=="undefined"&&gest.length)?prodRacao():null;const m=p&&/(\d{2})\s*%/.exec(p.nome||"");if(m)return{v:+m[1],o:"nome da ração ("+p.nome+")"};return{v:38,o:"padrão: cadastre a % de proteína em Cadastro › Doses"}}
-function cnDoDia(kg){const pr=protRacao();const nR=kg*pr.v/100/6.25,cR=kg*0.45,fa=(cfg.doses.farelo||0)*kg,cF=fa*0.40,nF=fa*0.02;const N=nR+nF,C=cR+cF;const alvo=cfg.doses.cnAlvo||15;const faltaC=Math.max(0,alvo*N-C);return{cn:N>0?C/N:null,pr,alvo,faltaC,acucarKg:faltaC/0.42,fareloKg:alvo<20?faltaC/(0.40-alvo*0.02):null,fa}}
+function cnDoDia(kg,sL){const pr=protRacao();const nR=kg*pr.v/100/6.25,cR=kg*0.45,fa=(cfg.doses.farelo||0)*kg,cF=fa*0.3767,nF=fa*0.02172;/* puim na matéria natural: 41,8% C e 2,41% N na matéria seca × 90,12% de MS (Leite et al. 2020, Rev Bras Zootec 49:e20190039) */sL=sL||0;/* sL = número de lotes do simbiótico no dia (receita da tese: por m³ 20 g de farelo e 2 g de açúcar) */const vS=tanque().vol,cS=sL*vS*(0.020*0.3767+0.002*0.4211),nS=sL*vS*0.020*0.02172;const N=nR+nF+nS,C=cR+cF+cS;const alvo=cfg.doses.cnAlvo||10;const faltaC=Math.max(0,alvo*N-C);return{cn:N>0?C/N:null,pr,alvo,faltaC,sL,cS,cR,cF,acucarKg:faltaC/0.4211,fareloKg:(0.3767-alvo*0.02172)>0?faltaC/(0.3767-alvo*0.02172):null,fa}}
 function despescadoKg(){return(typeof gest!=="undefined"?gest:[]).filter(g=>g.k==="despesca"&&g.tipo==="PARCIAL"&&g.ciclo===(cfg.cicloId||"c1")).reduce((s,g)=>s+(g.kg||0),0)}
 function fcrCiclo(dia){dia=dia||hoje();if(!cfg.dataPovoamento||!biometriasAte(dia).length)return null;const ini=cfg.dataPovoamento;const racaoKg=tipo("racao").filter(r=>r.dia>=ini&&r.dia<=dia).reduce((s,r)=>s+(r.qtd||0),0)/1000;const L=lote(dia);const ganho=L.biomKg+despescadoKg()-L.t.pls*cfg.pesoInicial/1000;if(ganho<0.5||racaoKg<=0)return null;return{fcr:racaoKg/ganho,racaoKg,ganho}}
 function alertas(){const out=[];
-  for(const p of PARAMS){const u=leituraRecente(p.k,hoje());if(!u)continue;if(ionSemFaixa(p.k)&&u.v<ionAlvo(p.k))continue;const n=nivel(p.k,u.v);if(n&&n!=="ok")out.push([n==="crit"?"bad":"w",`${p.n} ${fora(p.k,u.v)}: ${f(u.v,p.d)} ${p.u}${n==="crit"?" · CRÍTICO":""}`,`Ideal ${faixaTxt(p.k)}${critTxt(p.k)?" · crítico "+critTxt(p.k):""} · medido ${dt(u.data)}`])}
+  {const b=leituraRecente("phb",hoje());if(b){if(b.v<5)out.push(["bad",`pH do lote ${f(b.v,1)}: as bactérias morreram`,"Abaixo de 5 o simbiótico azedou (caderno Só Bioflocos). Não ponha no tanque: descarte e faça um lote novo."]);else if(b.v<7)out.push(["w",`pH do lote ${f(b.v,1)}: abaixo de 7`,"Confira se o bicarbonato da receita entrou (2 g por m³ de tanque; na tese ele é o tampão da fermentação). A faixa 7,0–7,5 é do caderno Só Bioflocos."]);else out.push(["w",`pH do lote ${f(b.v,1)}: acima de 7,5`,"Não precisa de bicarbonato. Confira de novo amanhã (faixa do caderno 7,0–7,5)."])}}
+  for(const p of PARAMS){if(p.k==="cl"||p.k==="vibV"||p.k==="phb")continue;/* têm alerta próprio com a conduta, abaixo */const u=leituraRecente(p.k,hoje());if(!u)continue;if(ionSemFaixa(p.k)&&u.v<ionAlvo(p.k))continue;const n=nivel(p.k,u.v);if(n&&n!=="ok")out.push([n==="crit"?"bad":"w",`${p.n} ${fora(p.k,u.v)}: ${f(u.v,p.d)} ${p.u}${n==="crit"?" · CRÍTICO":""}`,`Ideal ${faixaTxt(p.k)}${critTxt(p.k)?" · crítico "+critTxt(p.k):""} · medido ${dt(u.data)}`])}
   const t=leituraRecente("tan",hoje()),ph=leituraRecente("ph",hoje()),tp=leituraRecente("temp",hoje());if(t&&ph){const x=nh3(t.v,ph.v,tp&&tp.v);if(x>0.03)out.push([x>0.1?"bad":"w",`Amônia tóxica (NH₃) ${f(x,3)} mg/L`,"Calculada com amônia total, pH e temperatura. Ideal < 0,03; crítico > 0,1. pH alto aumenta a parte tóxica."])}
+  const clr=leituraRecente("cl",hoje());if(clr&&clr.v>=0.05)out.push(["bad",`Cloro residual ${f(clr.v,2)} mg/L: não povoe nem ponha bactéria`,`Espere o cloro zerar com ar forte e meça todo dia. Para neutralizar: tiossulfato ≈ 7 × o cloro (mg/L) × o volume: ${f(7*clr.v*tanque().vol,0)} g no seu tanque (limiares, tiossulfato 7×). Povoar só abaixo de 0,05.`]);
+  const vv=leituraRecente("vibV",hoje());if(vv&&vv.v>cfg.faixas.vibV.max)out.push([vv.v>(cfg.faixas.vibV.cmax||1e9)?"bad":"w",`Vibrio verde na placa TCBS: ${f(vv.v,0)} UFC/mL (atenção acima de ${f(cfg.faixas.vibV.max,0)})`,"Verdes costumam ser as patogênicas (FAU/UF). Corte a ração e confira a bandeja (sobra alimenta o Vibrio); simbiótico todo dia (no bioflocos o probiótico subiu a sobrevivência de 77% para 92%, Aguilera-Rivera 2014); sem rodo agora; nunca antibiótico. Repita a placa em 2 a 3 dias (regra do app). Mortes começaram depois que as verdes subiram (Samocha)."]);
   const np=nutratPlano(hoje());
   const dec=decantadorAcao(hoje());if(dec&&dec.urg)out.push([dec.urg,"Decantador: "+dec.t,dec.p]);
-  const oda=leituraRecente("od",hoje());if(oda&&oda.v<cfg.doses.odAlarme&&oda.v>=4)out.push(["w",`Alarme de oxigênio: ${f(oda.v,1)} mg/L abaixo de ${f(cfg.doses.odAlarme,1)}`,"Plano B: confira o soprador e deixe o reserva pronto. Abaixo de 4, ligue o reserva."]);
-  const od=leituraRecente("od",hoje());if(od&&od.v<4)out.push([od.v<3?"bad":"w",`Pouco oxigênio (${f(od.v,1)} mg/L): abra todos os registros e ligue o soprador reserva${od.v<3?"; abra o cilindro de O₂ na pedra porosa e use Oxitrat":""}`,"Só depois disso, Nutrat em dobro. O fabricante diz que o Nutrat melhora a troca de oxigênio (promessa sem estudo independente). Com estudo: mais oxigênio acelera as bactérias que transformam amônia em nitrito e nitrato, então subir o O₂ ajuda a baixar a amônia."]);
+  const oda=leituraRecente("od",hoje());if(oda&&oda.v<cfg.doses.odAlarme&&oda.v>=4)out.push(["w",`Alarme de oxigênio: ${odT(oda.v)} abaixo de ${f(cfg.doses.odAlarme,1)}`,"Plano B: confira o soprador e deixe o reserva pronto. Abaixo de 4, ligue o reserva."]);
+  const od=leituraRecente("od",hoje());if(od&&od.v<4)out.push([od.v<3?"bad":"w",`Pouco oxigênio (${odT(od.v)}): abra todos os registros e ligue o soprador reserva${od.v<3?"; abra o cilindro de O₂ na pedra porosa e use Oxitrat":""}`,"Só depois disso, Nutrat em dobro. O Nutrat não põe oxigênio: age como emulsificante e ajuda as bactérias a quebrar a gordura. Com estudo: mais oxigênio acelera as bactérias que transformam amônia em nitrito e nitrato, então subir o O₂ ajuda a baixar a amônia."]);
   if(np.dobra)out.push(["w",`Nutrat em dobro hoje: ${n0(np.ml/2)} mL de manhã + ${n0(np.ml/2)} mL à noite, diluído em 2 L`,"Porque: "+np.motivos.join("; ")+"."]);
   if(np.pausa)out.push(["w","Espuma sumiu e água clara: manter o Nutrat ou pausar","Reduza a bactéria (menos simbiótico). Se o floco morreu de vez, use o botão em Técnicas › Emergências."]);
   const ls=recs.find(r=>r.tipo==="leitura");if(ls){const h=(Date.now()-toDate(ls.data))/36e5;if(h>12)out.push(["w","Última leitura de água há "+Math.round(h)+" h","Meça OD e temperatura às 6 h e às 18 h. A madrugada é o pior momento do oxigênio."])}
   const dc=diaCultivo();const b=biometriasAte(hoje())[0];if(dc!=null&&dc>=7){const d=b?diasEntre(b.data,hoje()):dc;if(d>7)out.push(["w",b?"Biometria há "+d+" dias":"Nenhuma biometria ainda","Pese 50 a 100 camarões juntos e divida pelo número. É o que mais corrige a ração."])}
   if(dc!=null&&dc>=10){const u=recs.filter(r=>(r.tipo==="agenda"&&r.feitos&&r.feitos.rodo)||(r.tipo==="ritual"&&r.itens&&r.itens.dif)).map(r=>r.dia).sort().pop();const d=u?diasEntre(u,hoje()):dc;
     if(d>7)out.push([d>14&&u?"bad":"w",u?`Rodo no fundo há ${d} dias`:"Rodo no fundo ainda não marcado neste ciclo","Passe o rodo no fundo e mexa os difusores 1 vez por semana (fora da janela de muda) e marque na Agenda. No simulador, o ciclo sem rodo virou lodo e sulfeto (cheiro de ovo podre) e perdeu quase todo o lote."])}
-  if(dc!=null&&dc>=2){const d1=tratosDoDia(addDias(hoje(),-1)),d2=tratosDoDia(addDias(hoje(),-2));if(d1.length&&d2.length&&!d1.concat(d2).some(r=>r.bandeja))out.push(["bad","Bandeja sem conferir há 2 dias","Sem a bandeja o app repete a ração no escuro. No simulador, ração 60% acima do apetite matou o lote inteiro por falta de oxigênio e Vibrio. Confira 1 a 2 horas depois de cada trato."])}
-  if(cfg.densidade>600)out.push(["w",`Densidade ${n0(cfg.densidade)} por m²: acima de 600`,"No simulador, com o mesmo manejo do manual, 250 e 500 por m² despescaram com 95% e 1.000 por m² caiu para cerca de metade (Vibrio, sólidos e oxigênio no fim do ciclo). É resultado de modelo, não de estudo; veja também Xu et al. 2025 no Cadastro."]);
+  if(dc!=null&&dc>=2){const d1=tratosDoDia(addDias(hoje(),-1)),d2=tratosDoDia(addDias(hoje(),-2));if(d1.length&&d2.length&&!d1.concat(d2).some(r=>r.bandeja))out.push(["bad","Bandeja sem conferir há 2 dias","Sem a bandeja o app repete a ração no escuro. No simulador, ração 60% acima do apetite derrubou a sobrevivência de 95% para 78% quando faltou o simbiótico (94% com ele), por Vibrio. Confira 1 a 2 horas depois de cada trato."])}
+  if(cfg.densidade>600)out.push(["w",`Densidade ${n0(cfg.densidade)} por m²: acima de 600`,"No simulador, com o mesmo manejo do manual, 250 e 500 por m² despescaram com cerca de 95% e a 1.000 por m² o oxigênio não aguentou no fim do ciclo e o lote se perdeu. É resultado de modelo, não de estudo; veja também Xu et al. 2025 no Cadastro."]);
   const L=lote(hoje());const dens=L.biomKg/L.t.vol;if(dens>6)out.push(["bad",`Biomassa ${f(dens,1)} kg/m³: hora da despesca parcial`,"Acima de 6 kg/m³ (~120 kg) o manual manda tirar cerca de 1/3 ou ligar os 2 sopradores juntos. A FURG (Da Silveira et al. 2022, Aquaculture) testou despescas parciais em bioflocos e viu ganho de sobrevivência e de peso; veja Aprenda › Estudos dos carrosséis."]);else if(dens>5)out.push(["w",`Biomassa ${f(dens,1)} kg/m³, chegando em 6`,"Prepare a despesca parcial ou o segundo soprador."]);
   {const fc=fcrCiclo();if(fc&&diaCultivo()>=21&&fc.fcr>1.8)out.push([fc.fcr>2.3?"bad":"w",`Conversão alimentar do ciclo ${f(fc.fcr,2)}: alta`,`${f(fc.racaoKg,1)} kg de ração para ${f(fc.ganho,1)} kg de camarão ganho. Em biofloco a conversão ficou entre 1,12 e 1,29 de 200 a 800 camarões por m³ (Xu et al. 2025, Fishes); 1,8 é o limite de alerta do app. Confira a biometria e a contagem de vivos; se estiverem certas, a sobra está indo para o fundo.`])}
-  if(L.peso>=cfg.pesoAlvo*0.95)out.push(["w",`Peso médio ${f(L.peso,1)} g perto da meta de ${f(cfg.pesoAlvo,0)} g: preparar a despesca`,"Na despesca, guardar as mantas úmidas para o próximo ciclo (as bactérias nitrificantes sobrevivem). Baixar a água para 50 cm, arrastar os difusores para um lado e tirar com puçá."]);
-  const jm=janelaMuda(new Date());if(jm.on)out.push(["moon",`Janela de muda: perto da ${jm.qual}`,"Abra todos os difusores ou ligue o soprador reserva (meta OD ≥ 5,5), ração −20%, confira alcalinidade ≥ 150, cálcio, magnésio e potássio. Não mexa no pH (ácido ou cal) nesses dias. Quando as cascas pararem de boiar, ração +10–20% por 2–3 dias: o camarão volta com fome. Veja Manejo › Calendário Lunar."]);
+  if(L.peso>=cfg.pesoAlvo*0.95)out.push(["w",`Peso médio ${f(L.peso,1)} g perto da meta de ${f(cfg.pesoAlvo,0)} g: preparar a despesca`,"Na despesca, guardar as telas úmidas para o próximo ciclo (as bactérias nitrificantes sobrevivem). Baixar a água para 50 cm, arrastar os difusores para um lado e tirar com puçá."]);
+  const jm=janelaMuda(new Date());if(jm.on)out.push(["moon",`Janela de muda: perto da ${jm.qual}`,"Abra todos os difusores ou ligue o soprador reserva (meta OD ≥ 5,5), ração −40% (Molina 2000), confira alcalinidade ≥ 150, cálcio, magnésio e potássio. Não mexa no pH (ácido ou cal) nesses dias. Quando as cascas pararem de boiar, volte à ração normal e deixe a bandeja decidir (limpa = subir 5–10%): o camarão volta a comer normal no fim da pós-muda (Galindo 2009). Veja Manejo › Calendário Lunar."]);
   alertasV14(out);
   return out}
 
@@ -452,8 +464,8 @@ function alertasV14(out){const H=hoje(),V=tanque().vol;const L=k=>leituraRecente
   /* minerais: proporção e correção */
   const ca=L("ca"),mg=L("mg"),k=L("k");
   if(mg&&ca){const r=mg.v/ca.v;if(r<2.5||r>4)out.push(["w",`Magnésio ÷ cálcio = ${f(r,1)} (ideal 2,5–4; no mar ≈ 3,1)`,"Fora da proporção a casca endurece mal depois da muda."])}
-  if(mg&&k){const r=mg.v/k.v;if(r<2.5||r>4)out.push(["w",`Magnésio ÷ potássio = ${f(r,1)} (ideal 2,5–4; no mar ≈ 3,2)`,"Potássio baixo dá câimbra (camarão dobrado) e morte na muda."])}
-  if(k&&k.v<ionAlvo("k")*0.8){const g=(ionAlvo("k")-k.v)*V/0.524;out.push(["w",`Potássio baixo: ${n0(k.v)} mg/L (alvo ≈ ${n0(ionAlvo("k"))})`,`Cloreto de potássio: ${n0(g)} g para chegar ao alvo. Dissolva e aplique em 2 ou 3 dias, longe da janela de muda.`])}
+  if(mg&&k){const r=mg.v/k.v;if(r<2.5||r>4)out.push(["w",`Magnésio ÷ potássio = ${f(r,1)} (ideal 2,5–4; no mar ≈ 3,2)`,"Potássio baixo dá câimbra (camarão dobrado) e morte na muda. A faixa 2,5–4 é regra do app (proporção da água do mar); o estudo (Roy 2007) só viu câimbra com K abaixo de 20% e Mg abaixo de 12% da água do mar."])}
+  if(k&&k.v<ionAlvo("k")*0.8){const g=(ionAlvo("k")-k.v)*V/0.524;out.push(["w",`Potássio baixo: ${n0(k.v)} mg/L (alvo ≈ ${n0(ionAlvo("k"))})`,`Cloreto de potássio: ${n0(g)} g para chegar ao alvo. Dissolva e aplique em 2 ou 3 dias, longe da janela de muda. Alvo de 80% da água do mar é regra do app (Roy 2007 viu dano só abaixo de 20%). Kit de potássio: método a confirmar.`])}
   if(mg&&mg.v<ionAlvo("mg")*0.8){const g=(ionAlvo("mg")-mg.v)*V/0.0986;out.push(["w",`Magnésio baixo: ${n0(mg.v)} mg/L (alvo ≈ ${n0(ionAlvo("mg"))})`,`Sulfato de magnésio (sal amargo, 7 H₂O): ${n0(g/1000)} kg para chegar ao alvo. Divida em 3 a 5 dias.`])}
   if(ca&&ca.v<ionAlvo("ca")*0.8)out.push(["w",`Cálcio baixo: ${n0(ca.v)} mg/L (alvo ≈ ${n0(ionAlvo("ca"))})`,"Líquido leitoso do gesso decantado (600 g por balde) ou cloreto de cálcio. Gesso traz cálcio, não alcalinidade."]);
   /* pH e CO2 */
@@ -461,9 +473,9 @@ function alertasV14(out){const H=hoje(),V=tanque().vol;const L=k=>leituraRecente
   if(phs.length>=2){const mx=Math.max(...phs.map(x=>x.v)),mn=Math.min(...phs.map(x=>x.v));if(mx-mn>0.5)out.push(["w",`pH balançou ${f(mx-mn,1)} hoje (${f(mn,1)} a ${f(mx,1)})`,"Muita alga: ela tira CO₂ de dia e devolve à noite. Feche o sombrite nas horas de sol, mantenha o floco marrom e a alcalinidade ≥ 150 (segura o pH)."])}
   const cedo=phs.filter(x=>x.h<8).sort((a,b)=>a.v-b.v)[0];if(cedo&&cedo.v<7.4)out.push(["w",`pH ${f(cedo.v,1)} de madrugada: CO₂ alto`,"Respiração da noite acumula CO₂. Academia de ar agora e meça de novo às 9 h antes de pensar em cal; se a alcalinidade estiver boa, o pH sobe sozinho com o ar."]);
   /* OD supersaturado */
-  const od=L("od");if(od&&od.v>9)out.push(["w",`OD ${f(od.v,1)} mg/L: acima do que o ar consegue (≈ 7 mg/L)`,"É fotossíntese de alga (água verde). À noite ela consome e o OD despenca. Feche o sombrite nas horas de sol e meça às 5–6 h."]);
+  const od=L("od");if(od&&od.v>9)out.push(["w",`OD ${odT(od.v)}: acima do que o ar consegue (≈ 7 mg/L)`,"É fotossíntese de alga (água verde). À noite ela consome e o OD despenca. Feche o sombrite nas horas de sol e meça às 5–6 h."]);
   /* nitrato */
-  const no3=L("no3");if(no3&&no3.v>300)out.push(["bad",`Nitrato ${n0(no3.v)} mg/L: dano crônico`,"Kuhn et al. 2010: em 6 semanas, sobrevivência 64% com 435 mg/L e 15% com 910. Troque parte da água (10–20%) com água preparada sem cloro."]);else if(no3&&no3.v>177)out.push(["w",`Nitrato ${n0(no3.v)} mg/L: acima do seguro (177)`,"Kuhn et al. 2010: com 220 mg/L a sobrevivência caiu para 87% em 6 semanas. Planeje troca parcial."]);
+  const no3=L("no3");if(no3&&no3.v>300)out.push(["bad",`Nitrato ${n0(no3.v)} mg/L: dano crônico`,"Kuhn et al. 2010: em 6 semanas, sobrevivência 64% com 435 mg/L e 15% com 910. Troque parte da água (10–20%) com água preparada sem cloro."]);else if(no3&&no3.v>177)out.push(["w",`Nitrato ${n0(no3.v)} mg/L: acima do seguro (177)`,"Furtado et al. 2015 dão 177 mg/L como nível seguro. Em Kuhn et al. 2010, com 220 mg/L a sobrevivência ainda foi igual à do controle (87%), mas o peso final já foi menor (8,7 g contra 9,3 g). Planeje troca parcial."]);
   /* sólidos e sulfeto */
   const ss=L("ss");if(ss&&ss.v>30)out.push(["bad",`Cone ${f(ss.v,0)} mL/L: sólido demais`,"Ligue o decantador, Nutrat 2 mL por m³ e menos simbiótico. Acima de 30 vem brânquia preta, queda de OD e sulfeto no fundo."]);
   if(ss&&od&&ss.v>25&&od.v<4.5)out.push(["w","Risco de sulfeto (cheiro de ovo podre) no fundo","Cone alto e pouco oxigênio. Passe o rodo nos difusores, ligue o decantador e faça academia de ar."]);
@@ -474,8 +486,8 @@ function alertasV14(out){const H=hoje(),V=tanque().vol;const L=k=>leituraRecente
 const RITUAL=[["espuma","1. Olhar a espuma","Fina e limpa (tipo Sprite) está bom. Crespa, densa ou marrom: dobre o Nutrat. Sumiu e água clara: mantenha ou pause e reduza a bactéria."],
  ["cone","2. Cone Imhoff (15 min parado)","1 L de água, 15 min, anotar em Parâmetros. Meta 10–15 mL/L."],
  ["nutrat","3. Nutrat (biossurfactante)","1 mL por m³ por dia diluído em 2 L (o painel calcula). Dobra (metade de manhã + metade à noite) com espuma crespa, cone > 20, amônia > 1, nitrito > 1, OD < 4 (depois do ar) ou lua. O painel mostra o motivo."],
- ["simb","4. Simbiótico da bombona + balde novo de prebiótico","1 L por m³ por dia na formação (15–30 dias), 0,5–1 L por m³ depois. Probiótico: 30 g por bombona de 70–80 L, 24 h de ar. Meça o pH da bombona antes de usar: 7–7,5 é o certo; abaixo de 5 as bactérias morreram (corrija com bicarbonato na próxima)."],
- ["cat","4b. Catalisador de flocos na bombona","Só depois de corrigir o pH da bombona para 7–7,5 com bicarbonato. Dose do Cadastro (rótulo). O líquido engrossa e flocula."],
+ ["simb","4. Simbiótico (lote da tese)","Por m³ de tanque: 20 g de farelo de arroz + 2 g de açúcar + 2 g de bicarbonato + 0,3 g de probiótico, água 10× o farelo; 12 h fechado + 12 h com ar e o lote inteiro no tanque. Todo dia na maturação e nos 15 primeiros dias depois de povoar; depois 3 vezes por semana (Pimentel 2025, tese FURG). Meça o pH do lote antes de usar: 7–7,5; abaixo de 5 descarte."],
+ ["cat","4b. Catalisador de flocos no lote","Só com o pH do lote em 7–7,5. Dose do Cadastro (rótulo). O líquido engrossa e flocula."],
  ["racao","5. Ração com Azomite","3 g por kg de ração (o app calcula abaixo)."],
  ["dif","6. Difusores no lugar","Mexer com o rodo os que estiverem em ponto morto."],
  ["acad","7. Academia: 1 h de ar no máximo de manhã","Menos nos dias de muda."],
@@ -483,14 +495,19 @@ const RITUAL=[["espuma","1. Olhar a espuma","Fina e limpa (tipo Sprite) está bo
  ["farelo","9. Farelo fermentado (carbono) no lugar do açúcar","Quantidade em Quanto aplicar hoje. Açúcar só com amônia > 1. Nada de melaço."],
  ["lodo","Decantador: tirar o lodo do registro do cone","Todo dia enquanto o decantador estiver ligado."],
  ["gerador","Plano B: testar gerador e alarme de OD","Toda segunda-feira. Cilindro de O₂ cheio?"],
+ ["odnoite","OD de madrugada (3–5 h)","É a hora mais baixa do dia. Mínimo de 5,0 mg/L (≈ 72–76% de saturação); meta do dia 5,5 (≈ 80%), como no Xu 2025, que teve 84–95% de sobrevivência com OD médio de 5,6 ou mais. Lance em Parâmetros."],["ph14","pH à tarde (14–16 h), segunda leitura","Com sol o pH sobe à tarde: a diferença da manhã para a tarde mostra se a alcalinidade está segurando. Lance em Parâmetros."],
  ["od6","Camarão: OD e temperatura às 6 h","Lance em Parâmetros."],["od18","Camarão: OD e temperatura às 18 h","Lance em Parâmetros."],
  ["amon","Camarão: amônia e nitrito","3× por semana nas 6 primeiras semanas, depois 1×."],["alc","Camarão: alcalinidade","2× por semana. Reponha bicarbonato."]];
 function ritualDo(dia){const r=recs.find(x=>x.id==="ritual_"+dia);return r?Object.assign({itens:{}},r):{itens:{},espuma:""}}
-function precisaHoje(k,dia){const dc=diaCultivo(dia);const wd=toDate(dia).getDay();if(k==="amon")return dc!=null&&dc<42?[1,3,5].includes(wd):wd===1;if(k==="alc")return[1,4].includes(wd);if(k==="gerador")return wd===1;if(k==="lodo")return!!(prep.decantador&&prep.decantador.on);if(k==="cat")return num(cfg.doses.catalisador)!=null;return true}
+function precisaHoje(k,dia){const dc=diaCultivo(dia);const wd=toDate(dia).getDay();if(k==="amon")return dc!=null&&dc<42?[1,3,5].includes(wd):wd===1;if(k==="alc")return[1,4].includes(wd);if(k==="gerador")return wd===1;if(k==="lodo")return!!(prep.decantador&&prep.decantador.on);if(k==="cat")return num(cfg.doses.catalisador)!=null;if(k==="simb")return simbHoje(dia);return true}
+/* simbiótico pela receita da tese (Pimentel 2025, tese FURG, cap. III–V; escolha do Wagner 23/11): por m³ e por aplicação 20 g de farelo de arroz + 2 g de açúcar + 2 g de bicarbonato + 0,2–0,4 g de Bacillus, água 10× o farelo, 12 h fechado + 12 h com ar, o lote inteiro vai para o tanque. Todo dia na maturação e nos 15 primeiros dias depois de povoar; depois 3 vezes por semana (seg, qua e sex: os dias são regra do app) */
+function simbHoje(dia){const dc=diaCultivo(dia);if(dc==null||dc<15)return true;return[1,3,5].includes(toDate(dia).getDay())}
+function loteSimb(){const v=tanque().vol;return{v,far:20*v,acu:2*v,bic:2*v,prob:(num(cfg.doses.probLote)??0.3)*v,agua:0.2*v,nh4:v}}
+function loteTxt(){const l=loteSimb();return`${n0(l.far)} g de farelo de arroz (puim) + ${n0(l.acu)} g de açúcar + ${n0(l.bic)} g de bicarbonato + ${f(l.prob,0)} g de probiótico (Bactrat P) em ${f(l.agua,0)} L de água do tanque sem cloro; 12 h com o balde fechado e depois 12 h com ar; o lote inteiro vai para o tanque`}
 
 
 /* ===================== blocos animados dos parâmetros ===================== */
-const ESCALA={od:[0,10],temp:[18,36],ph:[6,9.5],sal:[0,40],alc:[0,300],tan:[0,5],no2:[0,8],no3:[0,350],ss:[0,35],dur:[0,1500],ca:[0,600],mg:[0,1800],k:[0,600]};
+const ESCALA={od:[0,10],temp:[18,36],ph:[6,9.5],sal:[0,40],alc:[0,300],tan:[0,5],no2:[0,8],no3:[0,350],ss:[0,35],dur:[0,1500],ca:[0,600],mg:[0,1800],k:[0,600],cl:[0,2],phb:[3,9],vibV:[0,20000],vibA:[0,50000]};
 const cl=(x,a,b)=>Math.max(a,Math.min(b,x));
 function vizSvg(k,v){if(v==null)return"";const [a,b]=ESCALA[k];const r=cl((v-a)/(b-a),0,1);const C="var(--c)";let g="";
   if(k==="od"){const n=Math.round(cl(v,0,10))+1;const dur=cl(4.5-v*0.35,1,4.5);for(let i=0;i<n;i++){const x=8+((i*37)%42),rr=2+(i%3);g+=`<circle class="bub" cx="${x}" cy="60" r="${rr}" fill="none" stroke="${C}" stroke-width="1.5" style="animation-duration:${(dur+(i%4)*.4).toFixed(2)}s;animation-delay:-${(i*.53).toFixed(2)}s"/>`}
@@ -519,35 +536,41 @@ const idb={_p:null,open(){return this._p||(this._p=new Promise((ok,er)=>{const r
   async set(k,v){try{const d=await this.open();await new Promise((ok,er)=>{const t=d.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=ok;t.onerror=()=>er(t.error)})}catch(e){lsSet("bfw_"+k,v)}}};
 function carregaScript(src){return new Promise((ok,er)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=er;document.head.appendChild(s)})}
 function webStatus(){const n=wdb?wdb.pendentes():0;
-  if(!sbUser)return "Salvo só neste aparelho · toque em Entrar";
+  if(!sbUser)return "Salvo só neste aparelho · toque no seu nome para entrar na conta";
   if(!navigator.onLine)return "Sem internet · "+(n?n+" lançamento(s) esperando sinal":"tudo guardado no aparelho");
   if(syncErro)return "Nuvem com erro ("+syncErro+") · toque para ver";
   return n?"Enviando "+n+" para a nuvem…":"Tudo salvo na nuvem ✓"}
 async function webStart(){
-  let docs=(await idb.get("docs"))||{},outbox=(await idb.get("outbox"))||{},desde=(await idb.get("desde"))||"1970-01-01T00:00:00Z";
+  // nuvem: carrega a biblioteca (fica no cache do app para uso offline) e a sessão salva
+  try{await carregaScript(SB_JS);sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+    const {data}=await sb.auth.getSession();sbUser=data&&data.session?data.session.user:null}catch(e){sb=null}
+  // cada pessoa tem a sua gaveta no aparelho; sem login usa a gaveta antiga ("só neste aparelho")
+  const PF=perfilAtual(),PX=PF?PF+"/":"";const NS=(sbUser?"_"+sbUser.id:"")+(PF?"_"+PF:"");
+  let docs=(await idb.get("docs"+NS))||{},outbox=(await idb.get("outbox"+NS))||{},desde=(await idb.get("desde"+NS))||"1970-01-01T00:00:00Z";
+  // primeira vez desta pessoa neste aparelho: leva junto o que foi lançado sem login (menos os exemplos)
+  if(sbUser&&!(await idb.get("desde"+NS))&&!Object.keys(docs).length)for(const src of [PF?"_"+PF:null,""]){if(src===null||src===NS)continue;const ad=(await idb.get("docs"+src))||{};let m=0;for(const k in ad){if(ad[k]&&!ad[k].exemplo){docs[k]=ad[k];outbox[k]={data:ad[k],deleted:false,n:Date.now()+Math.random()};delete ad[k];m++}}if(m){await idb.set("docs"+src,ad);await idb.set("outbox"+src,{});await idb.set("docs"+NS,docs);await idb.set("outbox"+NS,outbox)}}
+  if(!sbUser&&PF&&!Object.keys(docs).length){const ad=(await idb.get("docs"))||{};if(Object.keys(ad).length){docs=ad;outbox=(await idb.get("outbox"))||{};await idb.set("docs",{});await idb.set("outbox",{});await idb.set("docs"+NS,docs);await idb.set("outbox"+NS,outbox)}}
   const subs=[];let tFire=null,tSave=null,enviando=false;
   const snapDoc=p=>({exists:p in docs,data:()=>clone(docs[p]),metadata:{fromCache:false}});
   const snapCol=c=>({docs:Object.keys(docs).filter(p=>p.startsWith(c+"/")&&p.split("/").length===2).map(p=>({id:p.slice(c.length+1),data:()=>clone(docs[p])})),metadata:{fromCache:false}});
   const fire=()=>{subs.forEach(s=>{try{s.cb(s.k==="doc"?snapDoc(s.key):snapCol(s.key))}catch(e){console.error(e)}});setStatus("")};
   const fireSoon=()=>{clearTimeout(tFire);tFire=setTimeout(fire,0)};
-  const guarda=()=>{clearTimeout(tSave);tSave=setTimeout(()=>{idb.set("docs",docs);idb.set("outbox",outbox)},50)};
+  const guarda=()=>{clearTimeout(tSave);tSave=setTimeout(()=>{idb.set("docs"+NS,docs);idb.set("outbox"+NS,outbox)},50)};
   function grava(p,d,apaga){if(apaga)delete docs[p];else docs[p]=clone(d);outbox[p]={data:apaga?null:clone(d),deleted:!!apaga,n:Date.now()+Math.random()};guarda();fireSoon();setTimeout(envia,300)}
   async function envia(){if(!sb||!sbUser||!navigator.onLine||enviando)return;const ks=Object.keys(outbox);if(!ks.length)return;enviando=true;
     try{for(let i=0;i<ks.length;i+=200){const lote=ks.slice(i,i+200).map(p=>[p,outbox[p]]);
-        const {error}=await sb.from("bf_docs").upsert(lote.map(([p,o])=>({user_id:sbUser.id,path:p,data:o.data,deleted:o.deleted})),{onConflict:"user_id,path"});
+        const {error}=await sb.from("bf_docs").upsert(lote.map(([p,o])=>({user_id:sbUser.id,path:PX+p,data:o.data,deleted:o.deleted})),{onConflict:"user_id,path"});
         if(error)throw error;lote.forEach(([p,o])=>{if(outbox[p]&&outbox[p].n===o.n)delete outbox[p]})}
       syncErro="";guarda()}catch(e){syncErro=(e&&(e.code||e.message))||"falha"}
     enviando=false;setStatus("");if(!syncErro&&Object.keys(outbox).length)setTimeout(envia,500)}
   async function puxa(){if(!sb||!sbUser||!navigator.onLine)return;let mudou=false;
-    try{for(;;){const {data,error}=await sb.from("bf_docs").select("path,data,deleted,updated_at").gt("updated_at",desde).order("updated_at").limit(1000);
-        if(error)throw error;for(const r of data){desde=r.updated_at;if(outbox[r.path])continue;if(r.deleted)delete docs[r.path];else docs[r.path]=r.data;mudou=true}
+    try{for(;;){const {data,error}=await sb.from("bf_docs").select("path,data,deleted,updated_at").like("path",PX+"%").gt("updated_at",desde).order("updated_at").limit(1000);
+        if(error)throw error;for(const r of data){desde=r.updated_at;const k=r.path.slice(PX.length);if(PX&&!r.path.startsWith(PX))continue;if(outbox[k])continue;if(r.deleted)delete docs[k];else docs[k]=r.data;mudou=true}
         if(data.length<1000)break}
-      syncErro="";idb.set("desde",desde);if(mudou){guarda();fireSoon()}}catch(e){syncErro=(e&&(e.code||e.message))||"falha"}setStatus("")}
+      syncErro="";idb.set("desde"+NS,desde);if(mudou){guarda();fireSoon()}}catch(e){syncErro=(e&&(e.code||e.message))||"falha"}setStatus("")}
   const sync=async()=>{await envia();await puxa()};
-  // nuvem: carrega a biblioteca (fica no cache do app para uso offline) e a sessão salva
-  try{await carregaScript(SB_JS);sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
-    const {data}=await sb.auth.getSession();sbUser=data&&data.session?data.session.user:null;
-    sb.auth.onAuthStateChange((ev,s)=>{const antes=sbUser&&sbUser.id;sbUser=s?s.user:null;if(sbUser&&sbUser.id!==antes){desde="1970-01-01T00:00:00Z";sync()}setStatus("")})}catch(e){sb=null}
+  // trocou de pessoa: recarrega para abrir a gaveta certa (nada se mistura)
+  if(sb)sb.auth.onAuthStateChange((ev,s)=>{const u=s?s.user:null;if((u&&u.id)!==(sbUser&&sbUser.id)){sbUser=u;setTimeout(()=>location.reload(),150)}else{sbUser=u;setStatus("")}});
   // primeira leitura: espera a nuvem (até 8 s) para não semear exemplo num aparelho novo
   if(sbUser&&navigator.onLine)await Promise.race([sync(),new Promise(r=>setTimeout(r,8000))]);
   addEventListener("online",sync);addEventListener("offline",()=>setStatus(""));
@@ -556,39 +579,56 @@ async function webStart(){
       onSnapshot:cb=>{const s={k:"doc",key:p,cb};subs.push(s);setTimeout(()=>cb(snapDoc(p)),0);return()=>subs.splice(subs.indexOf(s),1)}}),
     collection:c=>{const q={orderBy:()=>q,limit:()=>q,onSnapshot:cb=>{const s={k:"col",key:c,cb};subs.push(s);setTimeout(()=>cb(snapCol(c)),0);return()=>subs.splice(subs.indexOf(s),1)}};return q},
     pendentes:()=>Object.keys(outbox).length,sync,
-    backup:()=>({app:"Tanque Biofloco",em:new Date().toISOString(),docs})}}
+    backup:()=>({app:"Tanque Biofloco",perfil:PF,em:new Date().toISOString(),docs})}}
+// Perfis (pessoas) dentro da conta da nuvem: cada um com os próprios lançamentos e anotações (caminho "<perfil>/..." na nuvem).
+// Para cadastrar mais pessoas, o Wagner pede ao Claude no projeto.
+const PERFIS=[["usuario1","Usuário 1"],["usuario2","Usuário 2"],["usuario3","Usuário 3"]];
+const perfilAtual=()=>{try{const p=localStorage.getItem("bf_perfil");return PERFIS.some(x=>x[0]===p)?p:""}catch(e){return ""}};
+const nomePerfil=()=>{const p=PERFIS.find(x=>x[0]===perfilAtual());return p?p[1]:""};
+const emailDe=u=>(u.includes("@")?u:u.toLowerCase().replace(/[^a-z0-9._-]/g,"")+"@wpnjunior.github.io");
+const nomeDe=()=>nomePerfil()||"Entrar";
+function escolherPerfil(){let d=$("#dlgPerfil");if(!d){d=document.createElement("dialog");d.id="dlgPerfil";document.body.appendChild(d)}
+  d.innerHTML=`<div class="dlghead">Quem vai usar?</div><div class="dlgbody"><div class="pessoas">${PERFIS.map(p=>`<button class="btn pessoa" type="button" data-perfil="${p[0]}">👤 ${esc(p[1])}</button>`).join("")}</div>
+    <p class="muted" style="margin-top:14px">Cada pessoa tem os próprios lançamentos e anotações. Para cadastrar alguém, fale com o Claude no projeto.</p></div>`;
+  d.onclick=ev=>{const b=ev.target.closest("[data-perfil]");if(!b)return;try{localStorage.setItem("bf_perfil",b.dataset.perfil)}catch(e){}d.close();location.reload()};
+  d.oncancel=e=>e.preventDefault();if(!d.open)d.showModal()}
 function abrirLogin(){
   let d=$("#dlgLogin");if(!d){d=document.createElement("dialog");d.id="dlgLogin";document.body.appendChild(d)}
-  const sair=sbUser?`<p>Conectado como <b>${esc(sbUser.email||"")}</b>.</p><p class="muted">${esc(webStatus())}</p>
-    <div class="dlgfoot"><button class="btn" type="button" data-l="backup">Baixar cópia (JSON)</button><button class="btn" type="button" data-l="sair">Sair</button><button class="btn p" type="button" data-l="fechar">Fechar</button></div>`:"";
-  d.innerHTML=`<div class="dlghead">${sbUser?"Nuvem":"Entrar para guardar na nuvem"}</div><div class="dlgbody">`+(sair||(!sb?`<p>Sem internet agora. O app continua salvando neste aparelho; entre quando tiver sinal.</p><div class="dlgfoot"><button class="btn p" type="button" data-l="fechar">Fechar</button></div>`:
-    `<p class="muted">Com login, cada lançamento vai para a nuvem e volta se você trocar ou limpar o celular. Sem sinal no tanque, ele espera e manda depois.</p>
-    <div class="f"><label for="lgEmail">Usuário (ou e-mail)</label><input id="lgEmail" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
-    <div class="f"><label for="lgSenha">Senha (mínimo 6)</label><input id="lgSenha" type="password" autocomplete="current-password"></div>
+  const quem=`<p>Usando como <b>👤 ${esc(nomePerfil())}</b>.</p>`;
+  if(sbUser)d.innerHTML=`<div class="dlghead">👤 ${esc(nomePerfil())}</div><div class="dlgbody">${quem}<p class="muted">${esc(webStatus())}</p>
+    <div id="lgTroca" hidden><div class="f"><label for="lgNova">Nova senha da conta (6 ou mais)</label><input id="lgNova" type="password" autocomplete="new-password"></div><button class="btn p" type="button" data-l="salvaSenha">Salvar senha</button></div>
     <div class="muted" id="lgMsg" style="min-height:1.2em"></div>
-    <div class="dlgfoot"><button class="btn" type="button" data-l="fechar">Agora não</button><button class="btn" type="button" data-l="criar">Criar conta</button><button class="btn p" type="button" data-l="entrar">Entrar</button></div>`))+`</div>`;
+    <div class="dlgfoot" style="flex-wrap:wrap"><button class="btn" type="button" data-l="trocar">Trocar pessoa</button><button class="btn" type="button" data-l="senha">Trocar senha</button><button class="btn" type="button" data-l="backup">Baixar cópia</button><button class="btn" type="button" data-l="sair">Sair da conta</button><button class="btn p" type="button" data-l="fechar">Fechar</button></div></div>`;
+  else d.innerHTML=`<div class="dlghead">Entrar na conta</div><div class="dlgbody">${quem}${!sb?`<p>Sem internet agora. O app continua salvando neste aparelho; entre quando tiver sinal.</p><div class="dlgfoot"><button class="btn" type="button" data-l="trocar">Trocar pessoa</button><button class="btn p" type="button" data-l="fechar">Fechar</button></div>`:`
+    <p class="muted">Com a conta, os lançamentos vão para a nuvem e voltam se trocar ou limpar o celular. Sem sinal no tanque, ele espera e manda depois.</p>
+    <div class="f"><label for="lgEmail">Usuário</label><input id="lgEmail" type="text" value="biofloco" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+    <div class="f"><label for="lgSenha">Senha</label><input id="lgSenha" type="password" autocomplete="current-password"></div>
+    <div class="muted" id="lgMsg" style="min-height:1.2em"></div>
+    <div class="dlgfoot" style="flex-wrap:wrap"><button class="btn" type="button" data-l="trocar">Trocar pessoa</button><button class="btn" type="button" data-l="fechar">Agora não</button><button class="btn p" type="button" data-l="entrar">Entrar</button></div>`}</div>`;
   d.onclick=async ev=>{const b=ev.target.closest("[data-l]");if(!b)return;const a=b.dataset.l,msg=t=>{const m=$("#lgMsg");if(m)m.textContent=t};
     if(a==="fechar")return d.close();
-    if(a==="sair"){await sb.auth.signOut();d.close();return}
-    if(a==="backup"){const blob=new Blob([JSON.stringify(wdb.backup())],{type:"application/json"});baixarArquivo(blob,"biofloco-backup-"+hoje()+".json");return}
-    let email=($("#lgEmail").value||"").trim().toLowerCase();const password=$("#lgSenha").value||"";if(!email||password.length<6)return msg("Preencha usuário e senha (6 ou mais).");if(!email.includes("@"))email=email.replace(/[^a-z0-9._-]/g,"")+"@wpnjunior.github.io";
-    msg("Aguarde…");
-    const r=a==="criar"?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});
-    if(r.error)return msg(/invalid login/i.test(r.error.message)?"E-mail ou senha não conferem.":/not confirmed/i.test(r.error.message)?(/@wpnjunior\.github\.io$/.test(email)?"Conta ainda não liberada: avise o Claude.":"Confirme o e-mail: abra o link que chegou na sua caixa e depois toque em Entrar."):r.error.message);
-    if(a==="criar"&&!r.data.session)return msg(/@wpnjunior\.github\.io$/.test(email)?"Conta criada. Falta liberar: avise o Claude e depois toque em Entrar.":"Conta criada. Abra o e-mail de confirmação que chegou, clique no link e volte aqui para Entrar.");
-    d.close();toast("Conectado. Enviando para a nuvem…");wdb&&wdb.sync()};
-  d.showModal()}
+    if(a==="trocar"){d.close();try{localStorage.removeItem("bf_perfil")}catch(e){}return location.reload()}
+    if(a==="sair"){d.close();await sb.auth.signOut();return}
+    if(a==="senha"){$("#lgTroca").hidden=false;return}
+    if(a==="salvaSenha"){const pw=$("#lgNova").value||"";if(pw.length<6)return msg("A senha precisa de 6 ou mais.");msg("Aguarde…");const r=await sb.auth.updateUser({password:pw});return msg(r.error?r.error.message:"Senha trocada. Vale para todas as pessoas da conta.")}
+    if(a==="backup"){const blob=new Blob([JSON.stringify(wdb.backup())],{type:"application/json"});baixarArquivo(blob,"biofloco-"+perfilAtual()+"-"+hoje()+".json");return}
+    const u=($("#lgEmail").value||"").trim(),password=$("#lgSenha").value||"";if(!u||password.length<6)return msg("Preencha usuário e senha (6 ou mais).");
+    const email=emailDe(u);msg("Aguarde…");
+    const r=await sb.auth.signInWithPassword({email,password});
+    if(r.error)return msg(/invalid login/i.test(r.error.message)?"Usuário ou senha não conferem.":/not confirmed/i.test(r.error.message)?"Conta ainda não liberada: avise o Claude.":r.error.message);
+    d.close();toast("Conectado. Enviando para a nuvem…")};
+  if(!d.open)d.showModal()}
 function baixarArquivo(blob,nome){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
 if(WEB&&/[?&]teste=1/.test(location.search))window.__bf={put:(...a)=>put(...a),del:(...a)=>del(...a),recs:()=>recsAll,sync:()=>wdb.sync(),exportar:k=>exportar(k),grids:()=>Object.keys(GRID)};
 if(WEB){document.addEventListener("click",ev=>{if(ev.target.closest("#status,#btnNuvem"))abrirLogin()});
   if("serviceWorker" in navigator&&location.protocol!=="file:")addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 
 /* ===================== banco ===================== */
-function setStatus(t){if(WEB){t=webStatus();const b=$("#btnNuvem");if(b){b.style.display="inline-flex";b.textContent=sbUser?"☁️ Nuvem":"🔑 Entrar"}}$("#status").textContent=t}
+function setStatus(t){if(WEB){t=webStatus();const b=$("#btnNuvem");if(b){b.style.display="inline-flex";b.textContent="👤 "+(nomePerfil()||"Entrar")+(sbUser?"":" · entrar")}}$("#status").textContent=t}
 async function start(){
   render();
   const timer=setTimeout(()=>{if(mode!=="db")setStatus("Salvando neste aparelho")},10000);
-  if(WEB){clearTimeout(timer);db=await webStart()}
+  if(WEB){clearTimeout(timer);if(!perfilAtual()){render();setStatus("");return escolherPerfil()}db=await webStart();if(!sbUser&&sb&&!/[?&]teste=1/.test(location.search))setTimeout(()=>abrirLogin(),300)}
   else try{db=window.claude&&window.claude.use?await window.claude.use("db"):null}catch(e){db=null}
   if(!db){clearTimeout(timer);mode="local";cfg=mergeCfg(lsGet("bf_cfg"));prep=lsGet("bf_prep")||{feitos:{}};recsAll=sortRecs(lsGet("bf_recs")||[]);gest=lsGet("bf_gest")||[];filt();carregou={cfg:true,recs:true,gest:true};talvezSemear();setStatus("Salvando só neste aparelho");render();return}
   mode="db";if(!WEB)window.claude.use("downloads").then(d=>downloads=d).catch(()=>{});
@@ -628,15 +668,16 @@ const opt=(arr,sel)=>arr.map(a=>{const v=Array.isArray(a)?a[0]:a,l=Array.isArray
 const ACOES={
   parametros(){form("Parâmetros da água",[{name:"data",label:"Data e hora",type:"datetime-local",value:agora(),req:true},
     {html:`<div class="fg">`+PARAMS.map(p=>`<div class="f"><label for="i_${p.k}">${esc(p.n)}${p.u?" ("+esc(p.u)+")":""}</label><input id="i_${p.k}" name="${p.k}" type="number" inputmode="decimal" step="any" placeholder="${esc(faixaTxt(p.k))}"></div>`).join("")+`</div>`},
+    {name:"odp",label:"Ou oxigênio em % de saturação (seu aparelho): o app converte para mg/L com a temperatura e a salinidade (Weiss 1970)",type:"number"},
     {name:"obs",label:"Observação"}],
-    o=>{const e=[];PARAMS.forEach(p=>{const v=num(o[p.k]);const s=fora(p.k,v);if(s)e.push(`⚠ ${p.n} ${s} (${faixaTxt(p.k)}): entra nos alertas`)});
+    o=>{odDePct(o);const e=[];if(num(o.odp)!=null&&num(o.od)==null)e.push("⚠ Para converter o oxigênio de % para mg/L, lance também a temperatura e a salinidade (ou meça hoje antes)");if(num(o.odp)!=null&&o.od!=="")e.push(`Oxigênio ${f(num(o.odp),0)}% = ${f(num(o.od),1)} mg/L (saturação ${f(odSat(o),2)} mg/L)`);PARAMS.forEach(p=>{const v=num(o[p.k]);const s=fora(p.k,v);if(s)e.push(`⚠ ${p.n} ${s} (${faixaTxt(p.k)}): entra nos alertas`)});
       const od=num(o.od);if(od!=null&&od<3)e.push("⚠ Ração do dia passa para SUSPENDER");else if(od!=null&&od<4)e.push("Ração do dia cai 20%");const x=nh3(num(o.tan),num(o.ph),num(o.temp));if(x!=null)e.push(`Amônia tóxica (NH₃) calculada: ${f(x,3)} mg/L${x>0.03?" ⚠":""}`);
-      if(num(o.tan)!=null&&fora("tan",num(o.tan)))e.push("Ração do dia cai 20% e o app calcula o açúcar");return e},
-    async o=>{const v={};PARAMS.forEach(p=>{const x=num(o[p.k]);if(x!=null)v[p.k]=x});if(!Object.keys(v).length)return toast("Preencha pelo menos um parâmetro.");
+      if(num(o.tan)!=null&&fora("tan",num(o.tan))){const _c=num(o.tan)>3||(x!=null&&x>0.1);e.push(_c?"Nível crítico: ração do dia cai 30% (Alune 2020) e o app calcula o açúcar":"Amônia em alerta: o app calcula o açúcar e mantém a ração (corte só acima de 3 ou NH₃ acima de 0,1)")};return e},
+    async o=>{odDePct(o);const v={};PARAMS.forEach(p=>{const x=num(o[p.k]);if(x!=null)v[p.k]=x});if(!Object.keys(v).length)return toast("Preencha pelo menos um parâmetro.");
       await put({tipo:"leitura",data:o.data,valores:v,obs:o.obs||""});const al=PARAMS.filter(p=>fora(p.k,v[p.k])).map(p=>p.n+" fora da faixa");toast("Parâmetros lançados",al)})},
   biometria(){const L=lote(hoje());form("Biometria",[{name:"data",label:"Data",type:"date",value:hoje(),req:true},
-    {html:`<div class="fg">`},{name:"n",label:"Camarões pesados",type:"number",ph:"50 a 100"},{name:"pesoTotal",label:"Peso total (g)",type:"number"},{html:`</div>`},
-    {name:"peso",label:"Ou peso médio direto (g)",type:"number"},{name:"sobrev",label:"Sobrevivência estimada (%)",type:"number",value:L.sobrev.s},{name:"obs",label:"Observação"}],
+    {html:`<div class="fg">`},{html:`<p class="muted" style="grid-column:1/-1">Como fazer (manual 8.4): pegue 50 a 100 camarões com puçá ou tarrafa em pontos diferentes, pese todos juntos e divida pelo número. Faça fora da janela de muda.</p>`},{name:"n",label:"Camarões pesados",type:"number",ph:"50 a 100"},{name:"pesoTotal",label:"Peso total (g)",type:"number"},{html:`</div>`},
+    {name:"peso",label:"Ou peso médio direto (g)",type:"number"},{name:"sobrev",label:"Sobrevivência (%): o app sugere pelos mortos contados e pela testemunha de 100 PL",type:"number",value:sobrevContada()},{name:"obs",label:"Observação"}],
     o=>{const p=num(o.peso)??(num(o.n)&&num(o.pesoTotal)?num(o.pesoTotal)/num(o.n):null);if(!p)return[];const e=[`Peso médio: ${f(p,p<1?3:2)} g`];
       const ant=biometriasAte(o.data)[0];if(ant){const dd=diasEntre(ant.data,o.data);if(dd>0)e.push(`Crescimento: ${f((p-ant.peso)/dd*7,2)} g/semana`)}
       const sv=num(o.sobrev)??cfg.sobrevivencia;const viv=Math.min(L.t.pls-L.mortos,L.t.pls*sv/100);const bio=viv*p/1000;e.push(`Biomassa: ${f(bio,2)} kg`,`Ração pela tabela: ${n0(bio*1000*pctTabela(p)/100)} g/dia (${f(pctTabela(p),1)}%)`);return e},
@@ -692,11 +733,11 @@ const PREP=[
  [-20,"p4","Clorar a 10–20 ppm","308 g de HTH 65% dão 10 ppm em 20 m³. Dissolver num balde e espalhar com o ar ligado."],
  [-19,"p5","Ar forte até o cloro zerar (dias 2 a 5)","Cerca de 5 dias, com teste de cloro todo dia. Só seguir quando der zero."],
  [-16,"p6","Medir e corrigir a água","Alcalinidade, pH, cálcio, magnésio, potássio. Alcalinidade para 150–180 com bicarbonato, no máximo 1 kg por dia."],
- [-16,"p7","Primeiro prebiótico","Balde de 20 L fechado: 600 g de farelo de arroz, 250 g de açúcar, 50 g de bicarbonato, água do tanque. 24 h no sol."],
- [-15,"p8","Simbiótico na bombona e início da maturação","Prebiótico + 30 g de probiótico (Bactrat P) na bombona de 70–80 L com ar, 24–48 h. Começar simbiótico a 1 L por m³ por dia (20 L) + 50–100 g de ração/dia + Nutrat 1 mL por m³ (20 mL)."],
- [-15,"p13","Instalar as mantas de biofilme (~30 m²)","Penduradas na parede desde a maturação, para as bactérias nitrificantes. Na despesca, guardar para o próximo ciclo."],
- [-15,"p9","Amônia e nitrito a cada 2 dias (dias 6 a 20)","Açúcar se a amônia passar de 1 mg/L. Esperar o pico de nitrito passar. Povoar só com os dois abaixo de 1 e caindo."],
- [-3,"p10","Avaliar o lote de PL (dias 18 a 20)","Exame a olho, microscópio, teste de estresse (formalina ou choque de salinidade) e laudo de PCR."],
+ [-16,"p7","Primeiro lote do simbiótico (receita da tese)","Só depois do teste de cloro dar zero (cloro mata os bacilos). Em 20 m³: 400 g de farelo de arroz (puim) + 40 g de açúcar + 40 g de bicarbonato + 6 g de Bactrat P em uns 4 L de água do próprio tanque. 12 h com o balde fechado e depois 12 h com ar forte; o lote inteiro vai para o tanque. Receita da tese do Pimentel (FURG 2025, cap. III–V: por m³ 20 g de farelo, 2 g de açúcar, 2 g de bicarbonato, 0,2–0,4 g de Bacillus). A quantidade de Bactrat é regra do app (a tese usa outro produto)."],
+ [-15,"p8","Maturação: lote diário + cloreto de amônio","Todo dia: 1 lote do simbiótico + 20 g de cloreto de amônio (1 mg/L do sal, fonte de nitrogênio para as nitrificantes 1 e 2). Sem ração e sem camarão. Na tese foram 16 dias assim (Pimentel 2025, cap. V, a 2 ppt). Alcalinidade em 150 com bicarbonato. Nutrat 1 mL por m³ (20 mL)."],
+ [-15,"p13","Instalar as telas verticais de poliéster (~30 m²)","Penduradas na parede desde a maturação: abrigo para o camarão na muda (Zhang 2010: com 3 telas a sobrevivência a 500/m² foi de 63,5% para 86,5%; Schveitzer 2013). Poliéster, não tela mosquiteira (Legarda 2018: piorou). Na despesca, guardar para o próximo ciclo."],
+ [-15,"p9","Amônia, nitrito e nitrato a cada 2 dias","Povoar só com amônia e nitrito abaixo de 1 e estáveis e o nitrato subindo (decisão do Wagner; o número 1 é regra do app). Na tese, no dia de povoar: amônia 0,73, nitrito 0,19, nitrato 42 e alcalinidade 140 (Pimentel 2025, cap. V). Se passar do dia 16 sem estabilizar, continue o lote e o cloreto de amônio e espere."],
+ [-3,"p10","Avaliar o lote de PL (dias 18 a 20)","Exame a olho, microscópio, teste de estresse (formalina ou choque de salinidade), placa TCBS da PL macerada (muitas colônias verdes = sinal ruim) e laudo de PCR de laboratório credenciado para WSSV, IHHNV, IMNV, EHP e AHPND (manual 6.4). Estresse (manual 6.3): 100 PL em formalina 150 mg/L por 30 min ou em água doce por 15 a 30 min; rejeite o lote com menos de 60% vivas (média de 3)."],
  [0,"p11","Tanque apto a povoar","Todos os critérios verdes na aba Apto a povoar?"],
  [0,"p12","Povoar 11.450 PL","Manhã cedo ou fim da tarde. Saco boiando ~30 min, misturar água aos poucos (no máximo 1–2 ppt por hora). Separar 100 PL como testemunha. Primeira ração depois de 2–4 h."]];
 T.preparo_passos=()=>{const d0=cfg.dataPovoamento;const hj=hoje();const feitos=PREP.filter(x=>prep.feitos[x[1]]).length;
@@ -704,7 +745,7 @@ T.preparo_passos=()=>{const d0=cfg.dataPovoamento;const hj=hoje();const feitos=P
   return `<h2>Preparo da água: dia 0 a 21</h2>${d0?`<div class="banner ${atual!=null&&atual<0?"ok":"w"}"><b>${atual<-21?"Preparo começa em "+dt(addDias(d0,-21)):atual<0?"Hoje é o dia "+(atual+21)+" do preparo":atual===0?"Hoje é o dia 21: povoamento":"Povoado há "+atual+" dias"}</b><small>Dia 0 do preparo: ${dt(addDias(d0,-21))}. Povoamento (dia 21): ${dt(d0)}. ${feitos}/${PREP.length} passos feitos.</small></div>`:`<div class="banner w">Marque a data planejada do povoamento em <a href="#" data-go="cadastro.tanque">Cadastro › Tanque</a> para o app mostrar a data de cada passo.</div>`}
   <div class="card" style="margin-top:12px"><div class="stack">${PREP.slice().sort((a,b)=>a[0]-b[0]).map(x=>{const data=d0?addDias(d0,x[0]):null;const ok=!!prep.feitos[x[1]];const hojeP=atual!=null&&(x[0]===atual||(x[1]==="p5"&&atual>=-19&&atual<=-16)||(x[1]==="p9"&&atual>=-15&&atual<=-1)||(x[1]==="p10"&&atual>=-3&&atual<=-1));const late=!ok&&atual!=null&&x[0]<atual&&!hojeP;
     return `<label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;padding:6px;border-radius:8px;${hojeP?"background:var(--s-ok)":late?"background:var(--s-alerta)":""}"><input type="checkbox" data-prep="${x[1]}" ${ok?"checked":""} style="width:20px;height:20px;margin-top:2px;flex:none"><span><span class="tag">Dia ${x[0]+21}${data?" · "+dt(data):""}</span> ${hojeP?'<span class="tag ok">hoje</span>':late?'<span class="tag w">atrasado</span>':""}<b style="display:block;margin-top:2px">${esc(x[2])}</b><span class="muted">${esc(x[3])}</span></span></label>`}).join("")}</div></div>
-  ${(()=>{const ne=nitritoEstavel();const hist=(prep.ciclos||[]);return `<div class="card" style="margin-top:12px"><b>Nitrito estabilizou (mantas)</b><div class="muted">Dias do início da maturação (dia 6) até o nitrito cair abaixo de 1 depois do pico. Serve para comparar este ciclo com o próximo.</div><div style="margin-top:6px">${!ne?"Ainda sem leituras de nitrito na maturação.":ne.pendente?`Pico de ${f(ne.pico,2)} mg/L registrado; aguardando cair abaixo de 1.`:`<b>${ne.dias} dias</b> (abaixo de 1 em ${dt(ne.data)}, depois de pico de ${f(ne.pico,2)} mg/L) <button type="button" class="btn sm" id="btnGuardaNo2" data-d="${ne.dias}">Guardar para comparar ciclos</button>`}</div>${hist.length?`<div class="muted" style="margin-top:6px">Ciclos anteriores: ${hist.map(c=>esc(dt(c.ciclo))+": "+c.dias+" dias").join(" · ")}</div>`:""}</div>`})()}
+  ${(()=>{const ne=nitritoEstavel();const hist=(prep.ciclos||[]);return `<div class="card" style="margin-top:12px"><b>Nitrito estabilizou (telas)</b><div class="muted">Dias do início da maturação (dia 6) até o nitrito cair abaixo de 1 depois do pico. Serve para comparar este ciclo com o próximo.</div><div style="margin-top:6px">${!ne?"Ainda sem leituras de nitrito na maturação.":ne.pendente?`Pico de ${f(ne.pico,2)} mg/L registrado; aguardando cair abaixo de 1.`:`<b>${ne.dias} dias</b> (abaixo de 1 em ${dt(ne.data)}, depois de pico de ${f(ne.pico,2)} mg/L) <button type="button" class="btn sm" id="btnGuardaNo2" data-d="${ne.dias}">Guardar para comparar ciclos</button>`}</div>${hist.length?`<div class="muted" style="margin-top:6px">Ciclos anteriores: ${hist.map(c=>esc(dt(c.ciclo))+": "+c.dias+" dias").join(" · ")}</div>`:""}</div>`})()}
   <p class="muted">Durante o preparo, lance amônia, nitrito, alcalinidade e cone em Manejo › Digitação de Parâmetros. Passos tirados do manual, cap. 12.</p>`};
 T.preparo_calc=()=>`<h2>Calculadoras do preparo</h2>
   <div class="card"><h3 style="margin-top:0">Salinidade: mistura de mar e doce</h3><div class="fg"><div class="f"><label for="k_salm">Salinidade do mar (ppt)</label><input id="k_salm" type="number" inputmode="decimal" step="any" value="32"></div><div class="f"><label for="k_salt">Meta (ppt)</label><input id="k_salt" type="number" inputmode="decimal" step="any" value="25"></div></div><div class="efeito" id="o_sal"></div></div>
@@ -719,7 +760,7 @@ function updCalc(){const v=tanque().vol,L=v*1000;const g=id=>num(($("#"+id)||{})
 function aptoLista(){return[["tan","Amônia total","< 1 mg/L",v=>v<1,2],["no2","Nitrito","< 1 mg/L",v=>v<1,2],["ss","Cone Imhoff","2–5 mL/L",v=>v>=2&&v<=5,1],["alc","Alcalinidade","≥ 150 mg/L",v=>v>=150,1],["ph","pH","7,5–8,0",v=>v>=7.5&&v<=8,2],["od","Oxigênio","> 5 mg/L",v=>v>5,1],["temp","Temperatura","26–30 °C",v=>v>=26&&v<=30,1],["sal","Salinidade",cfg.salLab!=null&&cfg.salLab!==""?"± 2 ppt da do laboratório ("+f(cfg.salLab,1)+")":"20–25 ppt (informe a do laboratório em Cadastro)",v=>cfg.salLab!=null&&cfg.salLab!==""?Math.abs(v-cfg.salLab)<=2:v>=20&&v<=25,1]]}
 const FAZER={tan:"Açúcar (amônia × m³ × 20 g), simbiótico e ar no máximo.",no2:"Ar no máximo, alcalinidade ≥ 150 e esperar o pico de nitrito passar.",ss:"Abaixo de 2: mais simbiótico. Acima de 5: Nutrat em dobro e menos ração de maturação.",alc:"Bicarbonato: (alvo − medido) × m³ ÷ 0,6, até 1 kg por dia.",ph:"Abaixo de 7,5: bicarbonato. Acima de 8,0: esperar e não usar cal.",od:"Mais difusores ou o soprador reserva.",temp:"Esperar estabilizar; cobrir o tanque se precisar.",sal:"Aclimatar devagar (no máximo 1–2 ppt por hora) ou ajustar com água doce/mar."};
 function caindo(k){const vs=recs.filter(r=>r.tipo==="leitura"&&r.valores&&r.valores[k]!=null).slice(0,2).map(r=>r.valores[k]);return vs.length<2?null:vs[0]<=vs[1]}
-function apto(){let ok=0;const AP=aptoLista();const rows=AP.map(x=>{const u=leituraRecente(x[0],hoje());const pass=u?x[3](u.v):null;const tend=(x[0]==="tan"||x[0]==="no2")?caindo(x[0]):null;const verde=pass&&tend!==false;if(verde)ok++;return{x,u,pass,tend,verde}});const man=[["cloro0","Cloro zero","Teste de cloro deu zero","Mais dias de ar forte, ou tiossulfato na dose do fabricante."],["plok","PL aprovada","Exame, teste de estresse e laudo de PCR","Não povoar com lote reprovado. Pedir outro lote."]];man.forEach(m=>{if(prep.feitos[m[0]])ok++});return{ok,total:AP.length+man.length,rows,man}}
+function apto(){let ok=0;const AP=aptoLista();const rows=AP.map(x=>{const u=leituraRecente(x[0],hoje());const pass=u?x[3](u.v):null;const tend=(x[0]==="tan"||x[0]==="no2")?caindo(x[0]):null;const verde=pass&&tend!==false;if(verde)ok++;return{x,u,pass,tend,verde}});const man=[["cloro0","Cloro zero","Teste de cloro deu zero","Mais dias de ar forte, ou tiossulfato: 7 g por m³ para cada 1 mg/L de cloro (Boyd 2008); o app calcula pelo campo de cloro residual."],["plok","PL aprovada","Exame, teste de estresse e laudo de PCR","Não povoar com lote reprovado. Pedir outro lote."]];man.forEach(m=>{if(prep.feitos[m[0]])ok++});return{ok,total:AP.length+man.length,rows,man}}
 function aptoTxt(){const a=apto();return a.ok===a.total?"🟢 Tanque apto a povoar":a.ok+"/"+a.total+" critérios verdes para povoar"}
 T.preparo_check=()=>{const a=apto();const tudo=a.ok===a.total;const dc=diaCultivo();
   const rows=a.rows.map(r=>`<tr><td>${r.x[1]}</td><td>${r.x[2]}${r.x[0]==="tan"||r.x[0]==="no2"?" e caindo":""}</td><td class="r">${r.u?f(r.u.v,r.x[4]):"–"}${r.tend===true?" ↓":r.tend===false?" ↑":""}</td><td>${r.u==null?'<span class="tag bad">🔴 sem leitura</span>':r.verde?'<span class="tag ok">🟢</span>':'<span class="tag bad">🔴</span>'}${!r.verde?`<div class="muted" style="font-size:12px">${esc(FAZER[r.x[0]]||"")}</div>`:""}</td></tr>`).join("")
@@ -729,16 +770,16 @@ T.preparo_check=()=>{const a=apto();const tudo=a.ok===a.total;const dc=diaCultiv
    <div class="row" style="margin-top:10px"><button class="btn p" type="button" id="btnPovoar" ${tudo?"":"disabled"} style="${tudo?"":"opacity:.45;cursor:not-allowed"}">🦐 Povoar hoje (${n0(tanque().pls)} PL)</button><button class="btn" type="button" data-acao="parametros">Lançar leitura</button></div>
    <p class="muted">${tudo?"Ao povoar, o app marca hoje como dia 0 de cultivo e passa a contar dias e semanas.":"O botão de povoar só libera com tudo verde."} Critérios do manual, cap. 7.</p>`};
 const EMERG={
- floco:["Floco morreu","Água clareou de repente, cone despencou ou espuma sumiu.",()=>[["Simbiótico da bombona","50 a 200 L de uma vez"],["Oxitrat","dose do rótulo, no tanque"],["Açúcar","dissolvido, junto (o caderno não fixa a dose; se a amônia subir, use a regra de 20 g por g de amônia-N)"],["Nutrat",`${n0(2*tanque().vol)} a ${n0(3*tanque().vol)} mL (2–3 mL por m³), diluído em 2 L`],["Ração","sugestão do app: baixar até o floco voltar e a bandeja confirmar"],["Medir","amônia e nitrito no dia seguinte"]]],
- luz:["Falta de luz","Soprador parou.",()=>[["Tempo máximo sem ar","15 minutos. Ligue o gerador antes disso."],["Oxitrat","1 copo de 200 mL por tanque, espalhado"],["Cilindro de O₂","abrir na pedra porosa enquanto o ar não volta"],["Ração","suspender até o ar voltar e o OD passar de 4"],["Depois","medir OD de hora em hora até estabilizar"]]],
+ floco:["Floco morreu","Água clareou de repente, cone despencou ou espuma sumiu.",()=>[["Simbiótico","2 lotes no dia (regra do app; o caderno usa 50 a 200 L do simbiótico de bombona)"],["Oxitrat","1 copo (200 mL) no máximo, só em emergência; não repetir antes de 24 h (mais que isso passa do limite seguro de H₂O₂, Furtado 2014)"],["Açúcar","dissolvido, junto (o caderno não fixa a dose; se a amônia subir, use a regra de 20 g por g de amônia-N)"],["Nutrat",`${n0(2*tanque().vol)} a ${n0(3*tanque().vol)} mL (2–3 mL por m³), diluído em 2 L`],["Ração","sugestão do app: baixar até o floco voltar e a bandeja confirmar"],["Medir","amônia e nitrito no dia seguinte"]]],
+ luz:["Falta de luz","Soprador parou.",()=>[["Tempo máximo sem ar","15 minutos. Ligue o gerador antes disso."],["Oxitrat","1 copo de 200 mL por tanque, espalhado; no máximo 1 copo a cada 24 h (Furtado 2014)"],["Cilindro de O₂","abrir na pedra porosa enquanto o ar não volta"],["Ração","suspender até o ar voltar e o OD passar de 4"],["Depois","medir OD de hora em hora até estabilizar"]]],
  ph:["pH caiu","pH abaixo de 7,5.",()=>{const v=tanque().vol;const a=leituraRecente("alc",hoje());const alvo=cfg.doses.alcAlvo||160;return[["1º alcalinidade",a?(a.v<150?`${n0(a.v)} mg/L: bicarbonato ${n0((alvo-a.v)*v/0.6/1000*1000)} g para ${n0(alvo)}`:`${n0(a.v)} mg/L, está boa: o pH baixo deve ser CO₂ (faça academia de ar e meça de novo em 1 h)`):"meça a alcalinidade: se < 150, bicarbonato resolve devagar e sem susto"],["Cal hidratada",`até 200 g por vez (≈ ${f(200/v,0)} g por m³), dissolvida e espalhada. Meça o pH antes e 1 h depois; só repita se precisar. É o teto do manual (100–200 g por vez em 20 m³).`],["Gesso agrícola decantado","600 g num balde com água, mexer, esperar assentar e jogar só o líquido leitoso de cima (o fundo vira lodo). Traz cálcio; não sobe alcalinidade."],["Nunca","cal virgem (esquenta e dispara o pH). Não mexa no pH na janela de muda se puder esperar."],["Rotina",`bicarbonato ${n0(cfg.doses.bicarb*1000*recomendacao(hoje()).final/1000)} g hoje`]]}],
- phalto:["pH alto com amônia","pH acima de 8,2 e amônia tóxica (NH₃) acima de 0,1.",()=>{const v=tanque().vol;const jm=janelaMuda(new Date());const r=[];if(jm.on)r.push(["HOJE NÃO",`Janela de muda (${jm.qual}): não use ácido. Só ar, menos ração e simbiótico.`]);return r.concat([["1º","ar no máximo, ração pela metade e simbiótico; menos amônia = menos NH₃"],["Ácido fosfórico 85%",`comece com ${n0(0.5*v)} mL (0,5 mL por m³) diluído em 10 L de água, espalhado longe dos camarões`],["Medir","pH 1 h depois. Alvo 7,5–7,8. Repita em doses pequenas, nunca tudo de uma vez."],["Efeito colateral","cada 1 mL por m³ gasta cerca de 1 mg/L de alcalinidade e soma fósforo (cianobactéria). Reponha bicarbonato depois."]])}],
- borda:["Camarão na borda ou boquejando","O que estou vendo: camarões na superfície ou na parede.",()=>[["Agora","todos os registros de ar abertos, soprador reserva ligado"],["Oxitrat","200 g espalhado (sobe o OD na hora)"],["Medir","OD agora e de hora em hora"],["Ração","suspender até o OD passar de 4"],["Depois","Nutrat em dobro; procure a causa (cone alto, floco morrendo, calor)"]]],
+ phalto:["pH alto com amônia","pH acima de 8,5 (limite da faixa boa, 7,5–8,5) e amônia tóxica (NH₃) acima de 0,1.",()=>{const v=tanque().vol;const jm=janelaMuda(new Date());const r=[];if(jm.on)r.push(["HOJE NÃO",`Janela de muda (${jm.qual}): não use ácido. Só ar, menos ração e simbiótico.`]);return r.concat([["1º","fechar o sombrite (menos luz = alga tira menos CO₂), ar no máximo, ração pela metade e simbiótico; menos amônia = menos NH₃. Subida curta do pH à tarde é normal (Boyd 2013)"],["Ácido fosfórico 85%",`comece com ${n0(0.5*v)} mL (0,5 mL por m³) diluído em 10 L de água, espalhado longe dos camarões. Último recurso: o manual diz \"em gotas, raro\" e nenhum estudo dá dose; Boyd e Kubitza não indicam ácido`],["Medir","pH 1 h depois. Alvo 7,5–7,8. Repita em doses pequenas, nunca tudo de uma vez."],["Efeito colateral","cada 1 mL por m³ gasta cerca de 1 mg/L de alcalinidade e soma fósforo (cianobactéria). Reponha bicarbonato depois."]])}],
+ borda:["Camarão na borda ou boquejando","O que estou vendo: camarões na superfície ou na parede.",()=>[["Agora","todos os registros de ar abertos, soprador reserva ligado"],["Oxitrat","1 copo (200 g) espalhado, só uma vez em 24 h (sobe o OD na hora; mais que isso passa do limite de H₂O₂, Furtado 2014)"],["Medir","OD agora e de hora em hora"],["Ração","suspender até o OD passar de 4"],["Depois","Nutrat em dobro; procure a causa (cone alto, floco morrendo, calor)"]]],
  ovo:["Cheiro de ovo podre no fundo","O que estou vendo: bolhas escuras, lodo preto, cheiro de ovo.",()=>[["Causa provável","sulfeto (H₂S) de lodo parado sem oxigênio: mata em pouca quantidade"],["Agora","rodo nos difusores e no fundo, academia de ar, decantador ligado"],["Ração","−30% até o cheiro sumir"],["Nutrat",`${n0(2*tanque().vol)} mL (2 mL por m³)`],["Prevenção","difusores sem ponto morto, rodo toda semana, cone até 15"]]],
- fezes:["Fios brancos boiando","O que estou vendo: fezes brancas na superfície, intestino branco.",()=>[["Suspeita","Vibrio (sobra de ração + matéria orgânica). Pode ser gregarina ou EHP: só o laboratório confirma."],["Agora","ração −30% por 3 dias e bandeja para conferir sobra; simbiótico e probiótico diários"],["Confirmar","placa TCBS (24 h); microscópio do intestino; PCR de EHP se não melhorar"],["Reverte?","se for Vibrio e manejo, sim. EHP é crônico."]]],
+ fezes:["Fios brancos boiando","O que estou vendo: fezes brancas na superfície, intestino branco.",()=>[["Suspeita","Vibrio (sobra de ração + matéria orgânica). Pode ser gregarina ou EHP: só o laboratório confirma."],["Agora","ração −30% por 3 dias e bandeja para conferir sobra; simbiótico e probiótico diários"],["Confirmar","placa TCBS (24 h; como fazer em Aprenda › Placa TCBS, e lance verdes e amarelas em Lançar › Água); microscópio do intestino; PCR de EHP se não melhorar"],["Reverte?","se for Vibrio e manejo, sim. EHP é crônico."]]],
  mancha:["Manchas brancas na casca","O que estou vendo: pontos brancos na carapaça, camarão avermelhado, para de comer.",()=>[["Suspeita","mancha branca (WSSV, vírus). Confirmação só por PCR."],["Agora","segurar a temperatura estável (sombrite, sem oscilação), não mexer na salinidade, ração −50%"],["Não há cura","acima de 32 °C o vírus se segura, mas o camarão sofre. Se o peso já vende, despesca de emergência."],["Biossegurança","não leve água nem puçá para outro tanque"]]],
- cauda:["Cauda branca e opaca","O que estou vendo: músculo da cauda com cor de cozido.",()=>[["Suspeita","mionecrose (IMNV, vírus) disparada por estresse. Confirmação por RT-PCR."],["Agora","menos manejo: adie biometria e transferências; OD ≥ 5; sem choque de salinidade ou temperatura"],["Reverte?","não tem cura; tirar o estresse segura a mortalidade"]]],
- hepato:["Camarão parado no fundo, pálido","O que estou vendo: letárgico, intestino vazio, hepatopâncreas claro.",()=>[["Suspeita","vibriose ou AHPND (mais comum nos primeiros 35 dias). Confirmação: TCBS e PCR."],["Agora","ração −50%, simbiótico/probiótico todo dia, decantador para baixar a matéria orgânica"],["Nunca","antibiótico no biofloco: mata o floco"],["Reverte?","vibriose leve sim; AHPND aguda raramente"]]],
+ cauda:["Cauda branca e opaca","O que estou vendo: músculo da cauda com cor de cozido.",()=>[["Suspeita","mionecrose (IMNV, vírus) disparada por estresse. Confirmação por RT-PCR."],["Agora","menos manejo: adie biometria e transferências; OD ≥ 5 mg/L (≈ 72% de saturação a 28 °C e 22 ppt); sem choque de salinidade ou temperatura"],["Reverte?","não tem cura; tirar o estresse segura a mortalidade"]]],
+ hepato:["Camarão parado no fundo, pálido","O que estou vendo: letárgico, intestino vazio, hepatopâncreas claro.",()=>[["Suspeita","vibriose ou AHPND (mais comum nos primeiros 35 dias). Confirmação: placa TCBS (Aprenda › Placa TCBS; lance em Lançar › Água) e PCR."],["Agora","ração −50%, simbiótico/probiótico todo dia, decantador para baixar a matéria orgânica"],["Nunca","antibiótico no biofloco: mata o floco"],["Reverte?","vibriose leve sim; AHPND aguda raramente"]]],
  branquia:["Brânquia escura","O que estou vendo na biometria: brânquias pretas ou marrons.",()=>[["Causa","sólidos altos, sulfeto, amônia ou nitrito por dias (não é um micróbio só)"],["Medir","cone, amônia, nitrito"],["Corrigir","decantador, rodo, cone até 15"],["Reverte?","sim: some na próxima muda se a água melhorar"]]],
  casca:["Casca mole ou de papel","O que estou vendo: casca fina dias depois da muda.",()=>[["Conferir","alcalinidade ≥ 150, cálcio, magnésio e potássio pela salinidade (Parâmetros)"],["Ração","Azomite 3 g por kg (teto 4)"],["pH","estável; não mexa com ácido ou cal na janela de muda"],["Se vier com crescimento desigual e calor","suspeita de NHP: microscópio do hepatopâncreas e PCR"]]],
 };
@@ -749,7 +790,7 @@ T.tecnicas_lembretes=()=>{const L=lote(hoje());const jm=janelaMuda(new Date());r
  <tr><td><b>Nutrat</b><div class="muted">1 mL por m³, diluído em 2 L, 1 vez por dia. Dobrar se a espuma piorar.</div></td><td><b>${n0(cfg.doses.nutrat*tanque().vol)} mL</b> em 2 L (${f(cfg.doses.nutrat,1)} mL/m³)</td></tr>
  <tr><td><b>"Academia"</b><div class="muted">1 h de manhã com o ar no máximo. Menos nos dias de muda.</div></td><td>${jm.on?"<b>Dia de muda:</b> academia curta (30 min)":"<b>1 hora</b> de manhã"}</td></tr>
  <tr><td><b>Puim</b><div class="muted">Cerca de 10 g por 100 kg de biomassa por dia.</div></td><td><b>${f(L.biomKg/100*10,1)} g</b> (${f(L.biomKg,1)} kg de biomassa)</td></tr>
- <tr><td><b>pH caiu</b><div class="muted">Gesso ou cal hidratada (veja Emergências).</div></td><td><button type="button" class="btn sm" data-go="tecnicas.botoes">Abrir</button></td></tr></table></div>
+ <tr><td><b>pH caiu</b><div class="muted">Bicarbonato ou cal hidratada até 200 g (gesso não traz alcalinidade). Veja Emergências.</div></td><td><button type="button" class="btn sm" data-go="tecnicas.botoes">Abrir</button></td></tr></table></div>
  <p class="muted">Origem: caderno Só Bioflocos (NotebookLM) <span class="ev camp">campo</span>. São práticas de tilápia adaptadas ao camarão; confirme pela água e pela bandeja.</p>`};
 T.inicio_painel=()=>{
   const r=recomendacao(hoje());const L=r.L;const dc=diaCultivo();const al=alertas();const fs=fase(new Date());
@@ -810,7 +851,7 @@ T.manejo_lua=()=>{const d0=new Date();const px=proximas(d0);let cal="";
 T.manejo_projecao=()=>{const L=lote(hoje());const cs=crescimentoSemanal(hoje());const falta=cfg.pesoAlvo-L.peso;const sem=cs.g>0?falta/cs.g:null;
   let linhas="";let p=L.peso,d=hoje();for(let w=0;w<=12&&p<=cfg.pesoAlvo+cs.g;w++){const bio=L.vivos*p/1000;linhas+=`<tr><td>${dt(d)}</td><td class="r">${f(p,2)}</td><td class="r">${f(bio,1)}</td><td class="r">${f(pctTabela(p),1)}</td><td class="r">${n0(bio*1000*pctTabela(p)/100)}</td></tr>`;p+=cs.g;d=addDias(d,7)}
   return `<h2>Projeção para despesca</h2><div class="grid">${kpi("Peso atual (est.)",f(L.peso,2)+" g","")}${kpi("Meta",f(cfg.pesoAlvo,0)+" g","")}${kpi("Crescimento",f(cs.g,2)+" g/sem",cs.fonte)}${kpi("Despesca em",sem!=null&&falta>0?f(sem,1)+" sem":"meta atingida",sem!=null&&falta>0?"por volta de "+dt(addDias(hoje(),Math.round(sem*7))):"")}${kpi("Biomassa na despesca",f(L.vivos*cfg.pesoAlvo/1000,1)+" kg",n0(L.vivos)+" vivos hoje")}${(()=>{const fc=fcrCiclo();return kpi("Conversão do ciclo",fc?f(fc.fcr,2):"–",fc?f(fc.racaoKg,1)+" kg de ração ÷ "+f(fc.ganho,1)+" kg ganhos · biofloco 1,12–1,29 (Xu 2025)":"precisa de biometria e tratos lançados",fc&&fc.fcr>1.8?"w":"")})()}</div>
-   <div class="card scroll" style="margin-top:12px"><table class="tbl"><tr><th>Semana</th><th class="r">Peso (g)</th><th class="r">Biomassa (kg)</th><th class="r">% peso</th><th class="r">Ração/dia (g)</th></tr>${linhas}</table></div><p class="muted">Projeção sem mortalidade adicional. Fica mais precisa a cada biometria.</p><div class="banner w"><b>No dia da despesca: guardar as mantas úmidas</b><small>Assim as bactérias nitrificantes sobrevivem e o próximo ciclo estabiliza o nitrito mais rápido. Devolver a água ao tanque, que fica madura.</small></div>`};
+   <div class="card scroll" style="margin-top:12px"><table class="tbl"><tr><th>Semana</th><th class="r">Peso (g)</th><th class="r">Biomassa (kg)</th><th class="r">% peso</th><th class="r">Ração/dia (g)</th></tr>${linhas}</table></div><p class="muted">Projeção sem mortalidade adicional. Fica mais precisa a cada biometria.</p><div class="banner w"><b>No dia da despesca: guardar as mantas úmidas</b><small>Assim as bactérias nitrificantes sobrevivem para o próximo ciclo (prática de campo; quanto acelera não tem estudo, regra do app). Devolver a água ao tanque, que fica madura.</small></div>`};
 
 function chartSvg(pts,band,unit,dec){
   if(!pts.length)return `<div class="empty">Sem dados ainda.</div>`;
@@ -825,9 +866,60 @@ function chartSvg(pts,band,unit,dec){
   g+=pts.map((p,i)=>{const out=band&&((band.min!=null&&p.y<band.min)||(band.max!=null&&p.y>band.max));return `<circle cx="${sx(p.x)}" cy="${sy(p.y)}" r="${i===pts.length-1?4.5:3}" fill="${out?"var(--bad)":"var(--accent)"}" stroke="var(--card)" stroke-width="1.5"/>`}).join("");
   const lp=pts[pts.length-1];g+=`<text x="${Math.min(sx(lp.x),W-R-2)}" y="${Math.max(sy(lp.y)-8,10)}" text-anchor="end" font-size="10" font-weight="700" fill="var(--ink)">${f(lp.y,dec)} ${esc(unit)}</text>`;
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico">${g}</svg></div>`}
+/* ===================== plano do ciclo: Iniciar, Reset, esperado × real ===================== */
+const PREPARO_DIAS=21;
+function diasAte(peso){for(let d=0;d<=400;d++)if(curva(d)>=peso)return d;return 400}
+function planoCalc(o){const t=tanque();const dens=num(o.densidade)||cfg.densidade,S=num(o.sobrevivencia)??cfg.sobrevivencia,W=num(o.pesoAlvo)||cfg.pesoAlvo,fca=num(o.fcr)||cfg.fcr,pv=num(o.preco)||precoVendaRef(W);
+  const pls=Math.round(t.area*dens),dias=diasAte(W),kg=pls*S/100*W/1000,receita=kg*pv;let rac=0;for(let d=0;d<dias;d++){const p=curva(d);rac+=pls*(100-(100-S)*Math.min(1,d/dias))/100*p*pctTabela(p)/100}rac/=1000; // ração somada pela tabela do manual, a mesma conta da curva esperada
+  const prRac=precoRef(produtos().find(p=>p.grupo==="RACAO"))||PRECO_REF["Ração 40% PB"];const cRac=rac*prRac,cPl=pls/1000*PL_MILHEIRO_REF,cEn=(cfg.eco.kw||0)*24*(dias+PREPARO_DIAS)*(cfg.eco.tarifa||0);
+  const pov=o.dia1?addDias(o.dia1,PREPARO_DIAS):"";return{pls,dias,kg,rac,receita,cRac,cPl,cEn,lucro:receita-cRac-cPl-cEn,pov,desp:pov?addDias(pov,dias):"",dens,S,W,fca,pv}}
+function espSobrev(dc){const D=(cfg.plano&&cfg.plano.dias)||diasAte(cfg.pesoAlvo);return 100-(100-cfg.sobrevivencia)*Math.min(1,Math.max(0,dc)/D)}
+function espRacaoDia(dc){const p=curva(Math.max(0,dc));return tanque().pls*espSobrev(dc)/100*p*pctTabela(p)/100}
+function espRacaoAte(dc){let s=0;for(let d=0;d<=dc;d++)s+=espRacaoDia(d);return s}
+function desvio(real,esp){if(real==null||!esp)return null;const d=(real-esp)/esp*100;return{d,n:Math.abs(d)<15?"ok":Math.abs(d)<30?"aten":"crit",t:Math.abs(d)<15?"ok":Math.abs(d)<30?"atenção":"fora"}}
+function realSeries(){const dp=cfg.dataPovoamento;if(!dp)return{peso:[],sob:[],rac:[]};const asc=recs.slice().reverse();
+  const peso=asc.filter(r=>r.tipo==="biometria").map(r=>({x:diasEntre(dp,r.data),y:r.peso})).filter(p=>p.x>=0);
+  const sob=asc.filter(r=>r.tipo==="biometria"&&r.sobrev!=null).map(r=>({x:diasEntre(dp,r.data),y:r.sobrev})).filter(p=>p.x>=0);
+  const m={};asc.filter(r=>r.tipo==="racao").forEach(r=>{const d=diasEntre(dp,r.dia||r.data);if(d>=0)m[d]=(m[d]||0)+(r.qtd||0)});let ac=0;const rac=Object.keys(m).map(Number).sort((a,b)=>a-b).map(d=>{ac+=m[d];return{x:d,y:ac/1000}});return{peso,sob,rac}}
+function espSerie(k,ate){const out=[];const D=Math.max(ate,7);let ac=0;for(let d=0;d<=D;d++){if(k==="rac")ac+=espRacaoDia(d);if(d%3&&d!==D)continue;out.push({x:d,y:k==="peso"?curva(d):k==="sob"?espSobrev(d):ac/1000})}return out}
+function chartDuo(esp,real,unit,dec){
+  if(!esp.length)return `<div class="empty">Sem plano ainda.</div>`;
+  const W=360,H=210,L=40,R=12,Tp=14,B=30;const all=esp.concat(real);let y0=Math.min(...all.map(p=>p.y)),y1=Math.max(...all.map(p=>p.y));if(y0===y1){y0-=1;y1+=1}const py=(y1-y0)*.08;y0=Math.max(0,y0-py);y1+=py;
+  const x0=0,x1=Math.max(...all.map(p=>p.x),1);const sx=x=>L+(x-x0)/(x1-x0)*(W-L-R),sy=y=>Tp+(1-(y-y0)/(y1-y0))*(H-Tp-B);let g="";
+  for(let i=0;i<=4;i++){const v=y0+(y1-y0)*i/4,y=sy(v);g+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-5}" y="${y+3}" text-anchor="end" font-size="9" fill="var(--muted)">${f(v,dec)}</text>`}
+  for(let i=0;i<=4;i++){const x=Math.round(x1*i/4);g+=`<text x="${sx(x)}" y="${H-14}" text-anchor="middle" font-size="9" fill="var(--muted)">dia ${x}</text>`}
+  g+=`<path d="${esp.map((p,i)=>(i?"L":"M")+sx(p.x).toFixed(1)+" "+sy(p.y).toFixed(1)).join(" ")}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/>`;
+  if(real.length){g+=`<path d="${real.map((p,i)=>(i?"L":"M")+sx(p.x).toFixed(1)+" "+sy(p.y).toFixed(1)).join(" ")}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`;
+    g+=real.map(p=>{const e=esp.reduce((a,b)=>Math.abs(b.x-p.x)<Math.abs(a.x-p.x)?b:a);const dv=desvio(p.y,e.y);return `<circle cx="${sx(p.x)}" cy="${sy(p.y)}" r="3.5" fill="${dv&&dv.n==="crit"?"var(--bad)":dv&&dv.n==="aten"?"var(--warn)":"var(--accent)"}" stroke="var(--card)" stroke-width="1.5"/>`}).join("")}
+  g+=`<line x1="${L}" x2="${L+18}" y1="${H-3}" y2="${H-3}" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><text x="${L+22}" y="${H}" font-size="9" fill="var(--muted)">esperado</text><line x1="${L+80}" x2="${L+98}" y1="${H-3}" y2="${H-3}" stroke="var(--accent)" stroke-width="2.5"/><text x="${L+102}" y="${H}" font-size="9" fill="var(--muted)">seu (${esc(unit)})</text>`;
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Esperado e real">${g}</svg></div>`}
+function cartaoPlano(){
+  const bt=`<div class="row" style="margin-top:6px"><button class="btn p sm" type="button" data-acao="iniciar">▶ Iniciar ciclo</button><button class="btn sm del" type="button" data-acao="reset">${pendDel==="_reset"?"Confirmar: apagar tudo deste perfil":"↺ Reset"}</button></div>`;
+  if(!cfg.plano)return `<div class="card" style="margin-bottom:12px"><b>Plano do ciclo</b><div class="muted">Toque em Iniciar para escolher o dia do preparo, a densidade e o peso de despesca. O app monta o calendário até a despesca e compara o que você lança com o esperado.</div>${bt}</div>`;
+  const p=cfg.plano,dc=diaCultivo();let h=`<div class="card" style="margin-bottom:12px"><b>Plano do ciclo</b><div class="muted">Preparo ${dt(p.dia1)} · povoamento ${dt(cfg.dataPovoamento)} · despesca ${dt(p.despesca)} (${p.dias} dias de cultivo) · ${f(p.kg,0)} kg esperados</div>`;
+  if(dc!=null&&dc>=0){const rs=realSeries();const ub=rs.peso[rs.peso.length-1],us=rs.sob[rs.sob.length-1],ur=rs.rac[rs.rac.length-1];
+    const lin=(nome,esp,real,un,dec,dia)=>{const dv=real!=null?desvio(real,esp):null;return `<tr><td>${nome}</td><td class="r">${f(esp,dec)} ${un}</td><td class="r">${real!=null?f(real,dec)+" "+un+(dia!=null?` <small class="muted">dia ${dia}</small>`:""):"—"}</td><td>${dv?`<span class="tag ${{ok:"ok",aten:"w",crit:"bad"}[dv.n]}">${dv.d>0?"+":""}${f(dv.d,0)}% ${dv.t}</span>`:""}</td></tr>`};
+    h+=`<div class="scroll"><table class="tbl"><tr><th>Dia ${dc}</th><th class="r">Esperado</th><th class="r">Seu</th><th></th></tr>`+
+      lin("Peso médio",ub?curva(ub.x):curva(dc),ub?ub.y:null,"g",2,ub&&ub.x)+lin("Sobrevivência",us?espSobrev(us.x):espSobrev(dc),us?us.y:null,"%",0,us&&us.x)+
+      lin("Ração do dia",espRacaoDia(dc)/1000,tratosDoDia(hoje()).length?tratosDoDia(hoje()).reduce((s,x)=>s+(x.qtd||0),0)/1000:null,"kg",2)+lin("Ração acumulada",ur?espRacaoAte(ur.x)/1000:espRacaoAte(dc)/1000,ur?ur.y:null,"kg",1,ur&&ur.x)+`</table></div><div class="muted">Até 15% de diferença é normal (Zeigler 2015); 15 a 30% pede atenção; acima de 30% está muito fora (regra do app). <a href="#" data-go="relatorios.graficos">Ver as duas curvas</a></div>`}
+  else if(dc!=null)h+=`<div class="muted">Faltam ${-dc} dia(s) para povoar. Siga o Preparo da água.</div>`;
+  return h+bt+`</div>`}
+ACOES.iniciar=function(){const hj=hoje();
+  form("Iniciar ciclo",[{name:"dia1",label:"Dia 1: começo do preparo da água virgem",type:"date",value:hj,req:true},
+    {html:`<div class="fg">`},{name:"densidade",label:"Densidade (camarões/m²)",type:"number",value:cfg.densidade},{name:"pesoInicial",label:"Peso da PL (g)",type:"number",value:cfg.pesoInicial},{name:"pesoAlvo",label:"Peso de despesca (g)",type:"number",value:cfg.pesoAlvo},{name:"sobrevivencia",label:"Sobrevivência esperada (%)",type:"number",value:cfg.sobrevivencia},{name:"fcr",label:"Conversão alimentar (FCA)",type:"number",value:cfg.fcr},{name:"preco",label:"Preço de venda (R$/kg)",type:"number",value:precoVendaRef(cfg.pesoAlvo)},{html:`</div>`},
+    {html:`<div class="muted" style="margin:4px 0 8px">Valores sugeridos são os do manual e do memorial: ${PREPARO_DIAS} dias de preparo, 500/m², PL de 0,02 g, despesca com 15 g (cerca de ${diasAte(15)} dias pela curva), 85% de sobrevivência e FCA 1,5 (estudos de biofloco em densidade parecida deram de 1,2 a 1,8: Purdue FNR-495-W; Samocha 2012; Hanson 2013). A ração esperada é somada pela tabela do manual, dia a dia. Tanque do Cadastro: ${f(cfg.diametro,1)} m × ${f(cfg.profundidade,1)} m.</div>`}],
+    o=>{if(!o.dia1)return["Escolha o dia 1"];const c=planoCalc(o);return[`Preparo: ${dt(o.dia1)} a ${dt(addDias(o.dia1,PREPARO_DIAS-1))} (${PREPARO_DIAS} dias)`,`Povoamento: ${dt(c.pov)} com ${n0(c.pls)} PLs`,`Despesca: ${dt(c.desp)} (${c.dias} dias de cultivo, ${f(c.W,0)} g)`,`Esperado: ${f(c.kg,0)} kg de camarão e ${f(c.rac,0)} kg de ração pela tabela (conversão ${f(c.rac/c.kg,2)})`,`Receita R$ ${n0(c.receita)} − ração R$ ${n0(c.cRac)} − PL R$ ${n0(c.cPl)} − energia R$ ${n0(c.cEn)} = lucro estimado R$ ${n0(c.lucro)} (sem outros insumos e mão de obra)`,"Lembre também: salinidade da água, preço real da PL e da ração (Estoque › Entradas) e o tamanho do tanque em Ajustes › Tanque.","Ao salvar, os lançamentos anteriores saem da tela (ficam guardados) e o app passa a comparar cada dia com este plano."]},
+    async o=>{if(!o.dia1)return toast("Escolha o dia 1.");if(cfg.exemplo)await apagarExemplo();const c=planoCalc(o);const n=clone(cfg);Object.assign(n,{densidade:c.dens,pesoAlvo:c.W,sobrevivencia:c.S,fcr:c.fca,dataPovoamento:c.pov,exemplo:false,exemploVisto:true,cicloId:"c"+Date.now().toString(36),cicloInicio:o.dia1<hj?o.dia1:agora()});
+      if(num(o.pesoInicial))n.pesoInicial=num(o.pesoInicial);n.eco=Object.assign({},n.eco,{preco:c.pv});n.plano={dia1:o.dia1,dias:c.dias,despesca:c.desp,kg:Math.round(c.kg*10)/10,criado:agora()};
+      prep.feitos={};await savePrep();await saveCfg(n);go("hoje","inicio_painel");toast("Ciclo iniciado",["Povoamento "+dt(c.pov),"Despesca "+dt(c.desp)])})};
+ACOES.reset=async function(){if(pendDel!=="_reset"){pendDel="_reset";render();setTimeout(()=>{if(pendDel==="_reset"){pendDel=null;render()}},5000);return}pendDel=null;
+  try{for(const r of recsAll.slice())await del(r.id);for(const g of gest.filter(x=>x.k!=="produto"))await gdel1(g.id);
+    const n=clone(DEFAULTS);["diametro","profundidade","faixas","tabela","curva","doses","eco"].forEach(k=>n[k]=cfg[k]);n.exemploVisto=true;prep={feitos:{}};await savePrep();await saveCfg(n);toast("Perfil zerado",["Produtos mantidos. Toque em Iniciar para um novo ciclo."])}catch(e){falha(e)}};
 T.relatorios_graficos=()=>{
-  const ops=PARAMS.map(p=>[p.k,p.n]).concat([["_peso","Peso médio (biometria)"],["_rac","Ração ofertada por dia"],["_mort","Mortalidade por dia"]]);
+  const ops=PARAMS.map(p=>[p.k,p.n]).concat([["_cPeso","Esperado × real: peso médio"],["_cRac","Esperado × real: ração acumulada"],["_cSob","Esperado × real: sobrevivência"],["_peso","Peso médio (biometria)"],["_rac","Ração ofertada por dia"],["_mort","Mortalidade por dia"]]);
   const asc=recs.slice().reverse();let pts=[],band=null,unit="",dec=1;
+  if(/^_c/.test(chartSel)){const k={_cPeso:"peso",_cRac:"rac",_cSob:"sob"}[chartSel];const rs=realSeries()[k];const dc=diaCultivo();const ate=Math.max((cfg.plano&&cfg.plano.dias)||diasAte(cfg.pesoAlvo),dc||0,...rs.map(p=>p.x));const u={peso:"g",rac:"kg",sob:"%"}[k];
+    return `<h2>Gráficos</h2><div class="card"><div class="f"><label for="gSel">Mostrar</label><select id="gSel">${opt(ops,chartSel)}</select></div>${cfg.dataPovoamento?chartDuo(espSerie(k,ate),rs,u,k==="peso"?1:0):`<div class="empty">Sem data de povoamento. Use Iniciar ciclo no Mapa do tanque.</div>`}<p class="muted">Linha tracejada = esperado pelo plano (curva do manual). Linha cheia = seus lançamentos. Ponto laranja: 15 a 30% fora; vermelho: mais de 30%.</p></div>`}
   if(chartSel==="_peso"){pts=asc.filter(r=>r.tipo==="biometria").map(r=>({x:+toDate(r.data),y:r.peso}));unit="g";dec=2}
   else if(chartSel==="_rac"||chartSel==="_mort"){const t=chartSel==="_rac"?"racao":"mortalidade";const m={};asc.filter(r=>r.tipo===t).forEach(r=>{const d=r.data.slice(0,10);m[d]=(m[d]||0)+(r.qtd||0)});pts=Object.keys(m).sort().map(d=>({x:+toDate(d),y:m[d]}));unit=t==="racao"?"g":"";dec=0}
   else{const p=PARAMS.find(x=>x.k===chartSel);pts=asc.filter(r=>r.tipo==="leitura"&&r.valores&&r.valores[chartSel]!=null).map(r=>({x:+toDate(r.data),y:r.valores[chartSel]}));band=cfg.faixas[chartSel];unit=p.u.split(" ")[0];dec=p.d}
@@ -845,36 +937,61 @@ T.aprenda_quando=()=>`<div class="learn"><h2>Quando aumentar ou reduzir a raçã
   <li>Bandeja <b>vazia</b> 1–2 h depois do trato;</li><li><b>OD ≥ 5</b> mg/L;</li><li><b>Amônia &lt; 1</b> e <b>nitrito &lt; 1</b> mg/L;</li><li><b>Não</b> ser dia de muda (lua cheia ou nova, ou muda vista).</li></ul>
  <p>Por quê: bandeja vazia mostra fome, mas se a água já está no limite, mais ração vira mais amônia e menos oxigênio. Subir aos poucos evita passar do ponto.</p>
  <h3>3. MANTER</h3><p>Quando sobrou <b>pouco</b> na bandeja. É o ponto certo: comeu quase tudo e não há desperdício.</p>
- <h3>4. BAIXAR 10–20%</h3><ul>
+ <h3>4. BAIXAR 10–30%</h3><ul>
   <li><b>Sobrou muito</b> na bandeja: −10% (um trato) a −20% (dois ou mais). Sobra apodrece, gasta oxigênio e vira amônia.</li>
   <li><b>OD &lt; 4</b>: −20%. Abaixo de 3, suspenda e ligue toda a aeração. Digerir gasta oxigênio.</li>
-  <li><b>Amônia &gt; 1</b>: −20% e açúcar (amônia × m³ × 20 g). A amônia vem da proteína da ração.</li>
-  <li><b>Nitrito &gt; 1</b>: −15%. As bactérias não estão dando conta.</li>
+  <li><b>Amônia &gt; 1</b>: açúcar (amônia × m³ × 20 g), ração mantida. <b>Amônia &gt; 3 ou NH₃ &gt; 0,1</b>: −30%. A amônia vem da proteína da ração.</li>
+  <li><b>Nitrito &gt; 1</b>: alerta, alcalinidade no alto. <b>Nitrito &gt; 5</b>: −15%. As bactérias não estão dando conta.</li>
   <li><b>Cone Imhoff &gt; 20 mL/L</b>: −15% e Nutrat dobrado. Sem dreno, a carga só cai se entrar menos.</li>
-  <li><b>Dia de muda</b> (lua cheia ou nova): cerca de −20%, com mais ar.</li></ul>
+  <li><b>Dia de muda</b> (lua cheia ou nova): cerca de −40% por 3 a 4 dias (Molina 2000: consumo cai 35 a 50%), com mais ar. As telas de poliéster no tanque dão abrigo ao camarão mole (Zhang 2010).</li></ul>
+ <p class="muted">Dos cortes acima, só o da amônia tem número publicado (Alune 2020: 30 a 40%) e o da temperatura tem estudo de apetite (Zhang 2025). Os tamanhos dos outros cortes (oxigênio, nitrito, cone, lua) são regra do app e do manual, sem estudo que dê o número: a bandeja do dia seguinte é quem confirma.</p>
+ <p class="muted">Com bandeja vazia e água boa, se a ração estiver abaixo da tabela o app volta para a tabela.</p>
  <p class="muted">O app aplica essas regras sozinho na Digitação de Ração e escreve o motivo de cada ajuste. A ração de amanhã sai dos tratos e das bandejas de hoje.</p></div>`;
+T.aprenda_tcbs=()=>`<div class="learn"><h2>Placa TCBS: como medir o Vibrio</h2>
+ <p>O ágar TCBS deixa crescer quase só Vibrio. Colônia <b>amarela</b> em geral é inofensiva; colônia <b>verde</b> em geral é a patogênica (FAU Harbor Branch / UF, "Bacterial Plating Instructions").</p>
+ <div class="card"><b>Passo a passo</b><ol>
+ <li>Colete a água do tanque num saco ou frasco estéril (o guia usa 200 mL). Semeie no mesmo dia.</li>
+ <li>Marque no fundo da placa: data, tanque e diluição.</li>
+ <li>Com uma alça descartável de 10 µL (1/100 de mL), pegue a água e espalhe por toda a placa. Uma alça nova por amostra.</li>
+ <li>Feche e guarde a placa de cabeça para baixo, num lugar fresco e seco (uma caixa plástica com tampa).</li>
+ <li>Conte depois de 24 horas, separando amarelas e verdes.</li>
+ <li>Conta: colônias × 100 = UFC/mL (porque 10 µL é 1/100 de mL). Exemplo do guia: 15 amarelas e 36 verdes → 1.500 amarelas e 3.600 verdes por mL; total 5.100.</li>
+ <li>Lance verdes e amarelas em <b>Lançar › Água</b>. O app avisa quando passa da faixa.</li></ol></div>
+ <div class="card"><b>Como ler</b><ul>
+ <li>Verdes acima de 1.000 UFC/mL: atenção (doencas-modelo; o guia FAU/UF quer Vibrio abaixo de 1.000 e sem verdes no larvário).</li>
+ <li>Verdes acima de 10.000: crítico. <span class="ev camp">regra do app</span> (limite de campo ainda não conferido).</li>
+ <li>Engorda em bioflocos de referência: Vibrio total 13.700 UFC/mL em média (5.300 a 27.750); as mortes começaram depois que as verdes subiram (Samocha, GSA Advocate).</li>
+ <li>PL na chegada: placa da PL macerada; muitas verdes é sinal ruim (manual, 6.4).</li></ul></div>
+ <p class="muted">O guia não diz a temperatura da estufa nem a marca do ágar: use placa de TCBS pronta, guardada à sombra. Faça a placa toda semana e sempre que aparecer fio branco ou camarão parado no fundo <span class="ev camp">regra do app</span>.</p></div>`;
 T.aprenda_regras=()=>`<div class="learn"><h2>Regras do app e o que é estudo ou prática</h2>
  <div class="card scroll"><table class="tbl"><tr><th>Regra</th><th>Efeito</th><th>Base</th></tr>
  <tr><td>Ração = vivos × peso × % por faixa de peso</td><td>Ponto de partida</td><td><span class="ev est">estudo</span> Purdue, CIBA</td></tr>
  <tr><td>Conferência pelo crescimento × FCR</td><td>Checagem</td><td><span class="ev est">estudo</span> Purdue</td></tr>
  <tr><td>Bandeja vazia + água boa / pouca / muita</td><td>+7% / 0 / −10 a −20%</td><td><span class="ev est">estudo</span> FAO, Purdue</td></tr>
- <tr><td>OD &lt; 4 e &lt; 3 mg/L</td><td>−20% / suspender</td><td><span class="ev est">estudo</span></td></tr>
- <tr><td>Amônia &gt; 1, nitrito &gt; 1</td><td>−20% / −15%</td><td><span class="ev est">estudo</span></td></tr>
- <tr><td>Espuma crespa, cone &gt; 20, amônia &gt; 1, nitrito &gt; 1, OD &lt; 4 (depois do ar), lua</td><td>Nutrat em dobro, mesma dose em qualquer salinidade</td><td><span class="ev camp">Só Bioflocos</span>; efeito no O₂ é promessa do fabricante</td></tr>
- <tr><td>Cone &gt; 20 mL/L</td><td>−15%, Nutrat em dobro</td><td><span class="ev est">estudo</span> + <span class="ev camp">Só Bioflocos</span></td></tr>
+ <tr><td>OD &lt; 4 e &lt; 3 mg/L</td><td>−20% / suspender</td><td><span class="ev camp">regra do app</span>: cortar ração com oxigênio baixo tem apoio (Davis e Venero 2005), o número não tem estudo</td></tr>
+ <tr><td>Amônia &gt; 3 ou NH₃ &gt; 0,1 (1 a 3: só açúcar)</td><td>−30%</td><td><span class="ev est">estudo</span> Alune 2020 (30 a 40%)</td></tr>
+ <tr><td>Nitrito &gt; 5 (1 a 5: só alerta)</td><td>−15%</td><td>gatilho perto do nível seguro de Lin e Chen 2003; tamanho do corte <span class="ev camp">regra do app</span></td></tr>
+ <tr><td>Mortos acima de 0,5% ao dia</td><td>−20%</td><td><span class="ev camp">regra do app</span>, sem estudo que dê o número</td></tr>
+ <tr><td>Emergências (cheiro de ovo, fezes brancas, mancha branca, Vibrio, pH alto)</td><td>−30%, −50% ou metade</td><td><span class="ev camp">regra do app</span>, sem estudo que dê o número</td></tr>
+ <tr><td>Bandeja vazia, água boa e ração abaixo da tabela</td><td>Volta para a tabela</td><td>Manual (tabela do cap. 8); achado do simulador</td></tr>
+ <tr><td>Plano: esperado × real</td><td>Até 15% normal; 15 a 30% atenção; acima de 30% fora</td><td>15%: <span class="ev est">estudo</span> Zeigler, Browdy e Stock 2015 (diferenças acima de 10 a 15% entre médias já são relevantes). 30%: <span class="ev camp">regra do app</span>, sem estudo</td></tr>
+ <tr><td>Plano: vivos esperados</td><td>Linha de 100% até 85% na despesca</td><td>Manual, tabela 8.3</td></tr>
+ <tr><td>Plano: conversão 1,5 e ração pela tabela</td><td>Prévia do Iniciar</td><td><span class="ev est">estudo</span> Purdue FNR-495-W (1,2 a 1,8); Samocha 2012 (1,43 a 1,77); Hanson 2013 (1,25 a 1,48)</td></tr>
+ <tr><td>Espuma crespa, cone &gt; 20, amônia &gt; 1, nitrito &gt; 1, OD &lt; 4 (depois do ar), lua</td><td>Nutrat em dobro, mesma dose em qualquer salinidade</td><td><span class="ev camp">Só Bioflocos</span>; não põe oxigênio (age como emulsificante; promessa de O₂ era do canal, não do fabricante)</td></tr>
+ <tr><td>Cone &gt; 20 mL/L</td><td>−15%, Nutrat em dobro</td><td><span class="ev camp">Só Bioflocos</span>; o −15% é regra do app, sem estudo que dê o número</td></tr>
  <tr><td>Bicarbonato 0,25 kg/kg de ração</td><td>Reposição diária</td><td><span class="ev est">estudo</span></td></tr>
  <tr><td>Açúcar 20 g por g de amônia-N</td><td>Quando amônia &gt; 1</td><td><span class="ev est">estudo</span> Avnimelech</td></tr>
  <tr><td>Ritual: espuma, cone, Nutrat, simbiótico, Azomite, difusores</td><td>Checklist diário</td><td><span class="ev camp">Só Bioflocos</span></td></tr>
  <tr><td>Azomite 3 g/kg de ração</td><td>Todo dia</td><td><span class="ev est">estudo</span> Tan 2014</td></tr>
- <tr><td>Janela de lua cheia/nova</td><td>−20%, ar, alcalinidade, Ca/Mg</td><td><span class="ev camp">campo</span>, estudo limitado</td></tr>
+ <tr><td>Janela de lua cheia/nova</td><td>−40% (Molina 2000), ar, alcalinidade, Ca/Mg</td><td><span class="ev camp">campo</span> (manual). Nenhum estudo mede o efeito da lua na ração ou na morte do vannamei; Almeida Neto e Freire 2007 não acharam ligação entre sobra e fase da muda</td></tr>
  <tr><td>Decantador: liga com cone &gt; 15, desliga em 10, alerta com 3 dias ligado, lodo do registro todo dia</td><td>Substitui o dreno</td><td><span class="ev est">estudo</span> Nunes e Castro 2012</td></tr>
  <tr><td>Skimmer: conferir antes de dobrar o Nutrat</td><td>Menos espuma marrom, OD melhor</td><td><span class="ev est">estudo</span> Samocha (raceway)</td></tr>
- <tr><td>Alarme de OD em 4,5 e teste do gerador às segundas</td><td>Plano B de oxigênio</td><td><span class="ev est">estudo</span></td></tr>
+ <tr><td>Alarme de OD em 4,5 e teste do gerador às segundas</td><td>Plano B de oxigênio</td><td><span class="ev camp">regra do app</span> (4,5 sem estudo)</td></tr>
  <tr><td>Farelo fermentado como carbono; açúcar só com amônia &gt; 1; sem melaço</td><td>Carbono do dia</td><td><span class="ev est">estudo</span> FURG; Ray e Lotz 2014</td></tr>
  <tr><td>Mantas de biofilme; dias até o nitrito estabilizar</td><td>Comparar ciclos</td><td><span class="ev est">promissor</span> FURG 2022</td></tr>
  <tr><td>Temperatura entre 22 e 26 °C</td><td>Ração −10%</td><td><span class="ev est">estudo</span> Zhang 2025 (laboratório)</td></tr>
  <tr><td>Conversão alimentar do ciclo &gt; 1,8 (a partir do dia 21, com biometria)</td><td>Alerta: conferir biometria e sobra</td><td><span class="ev est">estudo</span> Xu 2025 (1,12–1,29 em biofloco)</td></tr>
- <tr><td>Relação C:N do dia</td><td>Só mostra a conta; referência 10 : 1</td><td><span class="ev est">estudo</span> Halim 2025; estimativa de carbono do app</td></tr>
+ <tr><td>Relação C:N do dia</td><td>Só mostra a conta (já soma o carbono e o nitrogênio do lote de simbiótico do dia: por m³ 20 g de farelo + 2 g de açúcar, receita da tese do Pimentel); referência 10 : 1</td><td><span class="ev est">estudo</span> Halim 2025; estimativa de carbono do app</td></tr>
  <tr><td>Densidade 400–600 por m³</td><td>Aviso no Cadastro do tanque</td><td><span class="ev est">estudo</span> Xu 2025</td></tr>
  <tr><td>Mais Azomite na muda</td><td>Não aplicado pelo app</td><td>Ideia do Wagner, sem estudo. Teto 4 g/kg.</td></tr></table></div>
  <h3>Referências</h3><ul class="ref">
@@ -891,7 +1008,8 @@ T.aprenda_estudos=()=>{const E=[
  ["Densidade","Xu et al. 2025, Fishes 10(7):326","10.3390/fishes10070326","ok","Bioflocos de 200 a 800 camarões por m³: a amônia foi de 0,4 para 2,3 mg/L e o nitrito de 1,0 para 4,2 mg/L no pico; peso de despesca de 19,1 para 14,1 g; sobrevivência de 94,6% para 79,8%; produção de 3,6 para 9,1 kg/m³; conversão de 1,12 para 1,29. Faixa ótima 400–600 por m³.","Aviso no Cadastro do tanque. Nossos ~555 por m³ estão dentro."],
  ["Densidade","Said et al. 2024, Scientific Reports 14:11147","10.1038/s41598-024-61328-4","ok","Bioflocos, 50 contra 200 camarões por m², 16 semanas: densidade alta teve menor sobrevivência e crescimento, mais Vibrio na água (3,59 contra 2,45 log UFC/mL) e no camarão, e brânquia lesada.","Reforça não passar da densidade decidida e medir Vibrio se houver mortalidade."],
  ["Densidade","Khanjani 2026, Annals of Animal Science 26(2):813","10.2478/aoas-2025-0087","parcial","Bioflocos, 35 dias: no grupo mais denso, peso 7,01 g e sobrevivência 88,19%; o autor recomenda até 0,616 g de camarão por litro. Os números de conversão do carrossel não estão no resumo.","Só leitura."],
- ["Carbono (C:N)","Halim et al. 2025, Aquaculture, Fish and Fisheries 5:e70032","10.1002/aff2.70032","ok","Bioflocos com melaço, C:N 10 a 25 (vannamei junto com camarão de água doce): C:N 10 deu sobrevivência de 95,3%, conversão 1,58 e o melhor retorno econômico.","Referência 10 : 1 na conta de C:N do dia."],
+ ["Carbono (C:N)","Xu et al. 2022, Microorganisms 10:1060","10.3390/microorganisms10051060","ok","Bioflocos em tanques de 30 m³ a 300 camarões por m³: C:N 8, 12 e 16 deram 92,8, 92,4 e 89,7% de sobrevivência, sem diferença; a C:N controla o nitrogênio da água, não melhora o camarão.","Base da faixa de C:N na conta do dia."],
+ ["Carbono (C:N)","Halim et al. 2025, Aquaculture, Fish and Fisheries 5:e70032","10.1002/aff2.70032","parcial","Lido só pelo resumo. Bioflocos com melaço, C:N 10 a 25 (vannamei junto com camarão de água doce): C:N 10 deu sobrevivência de 95,3%, conversão 1,58 e o melhor retorno econômico.","Apoio para a referência 10 : 1, não é a base."],
  ["Carbono (C:N)","Cao et al. 2025, Bioresource Technology 435:132961","10.1016/j.biortech.2025.132961","nao","Carrossel: C:N 20 com glicose derrubou a amônia em 98%; C:N 15 deu +32% de peso.","Citado como não conferido."],
  ["Aeração","Han et al. 2025, Water 17(1):41","10.3390/w17010041","parcial","Bioflocos com 75, 35 e 10 L/min de ar: o DHA do floco foi maior com 75 L/min (resumo). O resto do carrossel veio do corpo do artigo.","Reforça ar no máximo e a academia de 1 h."],
  ["Oxigênio","Patkaew et al. 2024, Veterinary World 17:50","10.14202/vetworld.2024.50-58","ok","OD a 15 mg/L (O₂ puro) contra 5 mg/L por 30 dias: peso 14,73 contra 12,13 g e conversão 1,55 contra 2,51.","Reforça a meta OD ≥ 5 e o plano B com cilindro de O₂."],
@@ -929,13 +1047,13 @@ T.cadastro_doses=()=>{const v=tanque().vol;const d=cfg.doses;const row=(k,n,u,no
    ${row("alcAlvo","Alvo de alcalinidade na correção","mg/L CaCO₃","g = (alvo − medido) × m³ ÷ 0,6")}
    ${row("acucar","Açúcar contra amônia","g por (mg/L × m³)","Manual: 20 g por g de amônia-N.")}
    ${row("nutrat","Nutrat diário","mL por m³ por dia","Só Bioflocos: 1 mL/m³. O app dobra quando a química pede.")}
-   ${row("simbForm","Simbiótico na formação","L por m³ por dia","Só Bioflocos: 1 L/m³ (até 2 para acelerar).")}
+   
    ${row("farelo","Farelo de arroz fermentado (carbono principal)","kg por kg de ração","Ponto de partida: regra da Purdue de 0,5–1 kg de carbono por kg de ração, aplicada ao farelo. Ajuste pelo cone e pela amônia.")}
    ${row("odAlarme","Alarme de oxigênio","mg/L","Plano B de O₂: alarme em 4,5.")}
-   ${row("cnAlvo","Relação C:N de referência","C por N","Halim et al. 2025 (bioflocos com melaço, conferido): C:N 10 deu o melhor retorno, com sobrevivência de 95% e conversão 1,58. Cao et al. 2025 cita 15 para crescimento e 20 para limpar a água (números ainda não conferidos no artigo). O app só mostra a conta; não muda o farelo sozinho.")}
+   ${row("cnAlvo","Relação C:N de referência","C por N","Xu et al. 2022 (lido na íntegra, 30 m³): C:N 8, 12 e 16 deram 92,8, 92,4 e 89,7% de sobrevivência, sem diferença. Apoio: Halim et al. 2025, lido só pelo resumo, C:N 10 com 95%. Cao et al. 2025 cita 15 para crescimento e 20 para limpar a água (números ainda não conferidos no artigo). O app só mostra a conta; não muda o farelo sozinho.")}
    ${row("prot","Proteína da ração","% PB","Deixe vazio para o app ler do nome da ração (ex.: \"Ração 40% PB\"). Usado na conta da C:N.")}
-   ${row("probBombona","Probiótico na bombona","g por bombona de 70–80 L","Só Bioflocos: 30 g. Dose da bombona, não do tanque.")}
-   ${row("catalisador","Catalisador de flocos (opcional)","mL por bombona","O caderno não dá dose: use a do rótulo. Deixe vazio se não usa. Vai na bombona depois de corrigir o pH para 7–7,5 com bicarbonato. Preenchido, aparece no Ritual.")}
+   ${row("probLote","Probiótico no lote do simbiótico","g por m³ de tanque","Tese do Pimentel: 0,2–0,4 g de Bacillus por m³ a cada aplicação. Padrão 0,3.")}
+   ${row("catalisador","Catalisador de flocos (opcional)","mL por lote","O caderno não dá dose: use a do rótulo. Deixe vazio se não usa. Vai no lote com o pH em 7–7,5. Preenchido, aparece no Ritual.")}
   </table>${num(d.azomite)>4?`<div class="banner bad" style="margin-top:10px">Azomite acima de 4 g/kg: o estudo não viu benefício a 6–8 g/kg.</div>`:""}
   <div class="row" style="margin-top:10px"><button class="btn p" type="button" data-salvar="doses">✓ Salvar</button></div></div>`};
 /* ===================== render ===================== */
@@ -1006,15 +1124,16 @@ Object.assign(ACOES,{
   pagar(){contaManual("PAGAR")},receber(){contaManual("RECEBER")},
   povoamento(){const t=tanque();form("Povoamento",[{name:"data",label:"Data do povoamento",type:"date",value:cfg.dataPovoamento||hoje(),req:true},
       {html:dlPessoas()+`<div class="f"><label for="i_lab">Laboratório</label><input id="i_lab" name="lab" list="dlp"></div>`},{name:"idade",label:"Idade da PL",value:"PL10"},
-      {html:`<div class="fg">`},{name:"qtd",label:"Quantidade de PL",type:"number",value:t.pls,req:true},{name:"mil",label:"Valor do milheiro (R$; "+PL_MILHEIRO_REF+" é estimativa)",type:"number",value:PL_MILHEIRO_REF},{html:`</div>`},{html:`<div class="fg">`},{name:"salSaco",label:"Salinidade do saco (ppt)",type:"number",value:cfg.salLab||""},{name:"tempSaco",label:"Temperatura do saco (°C)",type:"number"},{html:`</div>`},{name:"venc",label:"Vencimento do pagamento",type:"date",value:hoje()}],
+      {html:`<div class="fg">`},{name:"qtd",label:"Quantidade de PL",type:"number",value:t.pls,req:true},{name:"mil",label:"Valor do milheiro (R$; "+PL_MILHEIRO_REF+" é estimativa)",type:"number",value:PL_MILHEIRO_REF},{html:`</div>`},{html:`<div class="fg">`},{name:"salSaco",label:"Salinidade do saco (ppt)",type:"number",value:cfg.salLab||""},{name:"tempSaco",label:"Temperatura do saco (°C)",type:"number"},{html:`</div>`},{html:`<div class="fg">`},{name:"estresse",label:"Teste de estresse: % vivas de 100 PL (água doce 15–30 min; formalina 150 mg/L 30 min só com luva e máscara)",type:"number"},{name:"plVib",label:"TCBS da PL: colônias verdes (UFC/g)",type:"number"},{html:`</div>`},{name:"pcr",label:"PCR das 5 doenças (laudo do laboratório)",type:"select",options:["não informado","negativo","positivo"]},{name:"testemunha",label:"Testemunha: vivas de 100 PL depois de 48 h (se já souber)",type:"number"},{name:"venc",label:"Vencimento do pagamento",type:"date",value:hoje()}],
       o=>{const q=num(o.qtd)||0,m=num(o.mil)||0;const e=[];{const ss=num(o.salSaco),ts=num(o.tempSaco),st=leituraRecente("sal",hoje()),tt=leituraRecente("temp",hoje());
         if(ss==null||ts==null)e.push("Informe a salinidade e a temperatura do saco para o app conferir a aclimatação");
-        if(ss!=null&&st&&Math.abs(ss-st.v)>3)e.push(`⚠ Saco ${f(ss,0)} ppt × tanque ${f(st.v,0)} ppt: diferença acima de 3. Aclimate devagar (cerca de 1 ppt a cada 20 min)`);
+        if(ss!=null&&st&&Math.abs(ss-st.v)>2)e.push(`⚠ Saco ${f(ss,0)} ppt × tanque ${f(st.v,0)} ppt: diferença acima de 2. Aclimate devagar, 1 a 2 ppt por hora (manual, cap. 7)`);
         if(ts!=null&&tt&&Math.abs(ts-tt.v)>2)e.push(`⚠ Saco ${f(ts,1)} °C × tanque ${f(tt.v,1)} °C: diferença acima de 2. Deixe o saco boiando até igualar`);
         if((ss!=null&&!st)||(ts!=null&&!tt))e.push("Meça a salinidade e a temperatura do tanque hoje antes de soltar");
-        e.push("Sempre aclimatar: no simulador, soltar direto perdeu cerca de 3 em cada 4 larvas")}e.push(`Densidade: ${f(q/t.area,0)} PL/m² em ${f(t.area,1)} m² (${f(q/t.vol,0)} por m³)`);if(m)e.push(`Custo de povoamento do ciclo +${brl(q/1000*m)}`,`Conta a pagar ao laboratório +${brl(q/1000*m)}`);if(o.data!==cfg.dataPovoamento)e.push("A data do povoamento no Cadastro passa a ser "+dt(o.data)+": dias de cultivo, ração e alertas contam daí");return e},
+        {const es=num(o.estresse),pv=num(o.plVib);if(es==null)e.push("Faça o teste de estresse em 100 PL antes de soltar (manual 6.3)");else if(es<60)e.push(`⚠ Teste de estresse ${f(es,0)}%: abaixo de 60%, recuse o lote (manual 6.3)`);if(o.pcr==="positivo")e.push("⚠ PCR positivo: não povoe com esse lote (manual 6.4)");else if(o.pcr!=="negativo")e.push("Peça o laudo de PCR das 5 doenças ao laboratório (manual 6.4)");if(pv!=null&&pv>0)e.push("TCBS da PL com colônias verdes: converse com o laboratório antes de soltar (critério do lote é regra do app)")}
+        e.push("Mesmo com aclimatação certa, conte com 5 a 10% de perda nas primeiras 48–72 h (Jayasankar 2009; Magalhães 2025): confira na testemunha de 100 PL");e.push("Sempre aclimatar: no simulador, soltar direto chega a perder metade das larvas quando a diferença é grande")}e.push(`Densidade: ${f(q/t.area,0)} PL/m² em ${f(t.area,1)} m² (${f(q/t.vol,0)} por m³)`);if(m)e.push(`Custo de povoamento do ciclo +${brl(q/1000*m)}`,`Conta a pagar ao laboratório +${brl(q/1000*m)}`);if(o.data!==cfg.dataPovoamento)e.push("A data do povoamento no Cadastro passa a ser "+dt(o.data)+": dias de cultivo, ração e alertas contam daí");return e},
       async o=>{const q=num(o.qtd),m=num(o.mil)||0;if(!q)return toast("Informe a quantidade de PL.");const v=q/1000*m;
-        const id=await gput({k:"povoamento",ciclo:cicloAtual(),data:o.data,lab:o.lab||"",idade:o.idade||"",qtd:q,milheiro:m,valor:v});
+        const id=await gput({k:"povoamento",ciclo:cicloAtual(),data:o.data,lab:o.lab||"",idade:o.idade||"",qtd:q,milheiro:m,valor:v,salSaco:num(o.salSaco),tempSaco:num(o.tempSaco),estresse:num(o.estresse),plVib:num(o.plVib),pcr:o.pcr||"",testemunha:num(o.testemunha)});
         if(v)await gput({k:"conta",tipo:"PAGAR",descricao:"Pós-larvas "+(o.idade||""),pessoa:o.lab||"",valor:v,venc:o.venc||o.data,pagoEm:null,origem:"POVOAMENTO",ref:id,ciclo:cicloAtual()});
         if(o.data!==cfg.dataPovoamento){const c=clone(cfg);c.dataPovoamento=o.data;await saveCfg(c)}
         toast("Povoamento lançado",[n0(q)+" PL",v?"Contas a pagar +"+brl(v):"Sem valor informado"])})},
@@ -1062,7 +1181,7 @@ T.producao_ciclo=()=>{const r=resultado();const dc=diaCultivo();const t=tanque()
   h+=`<div class="row" style="margin-top:8px"><button class="btn p" type="button" data-acao="povoamento">Lançar povoamento</button><button class="btn" type="button" data-acao="despesca">Lançar despesca</button></div>`;
   return h};
 T.producao_povoamento=()=>`<h2>Povoamento</h2>`+gradeG("povoamento",[{t:"Data",v:p=>dt(p.data)},{t:"Laboratório",v:p=>p.lab},{t:"Idade",v:p=>p.idade},{t:"PL",r:1,v:p=>n0(p.qtd)},{t:"PL/m²",r:1,v:p=>n0(p.qtd/tanque().area)},{t:"Milheiro",r:1,v:p=>brl(p.milheiro)},{t:"Total",r:1,v:p=>brl(p.valor)}],G("povoamento").filter(p=>p.ciclo===cicloAtual()),{incluir:"povoamento",vazio:"Nenhum povoamento lançado neste ciclo. O botão Povoar do Preparo só marca a data; aqui entram a quantidade e o custo."});
-T.producao_despesca=()=>`<h2>Despesca</h2><div class="banner w" style="margin-bottom:10px"><b>No dia da despesca: guardar as mantas úmidas</b><small>Baixar a água para 50 cm, arrastar os difusores para um lado e tirar com puçá. As bactérias das mantas aceleram o próximo ciclo.</small></div>`+gradeG("despesca",[{t:"Data",v:d=>dt(d.data)},{t:"Tipo",v:d=>d.tipo==="TOTAL"?"Total":"Parcial",h:d=>gTag(d.tipo==="TOTAL"?"Total":"Parcial",d.tipo==="TOTAL"?"w":"ok")},{t:"Cliente",v:d=>d.cli},{t:"Kg",r:1,v:d=>f(d.kg,1)},{t:"Peso (g)",r:1,v:d=>f(d.peso,1)},{t:"R$/kg",r:1,v:d=>brl(d.preco)},{t:"Total",r:1,v:d=>brl(d.kg*d.preco)}],G("despesca").filter(d=>d.ciclo===cicloAtual()),{incluir:"despesca"});
+T.producao_despesca=()=>`<h2>Despesca</h2><div class="banner w" style="margin-bottom:10px"><b>No dia da despesca: guardar as mantas úmidas</b><small>Baixar a água para 50 cm, arrastar os difusores para um lado e tirar com puçá. As bactérias das mantas ajudam o próximo ciclo (prática de campo; quanto acelera não tem estudo, regra do app).</small></div>`+gradeG("despesca",[{t:"Data",v:d=>dt(d.data)},{t:"Tipo",v:d=>d.tipo==="TOTAL"?"Total":"Parcial",h:d=>gTag(d.tipo==="TOTAL"?"Total":"Parcial",d.tipo==="TOTAL"?"w":"ok")},{t:"Cliente",v:d=>d.cli},{t:"Kg",r:1,v:d=>f(d.kg,1)},{t:"Peso (g)",r:1,v:d=>f(d.peso,1)},{t:"R$/kg",r:1,v:d=>brl(d.preco)},{t:"Total",r:1,v:d=>brl(d.kg*d.preco)}],G("despesca").filter(d=>d.ciclo===cicloAtual()),{incluir:"despesca"});
 T.producao_historico=()=>{const cs=G("ciclo").sort((a,b)=>a.fim<b.fim?1:-1);return `<h2>Histórico de ciclos</h2><p class="muted">Cada despesca total guarda o resultado do ciclo aqui, para comparar um ciclo com o outro.</p>`+gradeG("ciclos",[{t:"Ciclo",v:c=>c.numero},{t:"Povoamento",v:c=>dt(c.povoamento)},{t:"Despesca",v:c=>dt(c.fim)},{t:"Dias",r:1,v:c=>c.dias==null?"":c.dias},{t:"Kg",r:1,v:c=>f(c.kg,1)},{t:"Kg/m³",r:1,v:c=>f(c.kg/tanque().vol,2)},{t:"Peso (g)",r:1,v:c=>f(c.peso,1)},{t:"Sobrev.",r:1,v:c=>c.sobrev==null?"":f(c.sobrev,0)+"%"},{t:"FCA",r:1,v:c=>f(c.fca,2)},{t:"Custo/kg",r:1,v:c=>brl(c.custoKg)},{t:"Resultado",r:1,v:c=>brl(c.lucro)}],cs,{vazio:"Nenhum ciclo encerrado ainda. Lance uma despesca total para fechar o primeiro."})};
 T.estoque_produtos=()=>{const sa=saidas();return `<h2>Produtos</h2><p class="muted">O produto do grupo Ração é a ração ativa: cada trato do Manejo baixa dele. Aplicações com o mesmo nome do produto também baixam sozinhas.</p>${(()=>{const f2=faltaProd();return f2.length?`<div class="banner w" style="margin:8px 0">Faltam ${f2.length} produtos do manejo (os mesmos do jogo): ${esc(f2.map(x=>x[0]).join(", "))}.<div class="row" style="margin-top:6px"><button type="button" class="btn p" data-semprod="1">+ Cadastrar os ${f2.length} que faltam</button></div></div>`:""})()}`+gradeG("produtos",[{t:"Produto",v:p=>p.nome,h:p=>esc(p.nome)+(prodRacao()&&prodRacao().id===p.id?" "+gTag("ração ativa","ok"):p.grupo==="RACAO"?` <button type="button" class="btn sm" data-ativa="${esc(p.id)}">Usar esta</button>`:"")},{t:"Grupo",v:p=>(GRUPOS.find(g=>g[0]===p.grupo)||[])[1]||"",h:p=>{const g=GRUPOS.find(g=>g[0]===p.grupo)||GRUPOS[3];return `<span class="dot" style="background:${g[2]}"></span> ${esc(g[1])}`}},{t:"Saldo",r:1,v:p=>f(saldoProd(p.id,sa),1)+" "+p.unidade,h:p=>{const s=saldoProd(p.id,sa);return `<span class="${s<0||(p.minimo&&s<p.minimo)?"neg":""}">${f(s,1)} ${esc(p.unidade)}</span>`}},{t:"Preço",r:1,v:p=>brl(custoMedio(p.id)),h:p=>brl(custoMedio(p.id))+(temCompra(p.id)?"":custoMedio(p.id)?" "+gTag("estimativa","w"):"")},{t:"Valor",r:1,v:p=>brl(Math.max(0,saldoProd(p.id,sa))*custoMedio(p.id))}],produtos(),{incluir:"produto",vazio:"Cadastre a ração e os insumos (Bactrat, Nutrat, farelo, Azomite, calcário…)."})};
 T.estoque_entradas=()=>`<h2>Entradas</h2>`+gradeG("entradas",[{t:"Data",v:e=>dt(e.data)},{t:"Produto",v:e=>(gById(e.produto)||{}).nome||"?"},{t:"Fornecedor",v:e=>e.forn},{t:"NF",v:e=>e.nf},{t:"Qtd",r:1,v:e=>f(e.qtd,1)+" "+((gById(e.produto)||{}).unidade||"")},{t:"Unitário",r:1,v:e=>brl(e.valorUnit)},{t:"Total",r:1,v:e=>brl(e.qtd*e.valorUnit)}],G("entrada").sort((a,b)=>a.data<b.data?1:-1),{incluir:"entrada"});
@@ -1148,7 +1267,7 @@ function montar3d(){const cv=$("#cv"),T3=window.THREE;const R=new T3.WebGLRender
   S.atualizar=()=>{S.build();const sit=situacaoTanque();S.sit=sit[0];S.flag.material.color=new T3.Color(sit[2]);S.flag.material.emissive=new T3.Color(sit[2]);S.flag.material.emissiveIntensity=0.35;
     const ss=leituraRecente("ss",hoje());const k=ss?Math.min(1,ss.v/25):0.3;S.agua.material.color=new T3.Color().setHSL(0.25-0.17*k,0.45,0.42-0.12*k);
     const L=cfg.dataPovoamento&&diaCultivo()>=0?lote(hoje()):null;const od=leituraRecente("od",hoje()),dc=diaCultivo(),t=tanque();
-    $("#side").innerHTML=`<div><span class="dot" style="background:${sit[2]}"></span> <b>${esc(sit[1])}</b></div><div class="muted">Ø${f(cfg.diametro,1)} m · ${n0(t.vol*1000)} L</div>`+(L?`<div>Dia ${dc} · ${f(L.peso,L.peso<1?2:1)} g</div><div>${n0(L.vivos)} vivos · ${f(L.biomKg,1)} kg</div>`:dc!=null&&dc<0?`<div>Preparo dia ${Math.max(0,dc+21)} de 21</div>`:"")+(od?`<div>OD ${f(od.v,1)} mg/L</div>`:"")+(ss?`<div>Cone ${f(ss.v,0)} mL/L</div>`:"")+`<div class="sit">${(prep.decantador&&prep.decantador.on)?"Decantador ligado":"Decantador desligado"}</div>`};
+    $("#side").innerHTML=`<div><span class="dot" style="background:${sit[2]}"></span> <b>${esc(sit[1])}</b></div><div class="muted">Ø${f(cfg.diametro,1)} m · ${n0(t.vol*1000)} L</div>`+(L?`<div>Dia ${dc} · ${f(L.peso,L.peso<1?2:1)} g</div><div>${n0(L.vivos)} vivos · ${f(L.biomKg,1)} kg</div>`:dc!=null&&dc<0?`<div>Preparo dia ${Math.max(0,dc+21)} de 21</div>`:"")+(od?`<div>OD ${odT(od.v)}</div>`:"")+(ss?`<div>Cone ${f(ss.v,0)} mL/L</div>`:"")+`<div class="sit">${(prep.decantador&&prep.decantador.on)?"Decantador ligado":"Decantador desligado"}</div>`};
   S.tick=()=>{S.loop=true;const fr=()=>{if(!S.on){S.loop=false;return}const w=cv.clientWidth,h=cv.clientHeight;if(cv.width!==Math.round(w*R.getPixelRatio())||cv.height!==Math.round(h*R.getPixelRatio())){R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
       const t=performance.now()/1000;
       if(!reduz){const p=S.agua.geometry.attributes.position;for(let i=0;i<p.count;i++){const x=S.base[i*3],y=S.base[i*3+1];p.array[i*3+2]=0.025*Math.sin(x*3+t*2)+0.02*Math.cos(y*3.3+t*1.6)}p.needsUpdate=true;
@@ -1174,11 +1293,11 @@ function agendaDo(dia){const out=[];const dc=diaCultivo(dia);const ag=recs.find(
   const rit=ritualDo(dia);const itR=RITUAL.filter(x=>precisaHoje(x[0],dia));const fr=itR.filter(x=>x[0]==="espuma"?rit.espuma:rit.itens[x[0]]).length;
   const vol=tanque().vol,wd=new Date(dia+"T12:00").getDay();
   add("06:00","agua_m","💧","OD e temperatura (manhã)","Hora do OD mais baixo do dia",leit.some(r=>r.data.slice(11,13)<"12"),"acao.parametros");
-  if(dc!=null&&dc>=-15){const np=nutratPlano(dia);const simb=(dc<30?cfg.doses.simbForm:cfg.doses.simbMan)*vol;
+  if(dc!=null&&dc>=-15){const np=nutratPlano(dia);const simb=simbHoje(dia);
     add("06:30","esp","🫧","Olhar a espuma",rit.espuma?"Marcado: "+({sprite:"fina e limpa",marrom:"crespa/marrom",sem:"sumiu"}[rit.espuma]||rit.espuma):"Fina e limpa, crespa/marrom ou sumiu",!!rit.espuma,"acao.espuma");
     add("08:00","cone","🧫","Cone Imhoff (15 min parado)","Meta 10–15 mL/L; anotar em Parâmetros",!!rit.itens.cone||leit.some(r=>r.valores&&r.valores.ss!=null),"manejo.ritual");
     add("08:30","nutrat","🧴",`Nutrat: ${n0(np.ml)} mL`,np.pausa?"Espuma sumiu: manter ou pausar":(np.motivos&&np.motivos.length?"Dose dobrada: "+np.motivos[0]:"1 mL por m³, diluído em 2 L"),!!rit.itens.nutrat,"manejo.ritual");
-    add("09:30","simb","🪣",`Simbiótico: ${f(simb,0)} L da bombona`,dc<30?"Fase de formação (1 L/m³)":"Manutenção",!!rit.itens.simb,"manejo.ritual");
+    if(simb)add("09:30","simb","🪣","Simbiótico: 1 lote da tese",dc<0?"Maturação: lote + 20 g de cloreto de amônio":dc<15?"Todo dia até o dia 15":"3 vezes por semana",!!rit.itens.simb,"manejo.ritual");
     add("16:00","skim","🥛","Esvaziar o copo do skimmer","Copo cheio deixa a espuma voltar",!!rit.itens.skim,"manejo.ritual")}
   if(dc!=null&&dc>=-16&&(wd===2||wd===5))add("10:30","bic","🧂","Bicarbonato (terça e sexta)",(()=>{const c=correcoes(dia).find(x=>/alcalin/i.test(x[0]));return c?c[0]+": "+c[1]:"Conforme a alcalinidade"})(),recs.some(r=>r.tipo==="aplicacao"&&/calc|bicarb/i.test(r.produto)&&r.data.slice(0,10)===dia),"acao.aplicacao");
   if(dc!=null&&dc>=-15&&(wd===1||wd===3||wd===5))add("10:00","nit","🧪","Amônia e nitrito","Segunda, quarta e sexta",leit.some(r=>r.valores&&(r.valores.tan!=null||r.valores.no2!=null)),"acao.parametros");
@@ -1191,7 +1310,7 @@ function agendaDo(dia){const out=[];const dc=diaCultivo(dia);const ag=recs.find(
     if(wd===1)add("09:15","rodo","🧹","Rodo no fundo e nos difusores",janelaMuda(toDate(dia)).on?"Janela de muda: deixe para depois da lua":"Toda segunda. Evita lodo parado e sulfeto",false)}
   if(prep.decantador&&prep.decantador.on)add("10:00","lodo","🧹","Tirar o lodo do registro do cone","Decantador ligado",false);
   if(wd===1)add("11:00","gerador","🔌","Testar o gerador e o alarme de OD","Toda segunda. Plano B do oxigênio",false);
-  const jm=janelaMuda(toDate(dia));if(jm.on&&pov)add("12:00","lua","🌕","Janela da lua: muda","OD ≥ 5,5, ração −20%, alcalinidade ≥ 150, Azomite 3 g/kg",false);
+  const jm=janelaMuda(toDate(dia));if(jm.on&&pov)add("12:00","lua","🌕","Janela da lua: muda","OD ≥ 5,5, ração −40%, alcalinidade ≥ 150, Azomite 3 g/kg",false);
   add("18:00","agua_t","💧","OD e temperatura (fim da tarde)","Compare com a manhã: queda grande à noite pede ar reforçado",leit.some(r=>r.data.slice(11,13)>="12"),"acao.parametros");
   add("21:00","noite","🌙","Ronda da noite","Soprador, difusores, OD antes de dormir",false);
   recs.filter(r=>r.tipo==="tarefa"&&r.dia===dia).forEach(t=>out.push({hora:t.hora||"—",k:"t_"+t.id,ic:"📝",t:t.texto,sub:"Tarefa sua",feito:!!t.feito,tarefa:t.id}));
@@ -1233,7 +1352,7 @@ function proximos7(){const out=[];const hj=hoje();const dc0=diaCultivo(hj);
     if(dc===0)out.push([d,"🐟","Dia 21 do preparo: povoar","Só com todos os critérios verdes em Apto a povoar?"]);
     if(dc!=null&&dc<0&&dc>=-21)PREP.filter(p=>p[0]===dc).forEach(p=>out.push([d,"🧪",p[2],"Preparo dia "+(dc+21)]));
     if(dc!=null&&dc>0&&dc%7===0)out.push([d,"⚖️","Biometria da semana "+dc/7,"Pesar 50 a 100 camarões"]);
-    const jm=janelaMuda(toDate(d)),jm0=janelaMuda(toDate(addDias(d,-1)));if(jm.on&&!jm0.on)out.push([d,"🌕","Começa a janela da "+jm.qual,"±2 dias: OD ≥ 5,5, ração −20%, Azomite"]);
+    const jm=janelaMuda(toDate(d)),jm0=janelaMuda(toDate(addDias(d,-1)));if(jm.on&&!jm0.on)out.push([d,"🌕","Começa a janela da "+jm.qual,"±2 dias: OD ≥ 5,5, ração −40% (Molina 2000), Azomite"]);
     if(dc!=null&&dc>0){const a=pesoEstimado(addDias(d,-1)).p,b=pesoEstimado(d).p;const la=linhaTabela(a),lb=linhaTabela(b);if(la[0]!==lb[0])out.push([d,"📈",`Ração muda de faixa: ${f(lb[1],1)}% da biomassa`,`Peso estimado passa de ${f(lb[0],1)} g`]);
       if(a<cfg.pesoAlvo*0.66&&b>=cfg.pesoAlvo*0.66)out.push([d,"🧺","Avaliar despesca parcial","Peso estimado chega a 2/3 da meta; alivia a biomassa"])}
     if(new Date(d+"T12:00").getDay()===1)out.push([d,"🔌","Teste do gerador e do alarme","Toda segunda"])}
@@ -1271,6 +1390,7 @@ T.inicio_painel=()=>{
   if(!cfg.dataPovoamento&&!cfg.exemplo)h+=`<div class="banner w" style="margin-bottom:12px">Ainda sem data de povoamento. <a href="#" data-go="preparo.passos">Comece pelo Preparo da água</a> ou informe a data em <a href="#" data-go="cadastro.tanque">Cadastro</a>.</div>`;
   {const fs=fase(new Date());const jm=janelaMuda(new Date());const fl=dc==null?"Sem data de povoamento":dc<0?`Preparo · Dia ${Math.max(0,dc+21)} de 21`:`Cultivo · Dia ${dc} · Semana ${Math.floor(dc/7)+1}`;
    h+=`<div class="hoje"><div><div class="fz">${esc(fl)}</div><div class="muted">${["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][new Date().getDay()]}, ${dt(hoje())}</div></div><div class="lua${jm.on?" on":""}">${fs.i} <span>${esc(fs.n)}${jm.on?"<br><b>janela da muda</b>":""}</span></div></div>`}
+  h+=cartaoPlano();
   h+=`<div class="big4">
     <button type="button" class="bigbtn" style="--b:var(--c-od)" data-acao="parametros"><span class="ic">💧</span>Lançar água<small>${ultLeit?"última "+dt(ultLeit.data):"nenhuma ainda"}</small></button>
     <button type="button" class="bigbtn" style="--b:var(--c-temp)" data-go="manejo.racao"><span class="ic">🍤</span>Lançar trato<small>${n0(dado)} de ${n0(r.final)} g · ${trHoje.length}/${r.nt}</small></button>
@@ -1386,7 +1506,7 @@ document.addEventListener("click",async e=>{
     if(s==="faixas"){PARAMS.forEach(p=>c.faixas[p.k]={min:g("fmin_"+p.k),max:g("fmax_"+p.k),cmin:g("fcmin_"+p.k),cmax:g("fcmax_"+p.k)})}
     if(s==="tabela"){const tb=[];cfg.tabela.forEach((_,i)=>{const a=g("tp_"+i),b=g("tq_"+i),t=g("tt_"+i);if(a!=null&&b!=null)tb.push([a,b,t||4])});const a=g("tp_new"),b=g("tq_new"),t=g("tt_new");if(a!=null&&b!=null)tb.push([a,b,t||4]);c.tabela=tb.length?tb.sort((x,y)=>x[0]-y[0]):clone(DEFAULTS.tabela);const cv=$("#curvaTxt").value.split(";").map(num).filter(x=>x!=null);if(cv.length>=2)c.curva=cv}
     if(s==="eco"){c.eco={preco:g("e_preco"),kw:g("e_kw")??0,tarifa:g("e_tar")??0}}
-    if(s==="doses"){["azomite","bicarb","alcAlvo","acucar","nutrat","simbForm","probBombona","farelo","odAlarme","cnAlvo","prot","catalisador"].forEach(k=>{const v=g("d_"+k);c.doses[k]=v==null?DEFAULTS.doses[k]:v})}
+    if(s==="doses"){["azomite","bicarb","alcAlvo","acucar","nutrat","probLote","farelo","odAlarme","cnAlvo","prot","catalisador"].forEach(k=>{const v=g("d_"+k);c.doses[k]=v==null?DEFAULTS.doses[k]:v})}
     document.activeElement&&document.activeElement.blur();try{await saveCfg(c);toast("Cadastro salvo",["Cálculos atualizados"])}catch(er){falha(er)}return}
   if(t.dataset.padrao){const c=clone(cfg);c[t.dataset.padrao]=clone(DEFAULTS[t.dataset.padrao]);if(t.dataset.padrao==="tabela")c.curva=clone(DEFAULTS.curva);try{await saveCfg(c);toast("Padrões restaurados")}catch(er){falha(er)}return}
 });
@@ -1399,6 +1519,159 @@ document.addEventListener("change",async e=>{if(e.target.dataset&&e.target.datas
   if(e.target.id==="notaFoto"&&e.target.files&&e.target.files[0]){try{fotoPend=await fotoReduzida(e.target.files[0]);$("#fotoOk").textContent="foto pronta ✔"}catch(er){toast("Não consegui ler a foto.")}return}
   if(e.target.id==="gSel"){chartSel=e.target.value;e.target.blur();render()}if(e.target.id==="rDia"&&e.target.value){racaoDia=e.target.value;e.target.blur();render()}});
 start();
+/* ===================== comando de voz (mãos livres) =====================
+   Lançar o manejo falando e ouvir a confirmação e a orientação do app. Voz do próprio navegador (Chrome no Android), sem custo.
+   Depois de ligado, escuta de novo sozinho depois de cada resposta. "Parar voz" desliga. Grava no perfil em uso, como o lançamento pela tela. */
+{
+const V = { on: false, falando: false, ouvindo: false, buf: [], ult: "", erros: 0, conf: null, meus: [], lock: null };
+const SRv = window.SpeechRecognition || window.webkitSpeechRecognition;
+const sem = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const NUM = { zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13, catorze: 14, quatorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90, cem: 100, cento: 100, duzentos: 200, duzentas: 200, trezentos: 300, trezentas: 300, quatrocentos: 400, quatrocentas: 400, quinhentos: 500, quinhentas: 500, seiscentos: 600, seiscentas: 600, setecentos: 700, setecentas: 700, oitocentos: 800, oitocentas: 800, novecentos: 900, novecentas: 900 };
+function numeros(s) {
+  s = s.replace(/(\d)\.(\d{3})(?!\d)/g, "$1$2").replace(/(\d),(\d)/g, "$1.$2").replace(/%/g, " por cento");
+  const t = s.split(/\s+/), out = []; let i = 0; const ehN = w => w in NUM || w === "mil";
+  while (i < t.length) {
+    if (!ehN(t[i])) { if ((t[i] === "meio" || t[i] === "meia") && !(i && /^(da|de|do|na|no)$/.test(t[i - 1]))) { out.push("0.5"); i++; continue; } out.push(t[i]); i++; continue; }
+    let tot = 0, g = 0, dec = null;
+    while (i < t.length) { const w = t[i];
+      if (w === "mil") { tot += (g || 1) * 1000; g = 0; i++; continue; }
+      if (w in NUM) { g += NUM[w]; i++; continue; }
+      if (w === "e" && i + 1 < t.length && (ehN(t[i + 1]) || t[i + 1] === "meio" || t[i + 1] === "meia")) { if (t[i + 1] === "meio" || t[i + 1] === "meia") { dec = 0.5; i += 2; break; } i++; continue; }
+      if ((w === "virgula" || w === "ponto") && i + 1 < t.length && t[i + 1] in NUM) { i++; let d = ""; while (i < t.length && t[i] in NUM && NUM[t[i]] < 10) { d += NUM[t[i]]; i++; } if (!d && t[i] in NUM) { d = String(NUM[t[i]]); i++; } dec = +("0." + d); break; }
+      break; }
+    out.push(String(tot + g + (dec || 0)));
+  }
+  return out.join(" ").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
+}
+function falaTxt(s) {
+  return String(s).replace(/\s*CaCO₃/g, "").replace(/NH₃/g, "amônia tóxica").replace(/O₂/g, "O2").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus").replace(/mg\/L/g, " miligramas por litro").replace(/mL\/L/g, " mililitros por litro")
+    .replace(/UFC\/mL/g, " colônias por mililitro").replace(/(\d)\s?mL\b/g, "$1 mililitros").replace(/(\d)\s?kg\b/g, "$1 quilos").replace(/(\d)\s?g\b/g, "$1 gramas").replace(/(\d)\s?L\b/g, "$1 litros").replace(/\bppt\b/g, "partes por mil")
+    .replace(/−/g, "menos ").replace(/×/g, " vezes ").replace(/≥/g, "maior ou igual a ").replace(/[⚠✔·›•]/g, " ").replace(/\s+/g, " ").trim();
+}
+/* parâmetros falados → chaves do app (PARAMS) */
+const PWv = [[/ph (da|do) (bombona|lote|simbiotico)/, "phb"], [/vibrio verde|colonias verdes|verdes/, "vibV"], [/vibrio amarel|colonias amarel|amarelas/, "vibA"], [/oxigenio|\bod\b/, "od"], [/temperatura/, "temp"], [/\bph\b|pe aga/, "ph"], [/salinidade/, "sal"], [/alcalinidade/, "alc"], [/amonia/, "tan"], [/nitrito/, "no2"], [/nitrato/, "no3"], [/\bcone\b|imhoff|solidos/, "ss"], [/calcio/, "ca"], [/magnesio/, "mg"], [/potassio/, "k"], [/cloro/, "cl"]];
+function leituras(s) { // "oxigênio 95 por cento temperatura 29 pH 7.8" → {odp:95,temp:29,ph:7.8}
+  const ach = []; PWv.forEach(([re, k]) => { const g = new RegExp(re.source, "g"); let m; while ((m = g.exec(s))) { if (!ach.some(a => m.index >= a.i && m.index < a.f)) ach.push({ k, i: m.index, f: m.index + m[0].length }); } });
+  ach.sort((a, b) => a.i - b.i); const o = {};
+  ach.forEach((a, j) => { const fim = j + 1 < ach.length ? ach[j + 1].i : s.length, tr = s.slice(a.f, fim), m = tr.match(/(\d+(?:\.\d+)?)/); if (!m) return; const v = +m[1];
+    if (a.k === "od") { if (/por cento|porcento|satura/.test(tr) || v > 20) o.odp = String(v); else o.od = String(v); } else o[a.k] = String(v); });
+  return o;
+}
+const PNv = k => (PARAMS.find(p => p.k === k) || { n: k }).n.replace(/\s*\(.*\)/, "");
+const odFala = v => typeof odT === "function" ? odT(v) : f(v, 1) + " mg/L";
+const valFala = (k, v) => (k === "od" ? odFala(v) : f(v, (PARAMS.find(p => p.k === k) || { d: 1 }).d) + " " + ((PARAMS.find(p => p.k === k) || {}).u || "")).trim();
+function diz(t) { if (t && V.buf.indexOf(t) < 0) V.buf.push(t); }
+const ondeGrava = () => typeof nomePerfil === "function" && nomePerfil() ? " no " + nomePerfil() : "";
+async function grava(r, id) { id = id || ("r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)); await put(r, id); V.meus.push(id); try { render(); } catch (e) { } return id; }
+function idadeD(data) { const d = diasEntre(data.slice(0, 10), hoje()); return d <= 0 ? (data.length > 10 ? "hoje às " + data.slice(11, 16) : "hoje") : d === 1 ? "ontem" : "há " + d + " dias"; }
+
+/* ---- respostas do app ---- */
+function resumo() {
+  const out = [], dc = diaCultivo(hoje());
+  out.push(dc == null ? "Tanque sem data de povoamento." : dc < 0 ? "Preparo da água, faltam " + (-dc) + " dias para povoar." : "Dia " + dc + " de cultivo.");
+  const ms = []; ["od", "temp", "ph", "tan", "no2", "alc", "sal", "ss"].forEach(k => { const u = leituraRecente(k, hoje()); if (u && diasEntre(u.data.slice(0, 10), hoje()) <= 3) ms.push(PNv(k) + " " + valFala(k, u.v) + ", " + idadeD(u.data)); });
+  out.push(ms.length ? "Últimas medidas: " + ms.join("; ") + "." : "Nenhuma medida nos últimos 3 dias.");
+  if (dc != null && dc >= 0) { const r = recomendacao(hoje()), tot = tratosDoDia(hoje()).reduce((s, x) => s + (x.qtd || 0), 0); out.push("Ração de hoje: " + n0(r.final) + " g em " + r.nt + " tratos, cerca de " + n0(r.porTrato) + " g por trato (" + r.acao.toLowerCase() + "). Já lançado hoje: " + n0(tot) + " g."); }
+  const al = alertas(); out.push(al.length ? "Alertas: " + al.slice(0, 5).map(a => a[1]).join("; ") + "." : "Sem alertas.");
+  return out.join(" ");
+}
+function agendaFala() { const it = agendaDo(hoje()).filter(x => !x.feito).slice(0, 5); return it.length ? "Pendente hoje: " + it.map(x => x.hora + ", " + x.t).join("; ") + "." : "Nada pendente na agenda de hoje."; }
+function racaoFala() { const dc = diaCultivo(hoje()); if (dc == null || dc < 0) return "Ainda não há camarão no tanque."; const r = recomendacao(hoje()), tr = tratosDoDia(hoje()), tot = tr.reduce((s, x) => s + (x.qtd || 0), 0);
+  return "Ração de hoje: " + n0(r.final) + " g em " + r.nt + " tratos, cerca de " + n0(r.porTrato) + " g por trato. " + r.acao + " em relação à base. Lançados " + tr.length + " tratos, " + n0(tot) + " g. " + (r.motivos && r.motivos.length > 2 ? "Motivo: " + r.motivos[r.motivos.length - 1].t + "." : ""); }
+function emergFala(s) { if (/oxigenio|boquej/.test(s)) s += " borda"; if (/energia|soprador/.test(s)) s += " falta luz"; const k = Object.keys(EMERG).find(k => sem(EMERG[k][0]).split(/\s+/).some(w => w.length > 3 && s.indexOf(w) >= 0)); if (!k) return "Emergências do app: " + Object.values(EMERG).map(e => e[0]).join("; ") + ". Diga emergência e o nome."; const e = EMERG[k]; return e[0] + ". Faça agora: " + e[2]().map(r => r[0] + ": " + r[1]).join(". ") + "."; }
+
+/* ---- lançar ---- */
+async function lancaLeitura(s) {
+  const o = leituras(s); if (!Object.keys(o).length) return diz("Não peguei os valores. Fale assim: oxigênio 95 por cento, temperatura 29, pH 7 vírgula 8.");
+  o.data = agora(); if (typeof odDePct === "function") odDePct(o); else if (o.odp && !o.od) return diz("Este app ainda lê o oxigênio só em miligramas por litro. Fale o valor em miligramas.");
+  if (o.odp && !o.od) return diz("Para converter o oxigênio de por cento para miligramas, preciso da temperatura e da salinidade. Fale junto: temperatura e salinidade.");
+  const v = {}; PARAMS.forEach(p => { const x = num(o[p.k]); if (x != null) v[p.k] = x; }); if (!Object.keys(v).length) return diz("Nada para lançar.");
+  await grava({ tipo: "leitura", data: o.data, valores: v, obs: "lançado por voz" });
+  diz("Lancei" + ondeGrava() + ": " + Object.keys(v).map(k => PNv(k) + " " + valFala(k, v[k])).join("; ") + ".");
+  const fx = Object.keys(v).filter(k => fora(k, v[k])).map(k => PNv(k) + " " + fora(k, v[k]) + ", a faixa boa é " + faixaTxt(k)); if (fx.length) diz("Atenção: " + fx.join("; ") + ".");
+  if (v.od != null && v.od < 3) diz("Oxigênio abaixo de 3: a ração do dia passa para suspender."); else if (v.od != null && v.od < 4) diz("Oxigênio abaixo de 4: a ração do dia cai 20%.");
+  const x = nh3(v.tan ?? (leituraRecente("tan", hoje()) || {}).v, v.ph ?? (leituraRecente("ph", hoje()) || {}).v, v.temp); if (x != null && x > 0.03 && (v.tan != null || v.ph != null)) diz("Amônia tóxica calculada: " + f(x, 3) + " mg/L, acima de 0,03.");
+  const al = alertas().filter(a => a[0] === "bad"); if (al.length) diz("Alertas críticos: " + al.slice(0, 3).map(a => a[1] + ". " + a[2]).join(" "));
+}
+async function lancaTrato(s) {
+  const q = s.match(/(\d+(?:\.\d+)?)\s*(kg|quilos?|kilos?|g|gramas?)?/); if (!q) return diz("Quantos gramas foram no trato?");
+  const g = +q[1] * (/^(kg|qui|kil)/.test(q[2] || "") ? 1000 : 1), dia = hoje(); let i = tratosDoDia(dia).length + 1; while (recs.some(r => r.id === "racao_" + dia + "_" + i)) i++;
+  const d = new Date(), h = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"), b = /bandeja/.test(s) ? (/vazia|zer|limpa|comeu tudo/.test(s) ? "Vazia" : /muita|sobrou muito/.test(s) ? "Muita" : /pouca|pouco|sobr/.test(s) ? "Pouca" : "") : "", rac = prodRacao();
+  await grava(Object.assign({ tipo: "racao", dia, trato: i, data: dia + "T" + h, hora: h, qtd: g, bandeja: b, muda: false }, rac ? { produto: rac.id } : {}), "racao_" + dia + "_" + i);
+  const tot = tratosDoDia(dia).reduce((x, r) => x + (r.qtd || 0), 0), r = diaCultivo(dia) >= 0 ? recomendacao(dia) : null;
+  diz("Trato " + i + " lançado" + ondeGrava() + ": " + n0(g) + " g" + (b ? ", bandeja " + b.toLowerCase() : "") + ". Total de hoje " + n0(tot) + " g" + (r ? " de " + n0(r.final) + " recomendados em " + r.nt + " tratos." : "."));
+  if (b === "Muita") diz("Sobrou muito na bandeja: o próximo trato deve ser menor. Sobra de ração gasta oxigênio e alimenta o Vibrio.");
+}
+const ALIAS = [[/puim|farelo/, "Farelo de arroz (puim)"], [/bicarbonato/, "Bicarbonato de sódio"], [/\bcal\b/, "Cal hidratada"], [/acido|fosforico/, "Ácido fosfórico 85%"], [/hth|cloro/, "Cloro HTH 65%"], [/potassio|kcl/, "Cloreto de potássio (KCl)"], [/magnesio/, "Sulfato de magnésio"], [/vitamina c/, "Vitamina C (ácido ascórbico)"], [/simbiotico|lote/, "Simbiótico (lote da tese)"], [/cloreto de amonio/, "Cloreto de amônio (maturação)"], [/sal marinho|\bsal\b/, "Sal marinho (salinizar a água)"], [/bactrat|probiotico/, "Bactrat P (probiótico)"]];
+function produtoDe(s) { const a = ALIAS.find(([re]) => re.test(s)); if (a && PRODUTOS.indexOf(a[1]) >= 0) return a[1]; return PRODUTOS.find(p => sem(p).split(/[\s()]+/).some(w => w.length >= 4 && s.indexOf(w) >= 0)) || null; }
+async function lancaAplicacao(s) {
+  const p = produtoDe(s); if (!p) return diz("Não achei o produto. Fale o nome como está no Estoque.");
+  const q = s.match(/(\d+(?:\.\d+)?)\s*(kg|quilos?|kilos?|g|gramas?|ml|mililitros?|l|litros?)?/); if (!q) return diz("Quanto de " + p + "? Fale com a unidade.");
+  const u = q[2] || "", un = /^(kg|qui|kil)/.test(u) ? "kg" : /^(ml|mili)/.test(u) ? "mL" : /^(l|litro)/.test(u) ? "L" : "g";
+  await grava({ tipo: "aplicacao", data: agora(), produto: p, qtd: +q[1], un, obs: "lançado por voz" });
+  diz("Aplicação lançada" + ondeGrava() + ": " + f(+q[1], +q[1] % 1 ? 1 : 0) + " " + un + " de " + p + ". Baixa do Estoque.");
+  const ds = typeof doseSug === "function" ? doseSug(p) : ""; if (ds) diz("Dose do Cadastro: " + ds + ".");
+  if (p === "Azomite") diz("Azomite vai na ração, 3 g por kg, teto 4."); if (p === "Cal hidratada") diz("Até 200 g por vez; meça o pH 1 hora depois.");
+}
+async function lancaEspuma(s) { const e = /fina|limpa|sprite/.test(s) ? "sprite" : /crespa|densa|marrom/.test(s) ? "marrom" : /sumiu|clara|sem espuma/.test(s) ? "sem" : null; if (!e) return diz("Como está a espuma: fina e limpa, crespa ou marrom, ou sumiu?");
+  const dia = hoje(), r = ritualDo(dia); await grava({ tipo: "ritual", dia, data: dia + "T05:00", itens: r.itens || {}, espuma: e }, "ritual_" + dia);
+  diz({ sprite: "Espuma boa: Nutrat na dose normal.", marrom: "Espuma crespa: Nutrat de hoje dobra, metade de manhã e metade à noite. Antes, esvazie o copo do skimmer.", sem: "Espuma sumiu: manter ou pausar o Nutrat e reduzir o simbiótico." }[e]); }
+async function trata(bruto) {
+  const s = numeros(sem(bruto)).replace(/[.,!?]+$/g, "").trim(); if (!s) return; const tem = re => re.test(s);
+  if (tem(/\b(parar|desligar|desliga|encerrar|tchau)\b.*\bvoz\b|^(parar|desligar|tchau|encerrar)$/)) return desliga("Comando de voz desligado.");
+  if (tem(/\b(repete|repetir|repita|de novo|nao entendi)\b/) && s.length < 24) return diz(V.ult || "Nada para repetir.");
+  if (tem(/\b(ajuda|comandos|o que (eu )?posso (falar|dizer))\b/)) return diz("Você pode falar: como está o tanque; o que tenho para fazer; quanto de ração hoje; lançar oxigênio 95 por cento, temperatura 29, pH 7 vírgula 8; amônia 0 vírgula 5 e nitrito 1; trato de 300 gramas, bandeja vazia; apliquei 600 gramas de puim; mortalidade 12; biometria 3 vírgula 5 gramas; espuma fina; emergência oxigênio; desfazer; repetir; e parar voz.");
+  if (V.conf) { const c = V.conf; V.conf = null; if (tem(/\b(sim|confirmo|pode|isso)\b/)) return c(); return diz("Cancelado."); }
+  if (tem(/\b(desfaz|desfazer|apaga o ultimo|apagar o ultimo|cancela o ultimo)\b/)) { const id = V.meus.pop(); if (!id) return diz("Não lancei nada por voz para desfazer."); await del(id); try { render(); } catch (e) { } return diz("Apaguei o último lançamento por voz."); }
+  if (tem(/emergencia|socorro/)) return diz(emergFala(s));
+  if (tem(/\b(como (esta|ta)|resumo|status|situacao|alertas?|me (atualiza|conta))\b/) && !leituras(s).od) return diz(resumo());
+  if (tem(/\b(o que (eu )?(tenho|faco|fazer)|agenda|pendente|tarefas?)\b/)) return diz(agendaFala());
+  if (tem(/\b(quanto|qual)\b.*\b(racao|trato)\b|racao (de|do) (hoje|dia)/)) return diz(racaoFala());
+  if (tem(/espuma/)) return lancaEspuma(s);
+  if (tem(/mortalidade|morreram|mortos|morte/)) { const m = s.match(/(\d+)/); if (!m) return diz("Quantos mortos?"); await grava({ tipo: "mortalidade", data: hoje(), qtd: +m[1], obs: "lançado por voz" }); const L = lote(hoje()), p = L.vivos ? +m[1] / L.vivos * 100 : 0; diz("Mortalidade lançada" + ondeGrava() + ": " + m[1] + " camarões, " + f(p, 2) + "% do lote estimado." + (p > 0.5 ? " Acima de 0,5%: a ração de amanhã cai 20%." : "")); return; }
+  if (tem(/biometria|peso medio|pesei/)) { const ns = (s.match(/\d+(?:\.\d+)?/g) || []).map(Number); let peso = null, r = { tipo: "biometria", data: hoje(), obs: "lançado por voz" };
+    if (ns.length >= 2 && /camaroes/.test(s)) { r.n = ns[0]; r.pesoTotal = ns[1]; peso = ns[1] / ns[0]; } else if (ns.length) peso = ns[0]; if (!peso) return diz("Fale o peso médio em gramas, ou quantos camarões e o peso total.");
+    r.peso = Math.round(peso * 1000) / 1000; await grava(r); return diz("Biometria lançada" + ondeGrava() + ": peso médio " + f(peso, peso < 1 ? 3 : 2) + " g. A ração passa a usar este peso. " + racaoFala()); }
+  if (tem(/\b(trato|tratei|racao|alimentei|dei)\b/) && !produtoDe(s.replace(/racao/g, ""))) return lancaTrato(s);
+  if (Object.keys(leituras(s)).length && !tem(/\b(apliquei|coloquei|botei|pus|aplicar|aplicacao)\b/)) return lancaLeitura(s);
+  if (tem(/\b(apliquei|coloquei|botei|pus|joguei|aplicar|aplicacao|dei)\b/) || produtoDe(s)) return lancaAplicacao(s);
+  V.erros++; if (V.erros <= 2) diz("Não entendi: " + bruto + ". Diga ajuda para ouvir os comandos.");
+}
+/* ---- ouvir e falar ---- */
+let rc = null, vozPt = null;
+function escolheVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find(v => /pt[-_]BR/i.test(v.lang) && /google/i.test(v.name)) || vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null; }
+if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = escolheVoz; }
+function fala(txt, depois) {
+  if (!window.speechSynthesis) { if (depois) depois(); return; }
+  V.falando = true; try { rc && rc.abort(); } catch (e) { } speechSynthesis.cancel(); const ft = falaTxt(txt), partes = ft.match(/[^.;:!?]+[.;:!?]*/g) || [ft]; let fim = false;
+  const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
+  V.trava = setTimeout(acabou, ft.length * 95 + 4000);
+  partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); });
+  mostra("🔊 " + txt);
+}
+function ouve() { if (!V.on || V.falando || V.ouvindo || !rc) return; try { rc.start(); V.ouvindo = true; mostra("🎙️ Ouvindo…"); } catch (e) { } }
+function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, ouve); } else ouve(); }
+function vozLiga() {
+  if (!SRv) return toast("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.");
+  rc = new SRv(); rc.lang = "pt-BR"; rc.interimResults = false; rc.maxAlternatives = 1; rc.continuous = false;
+  rc.onresult = async e => { const t = e.results[e.results.length - 1][0].transcript; V.ouvindo = false; mostra("🗣️ " + t); try { await trata(t); if (V.buf.length) V.erros = 0; } catch (er) { diz("Não consegui salvar: " + ((er && er.message) || "erro") + "."); } if (V.on) responde(); };
+  rc.onend = () => { V.ouvindo = false; if (V.on && !V.falando) setTimeout(ouve, 300); };
+  rc.onerror = e => { V.ouvindo = false; if (e.error === "not-allowed" || e.error === "service-not-allowed") desliga("Sem permissão para o microfone. Libere o microfone para este site."); };
+  V.on = true; V.erros = 0; botao(); try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); } catch (e) { }
+  diz("Comando de voz ligado" + ondeGrava() + ". " + resumo() + " Diga ajuda para ouvir os comandos."); responde();
+}
+function desliga(msg) { V.on = false; V.conf = null; try { rc && rc.abort(); } catch (e) { } try { V.lock && V.lock.release(); } catch (e) { } V.lock = null; botao(); V.buf = []; if (msg) fala(msg); else { try { speechSynthesis.cancel(); } catch (e) { } mostra(""); } }
+document.addEventListener("visibilitychange", () => { if (V.on && document.visibilityState === "visible" && navigator.wakeLock) navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); });
+const vst = document.createElement("style"); vst.textContent = "#bVoz{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);width:58px;height:58px;border-radius:50%;border:2px solid #fff;background:#1d4f91;color:#fff;font-size:26px;z-index:60;box-shadow:0 2px 10px #0006;cursor:pointer}#bVoz.on{background:#b3261e;animation:vozp 1.4s infinite}@keyframes vozp{50%{box-shadow:0 0 0 10px #b3261e33}}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);max-width:min(560px,calc(100% - 32px));background:#102030ee;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:60;pointer-events:none}";
+document.head.appendChild(vst);
+const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); document.body.appendChild(bVoz);
+const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidden = true; document.body.appendChild(vozTxt);
+function mostra(t) { vozTxt.hidden = !t; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
+function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹" : "🎤"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
+bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
+if (/[?&]teste=1/.test(location.search)) window.__voz = { trata: async t => { V.buf = []; await trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, leituras };
+}
+/* ===================== fim do comando de voz ===================== */
 })();
 </script>
 </body></html>
