@@ -1643,16 +1643,16 @@ function escolheVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find(
 if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = escolheVoz; }
 function fala(txt, depois) {
   if (!window.speechSynthesis) { if (depois) depois(); return; }
-  V.falando = true; try { rc && rc.abort(); } catch (e) { } speechSynthesis.cancel(); const ft = falaTxt(txt), partes = ft.match(/[^.;:!?]+[.;:!?]*/g) || [ft]; let fim = false;
+  V.falando = true; try { rc && rc.abort(); } catch (e) { } if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); const ft = falaTxt(txt), partes = ft.match(/[^.;:!?]+[.;:!?]*/g) || [ft]; let fim = false;
   const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
   V.trava = setTimeout(acabou, ft.length * 95 + 4000);
   partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); });
   mostra("🔊 " + txt);
 }
-function ouve() { if (!V.on || V.falando || V.ouvindo || !rc) return; try { rc.start(); V.ouvindo = true; mostra("🎙️ Ouvindo…"); } catch (e) { } }
-function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, ouve); } else ouve(); }
+function ouve() { if (!V.on || V.falando || V.ouvindo || !rc) return; try { rc.start(); V.ouvindo = true; V.tenta = 0; mostra("🎙️ Ouvindo…"); } catch (e) { if ((V.tenta = (V.tenta || 0) + 1) <= 4) setTimeout(ouve, 600); } } // iPhone: o microfone demora a soltar depois da fala
+function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, () => setTimeout(ouve, 350)); } else ouve(); }
 function vozLiga() {
-  if (!SRv) return toast("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.");
+  if (!SRv) return toast("Este navegador não tem reconhecimento de voz. No iPhone, abra pelo Safari (não pelo ícone da tela inicial); no Android, pelo Chrome.");
   rc = new SRv(); rc.lang = "pt-BR"; rc.interimResults = false; rc.maxAlternatives = 1; rc.continuous = false;
   rc.onresult = async e => { const t = e.results[e.results.length - 1][0].transcript; V.ouvindo = false; mostra("🗣️ " + t); try { await trata(t); if (V.buf.length) V.erros = 0; } catch (er) { diz("Não consegui salvar: " + ((er && er.message) || "erro") + "."); } if (V.on) responde(); };
   rc.onend = () => { V.ouvindo = false; if (V.on && !V.falando) setTimeout(ouve, 300); };
@@ -1662,12 +1662,12 @@ function vozLiga() {
 }
 function desliga(msg) { V.on = false; V.conf = null; try { rc && rc.abort(); } catch (e) { } try { V.lock && V.lock.release(); } catch (e) { } V.lock = null; botao(); V.buf = []; if (msg) fala(msg); else { try { speechSynthesis.cancel(); } catch (e) { } mostra(""); } }
 document.addEventListener("visibilitychange", () => { if (V.on && document.visibilityState === "visible" && navigator.wakeLock) navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); });
-const vst = document.createElement("style"); vst.textContent = "#bVoz{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);width:58px;height:58px;border-radius:50%;border:2px solid #fff;background:#1d4f91;color:#fff;font-size:26px;z-index:60;box-shadow:0 2px 10px #0006;cursor:pointer}#bVoz.on{background:#b3261e;animation:vozp 1.4s infinite}@keyframes vozp{50%{box-shadow:0 0 0 10px #b3261e33}}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);max-width:min(560px,calc(100% - 32px));background:#102030ee;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:60;pointer-events:none}";
+const vst = document.createElement("style"); vst.textContent = "#bVoz.on{background:#b3261e;border-color:#b3261e;color:#fff}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);max-width:min(560px,calc(100% - 32px));background:#102030ee;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:60;pointer-events:none}";
 document.head.appendChild(vst);
-const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); document.body.appendChild(bVoz);
+const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.className = "btn"; bVoz.textContent = "🎤 Voz"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); { const l = document.getElementById("btnLancar"); if (l) l.parentNode.insertBefore(bVoz, l); else document.body.appendChild(bVoz); } // no topo, ao lado do + Lançar: não cobre nada da tela
 const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidden = true; document.body.appendChild(vozTxt);
 function mostra(t) { vozTxt.hidden = !t; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
-function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹" : "🎤"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
+function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹ Voz" : "🎤 Voz"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
 bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
 if (/[?&]teste=1/.test(location.search)) window.__voz = { trata: async t => { V.buf = []; await trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, leituras };
 }

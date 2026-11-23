@@ -2135,7 +2135,7 @@ function explica(s) {
   const em = TX.emerg.find(e => hit(e[0])); if (em) return "Emergência, " + em[0] + ": " + em[1];
   return null;
 }
-const AJUDA = "Você pode falar: como está o tanque; o que fazer; medir oxigênio e pH; medir tudo; dar o trato; trato de 200 gramas; aplicar Nutrat; puim 600 gramas; bicarbonato 1 quilo; simbiótico 20 litros; fazer o prebiótico; pH da bombona; ar no máximo; fechar o sombrite; passar o rodo; biometria; avançar 2 horas; avançar até o próximo trato; desfazer; o que é nitrito; repetir; e parar voz.";
+const AJUDA = "Você pode falar: como está o tanque; o que fazer; medir oxigênio e pH; medir tudo; dar o trato; trato de 200 gramas; aplicar Nutrat; puim 600 gramas; bicarbonato 1 quilo; aplicar o simbiótico; fazer o lote do simbiótico; pH da bombona; ar no máximo; fechar o sombrite; passar o rodo; biometria; avançar 2 horas; avançar até o próximo trato; desfazer; o que é nitrito; repetir; e parar voz.";
 
 /* ---- executar ---- */
 function age(tipo, p) { const m0 = G.mis, r = faz(tipo, p, true); diz(r.msg); if (r.ok && G.modo === "aprender" && G.mis !== m0 && TX.missoes[G.mis]) diz("Missão cumprida. Próxima: " + TX.missoes[G.mis].t); return r; }
@@ -2201,7 +2201,7 @@ function trata(bruto) {
   // bombona
   if (tem(/bombona|balde/) && tem(/\bph\b/) || tem(/ph da bombona/)) { faz("bombona_ph", null, true); const r = E.leit(st, "phBomb"); return diz(r ? "pH da bombona: " + nf(r.v, 1) + ". Faixa do caderno 7,0 a 7,5; abaixo de 7, 80 gramas de bicarbonato (dose regra do app)." : "Não consegui medir o pH da bombona."); }
   if (tem(/bicarbonato/) && tem(/bombona/)) return age("bombona_bicarb");
-  if (tem(/prebiotico|fazer o balde|balde do dia/)) return age("prebiotico");
+  if (tem(/prebiotico|fazer o balde|balde do dia|fazer o lote|lote do simbiotico/)) return age("prebiotico");
   if (tem(/(montar|iniciar|comecar).*simbiotico|bactrat|balde na bombona|por o balde/)) return age("simbio_iniciar");
   if (tem(/catalisador/)) { const q = qtd(s); return age("bombona_cat", { mL: q ? q.v : 50 }); }
   if (tem(/descartar.*bombona|lavar a bombona/)) { V.conf = () => age("bombona_descartar"); return diz("Descartar e lavar a bombona? Diga sim para confirmar."); }
@@ -2243,7 +2243,7 @@ if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = es
 function fala(txt, depois) {
   if (!window.speechSynthesis) { if (depois) depois(); return; }
   V.falando = true; try { rc && rc.abort(); } catch (e) { }
-  speechSynthesis.cancel(); const partes = falaTxt(txt).match(/[^.;:!?]+[.;:!?]*/g) || [txt]; let n = 0, fim = false;
+  if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); const partes = falaTxt(txt).match(/[^.;:!?]+[.;:!?]*/g) || [txt]; let n = 0, fim = false;
   const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
   V.trava = setTimeout(acabou, falaTxt(txt).length * 95 + 4000); // o Chrome às vezes não avisa o fim
   partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); n++; });
@@ -2251,11 +2251,11 @@ function fala(txt, depois) {
 }
 function ouve() {
   if (!V.on || V.falando || V.ouvindo || !rc) return;
-  try { rc.start(); V.ouvindo = true; mostra("🎙️ Ouvindo…"); } catch (e) { }
+  try { rc.start(); V.ouvindo = true; V.tenta = 0; mostra("🎙️ Ouvindo…"); } catch (e) { if ((V.tenta = (V.tenta || 0) + 1) <= 4) setTimeout(ouve, 600); } // iPhone: o microfone demora a soltar depois da fala
 }
-function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, ouve); } else ouve(); }
+function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, () => setTimeout(ouve, 350)); } else ouve(); }
 function vozLiga() {
-  if (!SR) return aviso("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.", "alarme", 8000);
+  if (!SR) return aviso("Este navegador não tem reconhecimento de voz. No iPhone, abra pelo Safari (não pelo ícone da tela inicial); no Android, pelo Chrome.", "alarme", 8000);
   rc = new SR(); rc.lang = "pt-BR"; rc.interimResults = false; rc.maxAlternatives = 1; rc.continuous = false;
   rc.onresult = e => { const t = e.results[e.results.length - 1][0].transcript; V.ouvindo = false; mostra("🗣️ " + t); try { trata(t); if (V.buf.length) V.erros = 0; } catch (er) { diz("Deu um erro ao fazer isso."); } if (V.on) responde(); };
   rc.onend = () => { V.ouvindo = false; if (V.on && !V.falando) setTimeout(ouve, 300); };
@@ -2271,12 +2271,12 @@ document.addEventListener("visibilitychange", () => { if (V.on && document.visib
 const avisoTela = aviso; aviso = function (txt, cls, ms) { avisoTela(txt, cls, ms); if (V.on) { if (cls === "alarme") V.alarme = true; diz(txt); } };
 const quizTela = quiz; quiz = function (k) { const ja = G.quiz[k]; quizTela(k); if (V.on && !ja) { const q = TX.quiz[k]; V.quiz = q; diz("Pergunta: " + q.q + " " + q.o.map((t, i) => "Opção " + (i + 1) + ": " + t).join(". ") + ". Responda com o número."); } };
 /* botão e faixa de status */
-const vst = document.createElement("style"); vst.textContent = "#bVoz{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:42%;width:58px;height:58px;border-radius:50%;border:2px solid #ffffff55;background:#16323d;color:#fff;font-size:26px;z-index:30;box-shadow:0 2px 10px #0008}#bVoz.on{background:#b3261e;animation:vozp 1.4s infinite}@keyframes vozp{50%{box-shadow:0 0 0 10px #b3261e33}}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 92px);max-width:min(560px,calc(100% - 32px));background:#0d1b22e6;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:30;pointer-events:none}";
+const vst = document.createElement("style"); vst.textContent = "#bVoz.on{background:#b3261e;border-color:#b3261e;color:#fff}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 92px);max-width:min(560px,calc(100% - 32px));background:#0d1b22e6;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:30;pointer-events:none}";
 document.head.appendChild(vst);
-const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); document.body.appendChild(bVoz);
+const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.className = "bt"; bVoz.textContent = "🎤 Voz"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); $("botoes").insertBefore(bVoz, $("bFazer")); // fica na barra de cima do jogo: não cobre os botões da capa
 const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidden = true; document.body.appendChild(vozTxt);
 function mostra(t) { vozTxt.hidden = !t || !V.on && !V.falando; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
-function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹" : "🎤"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
+function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹ Voz" : "🎤 Voz"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
 bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
 window.__voz = { trata: t => { V.buf = []; trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, falaTxt, V };
 }
