@@ -180,7 +180,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
 
   const PRECOS = { // R$ (editável)
     hth: 25, tiossulfato: 30, bicarbonato: 6, cal_hidratada: 1.5, cal_virgem: 2, gesso: 1.2, acido_fosforico: 28, vitamina_c: 60,
-    acucar: 5, farelo: 2.5, bactrat: 900, nutrat: 350, catalisador: 500, azomite: 12, oxitrat: 22, kcl: 8, mgso4: 7,
+    acucar: 5, farelo: 2.5, bactrat: 900, nutrat: 350, catalisador: 500, azomite: 12, oxitrat: 22, kcl: 8, mgso4: 7, nh4cl: 0, /* cloreto de amônio: sem preço conferido, edite */
     racao: 9, pl: 0.022, nitrificante: 180, floco_vizinho: 0, mantas: 350, agua_doce: 0.01, kit: 0, pcr: 250, tcbs: 30, sonda_od: 900, decantador: 600
   };
   // unidade de cada item: g, mL, L, un
@@ -193,7 +193,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     bactrat: { n: "Bactrat P (probiótico)", u: "g", pack: 1000 }, nutrat: { n: "Nutrat", u: "mL", pack: 1000 },
     catalisador: { n: "Catalisador de flocos", u: "mL", pack: 1000 }, azomite: { n: "Azomite", u: "g", pack: 20000 },
     oxitrat: { n: "Oxitrat (oxigênio em pó)", u: "g", pack: 1000 }, kcl: { n: "Cloreto de potássio (KCl)", u: "g", pack: 5000 },
-    mgso4: { n: "Sulfato de magnésio", u: "g", pack: 5000 }, racao: { n: "Ração 40% PB", u: "g", pack: 25000 },
+    mgso4: { n: "Sulfato de magnésio", u: "g", pack: 5000 }, nh4cl: { n: "Cloreto de amônio (NH4Cl)", u: "g", pack: 1000 }, racao: { n: "Ração 40% PB", u: "g", pack: 25000 },
     nitrificante: { n: "Nitrificante comercial", u: "un", pack: 1 }, mantas: { n: "Telas verticais de poliéster (substrato)", u: "un", pack: 1 },
     sonda_od: { n: "Sonda de OD com alarme", u: "un", pack: 1 }, decantador: { n: "Decantador cônico", u: "un", pack: 1 }
   };
@@ -242,7 +242,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       },
       bombona: { fase: "vazia", t0: 0, pH: 7, bicarb: false, cat: false, qual: 0, litros: 0 }, balde: { on: false, t0: 0 },
       estoque: { hth: 1000, tiossulfato: 0, bicarbonato: 25000, cal_hidratada: 20000, cal_virgem: 0, gesso: 40000, acido_fosforico: 1000, vitamina_c: 0,
-        acucar: 5000, farelo: 30000, bactrat: 1000, nutrat: 1000, catalisador: 0, azomite: 5000, oxitrat: 1000, kcl: 0, mgso4: 0, racao: 25000,
+        acucar: 5000, farelo: 30000, bactrat: 1000, nutrat: 1000, catalisador: 0, azomite: 5000, oxitrat: 1000, kcl: 0, mgso4: 0, nh4cl: 1000, racao: 25000,
         nitrificante: 0, mantas: 0, sonda_od: 0, decantador: 0 },
       usado: {}, entregas: [], log: [], leituras: [], hist: [], eventos: [], vistos: {}, azoPorKg: 3, fim: null,
       obs: { mortosVistos: 0 }
@@ -639,7 +639,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     st.entregas = st.entregas.filter(e => e.t > st.t);
   }
   function bombonaPasso(st) {
-    const bd = st.balde; if (bd.on && (st.t - bd.t0) >= 24 * 60 && !bd.avisou) { bd.avisou = true; ev(st, "info", "O prebiótico fermentou (24 h). Passe para a bombona com Bactrat P e ar.", "prebio_pronto"); }
+    const bd = st.balde; if (bd.on && (st.t - bd.t0) >= 12 * 60 && !bd.avisou) { bd.avisou = true; ev(st, "info", "O lote ficou 12 h fechado. Passe para a bombona com Bactrat P e ar por 12 h.", "prebio_pronto"); }
     const b = st.bombona; if (b.fase === "vazia") return;
     const h = (st.t - b.t0) / 60;
     if (b.fase === "simbio") {
@@ -647,10 +647,10 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       b.pH = clamp(b.pH - (b.morta ? 0 : h < 30 ? 0.11 : 0.03) / 6, 3.8, 7.5);
       if (b.pH < 5) b.morta = true;
       if (b.morta) b.qual = Math.min(b.qual, 0.05);
-      else if (h <= 30) b.qual = clamp(h / 24, 0, 1);
+      else if (h <= 30) b.qual = clamp(h / 12, 0, 1); /* tese do Pimentel: 12 h fechado + 12 h com ar */
       else b.qual = Math.max(0.3, 1 - (Math.max(0, (st.t - (b.tf || b.t0)) / 60 - 30)) / 96); // balde novo renova o simbiótico
     }
-    if (b.fase === "simbio" && h >= 24 && !b.avisou2) { b.avisou2 = true; ev(st, "info", b.pH < 5 ? "Simbiótico pronto, mas o pH caiu abaixo de 5: bactérias mortas." : "Simbiótico pronto (24 h).", "simbio_pronto"); }
+    if (b.fase === "simbio" && h >= 12 && !b.avisou2) { b.avisou2 = true; ev(st, "info", b.pH < 5 ? "Lote pronto, mas o pH caiu abaixo de 5: bactérias mortas." : "Lote do simbiótico pronto (12 h de ar): vai inteiro para o tanque.", "simbio_pronto"); }
   }
 
   /* ---------- ações ---------- */
@@ -707,28 +707,28 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       case "farelo": { if (!precisaAgua()) break; const g = p.g || 0; if (!gasta(st, "farelo", g)) { ok = false; msg = "Falta farelo."; break; }
         a.C += 0.3767 * g * 0.6 / V; a.OMc += 0.3767 * g * 0.25 / V; a.H += 0.25 * g / V; a.TAN += 0.02172 * g * 0.2 / V; /* puim matéria natural: 37,67% C e 2,17% N (Leite et al. 2020) */
         msg = `${g} g de farelo de arroz (puim) espalhado.`; min = TEMPO.aplicar; logA(st, msg); break; }
-      case "simbiotico": { if (!precisaAgua()) break; const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Não há simbiótico na bombona."; break; }
-        const L = Math.min(p.L || 20, b.litros); const q = b.morta ? 0.05 : b.qual; const f = L / V, fr = L / Math.max(b.litros, 1);
-        const cOut = (b.Cg || 0) * fr, nOut = (b.Ng || 0) * fr; b.Cg = (b.Cg || 0) - cOut; b.Ng = (b.Ng || 0) - nOut; // carbono e N que estão de fato na bombona (balde: 600 g puim × 37,67% + 250 g açúcar × 42,11% = 331,3 g C; 13,03 g N)
-        a.Bac += 0.5 * f * q; a.H += 0.8 * f * q; a.C += cOut * 0.6 / V; a.OMc += cOut * 0.25 / V; a.TAN += nOut * 0.2 / V; /* cenário Xu mantém a calibração antiga (o estudo não usou nosso simbiótico).  carbono como no app: 1 balde (600 g puim × 43% + 250 g açúcar × 42%) por balde de 20 L = 16,6 g C/L (puim 37,67% C, Leite 2020) (rotina do Wagner: 4 baldes na partida, depois 1 balde por dia e saem 20 L); 60% solúvel, 25% matéria orgânica, como o puim (regra do app) */
+      case "simbiotico": { if (!precisaAgua()) break; const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Não há lote de simbiótico na bombona."; break; }
+        const L = Math.min(p.L || b.litros, b.litros); const q = b.morta ? 0.05 : b.qual; const fr = L / Math.max(b.litros, 0.01), lote = fr * (b.litros / Math.max(b.lit0 || b.litros, 0.01));
+        const cOut = (b.Cg || 0) * fr, nOut = (b.Ng || 0) * fr; b.Cg = (b.Cg || 0) - cOut; b.Ng = (b.Ng || 0) - nOut; // receita da tese (Pimentel 2025, cap. III–V): por m³ 20 g de farelo (37,67% C, 2,17% N) + 2 g de açúcar (42,11% C) = 8,38 g C e 0,43 g N
+        const fq = (b.x || 1) * lote * 20 / V; /* um lote inteiro tem o efeito de bactéria da dose diária antiga (regra do app: a tese não mede Bacillus na água) */
+        a.Bac += 0.5 * fq * q; a.H += 0.8 * fq * q; a.C += cOut * 0.6 / V; a.OMc += cOut * 0.25 / V; a.TAN += nOut * 0.2 / V; /* 60% solúvel, 25% matéria orgânica, como o puim (regra do app) */
         if (b.cat) { a.cat = 1; }
-        a.AOB += 0.00002 * f; // bombona com água madura traz pouca nitrificante
-        b.litros -= L; if (b.litros <= 5) { b.fase = "vazia"; b.cat = false; b.bicarb = false; }
-        msg = `${L} L de simbiótico no tanque${q < 0.3 ? " (fraco: bactérias mortas ou imaturo)" : ""}${b.cat ? ", flocado pelo catalisador" : ""}.`; min = TEMPO.aplicar; logA(st, msg); break; }
-      case "prebiotico": { const b = st.balde; if (b.on && st.bombona.fase === "vazia" && (b.n || 1) < 4) { const mais = 4 - (b.n || 1); if (!gasta(st, "farelo", 600 * mais) || !gasta(st, "acucar", 250 * mais) || !gasta(st, "bicarbonato", 100 * mais)) { ok = false; msg = "Falta farelo, açúcar ou bicarbonato."; break; } b.n = 4; b.t0 = st.t; msg = `Mais ${mais} balde${mais > 1 ? "s" : ""} de prebiótico para a partida da bombona (4 baldes, rotina do Wagner). Todos ficam 24 h.`; min = TEMPO.bombona; logA(st, msg); break; }
-        if (b.on) { ok = false; msg = "O balde já está com prebiótico fermentando."; break; }
+        b.litros -= L; if (b.litros <= 0.05 * (b.lit0 || 1)) { b.fase = "vazia"; b.cat = false; b.bicarb = false; b.litros = 0; }
+        msg = `${b.fase === "vazia" ? "Lote inteiro" : L.toFixed(1).replace(".", ",") + " L"} do simbiótico no tanque${q < 0.3 ? " (fraco: bactérias mortas ou imaturo)" : ""}${b.cat ? ", flocado pelo catalisador" : ""}.`; min = TEMPO.aplicar; logA(st, msg); break; }
+      case "nh4cl": { if (!precisaAgua()) break; const g = p.g || Math.round(V); if (!gasta(st, "nh4cl", g)) { ok = false; msg = "Falta cloreto de amônio."; break; }
+        a.TAN += 0.2619 * g / V; msg = `${g} g de cloreto de amônio: amônia +${(0.2619 * g / V).toFixed(2).replace(".", ",")} mg/L para as nitrificantes (Pimentel 2025: 1 mg/L do sal por dia na maturação).`; min = TEMPO.aplicar; logA(st, msg); break; }
+      case "prebiotico": { const b = st.balde;
+        if (b.on) { ok = false; msg = "O balde já está com um lote fechado."; break; }
         if (a.Cl > 0.05) { ok = false; msg = "O cloro do tanque ainda não zerou: a água mataria os bacilos."; break; }
-        const nb = st.bombona.fase === "vazia" ? 4 : 1; // rotina do Wagner: 4 baldes de 20 L na partida, depois 1 por dia
-        if (!gasta(st, "farelo", 600 * nb) || !gasta(st, "acucar", 250 * nb) || !gasta(st, "bicarbonato", 100 * nb)) { ok = false; msg = "Falta farelo, açúcar ou bicarbonato."; break; }
-        Object.assign(b, { on: true, t0: st.t, avisou: false, n: nb });
-        msg = `${nb === 4 ? "4 baldes" : "1 balde"} de prebiótico fechado${nb === 4 ? "s" : ""}, no sol: cada um com 600 g de puim + 250 g de açúcar + 100 g de bicarbonato (teto do caderno; Pimentel 2023 usa 20% do farelo) + água do tanque sem cloro (madura do 2º ciclo em diante). Fica 24 h.`; min = TEMPO.bombona; logA(st, msg); break; }
-      case "simbio_iniciar": { const b = st.bombona, bd = st.balde; if (!bd.on || (st.t - bd.t0) < 24 * 60) { ok = false; msg = !bd.on ? "Faça o prebiótico no balde primeiro." : "O prebiótico ainda não fermentou (24 h)."; break; }
-        const nb = bd.n || 1;
-        if (b.fase === "simbio" && !b.morta) { if (!gasta(st, "bactrat", 30 * nb)) { ok = false; msg = "Falta Bactrat P (30 g a cada balde, rotina do Wagner)."; break; } const cab = Math.min(100, b.litros + 20 * nb) - b.litros, fr = nb > 0 ? cab / (20 * nb) : 0; b.litros += cab; b.Cg = (b.Cg || 0) + 331.3 * nb * fr; b.Ng = (b.Ng || 0) + 13.03 * nb * fr; /* só entra o carbono do que coube */ b.tf = st.t; bd.on = false; msg = `${nb} balde${nb > 1 ? "s" : ""} novo${nb > 1 ? "s" : ""} de prebiótico na bombona (${Math.round(b.litros)} L). Depois de 24 h de ar, tire os 20 L do dia.`; min = TEMPO.bombona; logA(st, msg); break; }
-        if (b.fase !== "vazia") { ok = false; msg = "A bombona ainda tem simbiótico. Use ou descarte antes."; break; }
-        if (!gasta(st, "bactrat", 30)) { ok = false; msg = "Falta Bactrat P."; break; }
-        Object.assign(b, { fase: "simbio", t0: st.t, tf: st.t, pH: 7.2, litros: 20 * nb, Cg: 331.3 * nb, Ng: 13.03 * nb, qual: 0, bicarb: false, cat: false, avisou2: false, morta: false }); bd.on = false;
-        msg = `Bombona de ${20 * nb} L com ${nb} balde${nb > 1 ? "s" : ""} de prebiótico + 30 g de Bactrat P, ar forte por 24 h.`; min = TEMPO.bombona; logA(st, msg); break; }
+        const x = p.x === 2 ? 2 : 1, fg = Math.round(20 * V * x), ag = Math.round(2 * V * x), bg = Math.round(2 * V * x); /* x = 2: lote dobrado (emergência; regra do app) */ // tese do Pimentel: por m³ 20 g de farelo, 2 g de açúcar, 2 g de bicarbonato; água 10× o farelo
+        if (!gasta(st, "farelo", fg) || !gasta(st, "acucar", ag) || !gasta(st, "bicarbonato", bg)) { ok = false; msg = "Falta farelo, açúcar ou bicarbonato."; break; }
+        Object.assign(b, { on: true, t0: st.t, avisou: false, n: 1, x });
+        msg = `Lote do simbiótico no balde fechado: ${fg} g de puim + ${ag} g de açúcar + ${bg} g de bicarbonato em ${(0.2 * V * x).toFixed(0)} L de água do tanque sem cloro (receita da tese do Pimentel). Fica 12 h fechado.`; min = TEMPO.bombona; logA(st, msg); break; }
+      case "simbio_iniciar": { const b = st.bombona, bd = st.balde; if (!bd.on || (st.t - bd.t0) < 12 * 60) { ok = false; msg = !bd.on ? "Faça o lote no balde primeiro." : "O lote ainda não completou 12 h fechado."; break; }
+        if (b.fase === "simbio" && !b.morta) { ok = false; msg = "A bombona ainda tem o lote anterior. Ponha no tanque ou descarte antes."; break; }
+        const x = bd.x || 1, gb = Math.max(1, Math.round(0.3 * V * x)); if (!gasta(st, "bactrat", gb)) { ok = false; msg = "Falta Bactrat P."; break; } /* tese: 0,2–0,4 g de Bacillus por m³; a quantidade de Bactrat é regra do app */
+        const lit = 0.2 * V * x; Object.assign(b, { fase: "simbio", t0: st.t, tf: st.t, pH: 7.2, litros: lit, lit0: lit, x, Cg: 8.376 * V * x, Ng: 0.4344 * V * x, qual: 0, bicarb: false, cat: false, avisou2: false, morta: false }); bd.on = false;
+        msg = `Lote na bombona com ${gb} g de Bactrat P, ar forte por 12 h. Depois vai inteiro para o tanque.`; min = TEMPO.bombona; logA(st, msg); break; }
       case "bombona_bicarb": { const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Sem simbiótico na bombona."; break; } if (!gasta(st, "bicarbonato", 80)) { ok = false; msg = "Falta bicarbonato."; break; }
         b.bicarb = true; b.pH = Math.min(7.5, b.pH + 1.2); msg = b.morta ? "80 g de bicarbonato na bombona, mas as bactérias já morreram (pH passou abaixo de 5)." : "80 g de bicarbonato na bombona: o pH sobe de novo."; min = 5; logA(st, msg); break; }
       case "bombona_cat": { const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Sem simbiótico na bombona."; break; } const mL = p.mL || 50; if (!gasta(st, "catalisador", mL)) { ok = false; msg = "Falta catalisador."; break; }
@@ -1006,7 +1006,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     const nb = Math.round(V);
     out.push({ k: "nutrat", nome: "Nutrat", qtd: mot.length ? nb * 2 : nb, un: "mL", dobra: mot.length > 0, txt: mot.length ? `Em dobro (${nb} mL de manhã + ${nb} mL à tarde) porque: ${mot.join(", ")}.` : "1 mL por m³, diluído em 2 L, sobre os difusores.", base: "campo" });
     const form = dias == null || dias < 30;
-    out.push({ k: "simbiotico", nome: "Simbiótico da bombona", qtd: Math.round(1 * V), un: "L", txt: "Rotina do Wagner: 20 L por dia (1 L por m³), tirados da bombona de 80 L que recebe 1 balde de prebiótico por dia.", base: "campo" });
+    if (simbHoje(st)) out.push({ k: "simbiotico", nome: "Simbiótico (lote da tese)", qtd: 1, un: "lote", txt: `Por m³: 20 g de puim + 2 g de açúcar + 2 g de bicarbonato + 0,3 g de Bactrat P; 12 h fechado + 12 h com ar; o lote inteiro no tanque. ${dias == null || dias < 15 ? "Todo dia até o dia 15." : "Depois do dia 15, 3 vezes por semana (seg, qua e sex; os dias são regra do app)."} Pimentel 2025 (tese FURG).`, base: "estudo" });
     if (kg > 0) {
       out.push({ k: "bicarbonato", nome: "Bicarbonato de rotina", qtd: Math.round(250 * kg), un: "g", txt: `0,25 kg por kg de ração × ${kg.toFixed(2)} kg.`, base: "estudo" });
       out.push({ k: "farelo", nome: "Farelo de arroz fermentado (carbono)", qtd: Math.round(500 * kg), un: "g", txt: `0,5 kg por kg de ração × ${kg.toFixed(2)} kg, Carbono principal, como no app. Leva a relação C:N para perto de 10.`, base: "campo" });
@@ -1032,18 +1032,22 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
   }
 
   /* ---------- piloto: segue o app e o caderno (testes, ajudante e comparação de densidades) ---------- */
+  /* simbiótico pela tese do Pimentel (escolha do Wagner 23/11): todo dia na maturação e até o dia 15 depois de povoar; depois 3 vezes por semana */
+  function simbHoje(st, amanha) { const cm = st.camarao; const t = st.t + (amanha ? 1440 : 0); if (cm.povoado == null || !(cm.n > 0)) return true; if ((t - cm.povoado) / 1440 < 15) return true; return [1, 3, 5].includes(new Date(agoraMs(st) + (amanha ? 864e5 : 0)).getDay()); }
   function piloto(st, pf) {
-    pf = Object.assign({ telas: true, cloro: 10, esperaCloro: true, inoculo: "nitrificante", carbono: true, bicarb: true, simbio: true, nutrat: true, sombrite: true, rodo: true, decantador: true,
-      aguaDoce: true, lua: true, racao: 1, aclimatar: true, dens: 500, sal: 22, alvo: 12, minerais: true, acucar: true, prep: true, tratos: true, medir: true, despescar: true, maxDias: 125, maturar: 15 }, pf || {});
+    pf = Object.assign({ telas: true, cloro: 10, esperaCloro: true, inoculo: "nitrificante", nh4cl: true, carbono: true, bicarb: true, simbio: true, nutrat: true, sombrite: true, rodo: true, decantador: true,
+      aguaDoce: true, lua: true, racao: 1, aclimatar: true, dens: 500, sal: 22, alvo: 12, minerais: true, acucar: true, prep: true, tratos: true, medir: true, despescar: true, maxDias: 125, maturar: 16 }, pf || {});
     const P = st.pil || (st.pil = { fase: 0, d: {} }), a = st.agua, cm = st.camarao;
     const h = Math.floor(horaLocal(st) + 0.01), dia = diaIdx(st), V = Vm3(st);
     const uma = k => { if (P.d[k] === dia) return false; P.d[k] = dia; return true; };
     const A = (t, p) => acao(st, t, p);
-    if (pf.simbio && a.cheio && h >= 6 && h <= 19) { const b = st.bombona, bd = st.balde; // rotina do balde e da bombona
-      if ((b.fase === "vazia" || (b.fase === "simbio" && !b.morta)) && bd.on && st.t - bd.t0 >= 24 * 60) A("simbio_iniciar");
-      if (!bd.on && a.Cl <= 0.05) { A("prebiotico"); if (bd.on) bd.t0 -= bd.t0 % 60; } // balde novo logo depois de despejar, na hora cheia: não atrasa 1 h por dia
+    if (pf.simbio && a.cheio && a.Cl <= 0.05 && h >= 6 && h <= 19) { const b = st.bombona, bd = st.balde; // lote da tese: 12 h no balde fechado + 12 h na bombona com ar; o lote inteiro vai para o tanque
+      if (b.fase === "simbio" && (b.morta || b.pH < 5)) A("bombona_descartar");
       if (b.fase === "simbio" && !b.morta && b.pH < 7.0) A("bombona_bicarb"); // caderno: manter 7,0–7,5
-      if (b.fase === "simbio" && (b.morta || b.litros < 10)) { A("bombona_descartar"); A("prebiotico"); /* recomeça com 4 baldes */ } }
+      if (b.fase === "simbio" && !b.morta && st.t - b.t0 >= 12 * 60 && (P.fase === 2 || cm.n > 0) && simbHoje(st) && uma("simbap")) A("simbiotico");
+      if (b.fase === "simbio" && !b.morta && st.t - b.t0 >= 36 * 60) A("bombona_descartar"); // lote velho de dias sem uso
+      if (b.fase === "vazia" && bd.on && st.t - bd.t0 >= 12 * 60) A("simbio_iniciar");
+      if (!bd.on && st.bombona.fase === "vazia" && simbHoje(st, true) && uma("lote")) { A("prebiotico", { x: pf.loteX || 1 }); if (bd.on) bd.t0 -= bd.t0 % 60; } }
     if (pf.prep) {
       if (!a.cheio) { st.salAlvo = pf.sal; A("encher", { sal: pf.sal }); if (pf.cloro > 0) A("cloro", { g: Math.round(pf.cloro * Vm3(st) / 0.65) }); A("aeracao", { nivel: "max" }); P.fase = 1; return; }
       if (P.fase === 0) P.fase = cm.n > 0 ? 3 : 1;
@@ -1056,9 +1060,8 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         return; }
       if (P.fase === 2 && h >= 7) { const b = st.bombona; // maturação do manual (cap. 5.2 e 7): simbiótico todo dia e só povoa com amônia e nitrito abaixo de 1
         if (P.mat0 == null) P.mat0 = dia;
-        if (uma("mat")) { const pronto = b.fase === "simbio" && st.t - b.t0 >= 24 * 60 && !b.morta;
-          if (pf.simbio && pronto) A("simbiotico", { L: Math.min(20, b.litros) }); if (pf.nutrat) A("nutrat", { mL: Math.round(V) });
-          const tn = medir(st, "tan").v, n2 = medir(st, "no2").v; if (tn > 1 && pf.acucar) A("acucar", { g: Math.round(tn * V * 20) });
+        if (uma("mat")) { if (pf.nutrat) A("nutrat", { mL: Math.round(V) });
+          const tn = medir(st, "tan").v, n2 = medir(st, "no2").v; if (pf.nh4cl && tn < 1) A("nh4cl", { g: Math.round(V) }); /* Pimentel 2025: 1 mg/L do sal por dia; com amônia acima de 1 não põe (regra do app) */
           if (dia - P.mat0 >= pf.maturar && tn < 1 && n2 < 1) { A("povoar", { densidade: pf.dens, aclimatar: pf.aclimatar }); P.fase = 3; P.d.simb = dia; } }
         return; }
     }
@@ -1080,7 +1083,6 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       if (pf.medir) { st.obsEspuma = espuma(st); medir(st, "od"); medir(st, "temp"); medir(st, "ph"); if (dc % 2 === 0) { medir(st, "tan"); medir(st, "no2"); medir(st, "cone"); } if (dc % 2 === 1) medir(st, "alk"); if (dc % 5 === 0) medir(st, "sal"); if (dc % 10 === 0) medir(st, "no3"); }
       const ds = appDoses(st), D = k => ds.find(x => x.k === k);
       if (pf.nutrat && D("nutrat")) { const n = D("nutrat"); P.nut2 = n.dobra ? n.qtd / 2 : 0; A("nutrat", { mL: n.dobra ? n.qtd / 2 : n.qtd }); }
-      if (pf.simbio && st.bombona.fase === "simbio" && st.t - st.bombona.t0 >= 24 * 60 && !st.bombona.morta) A("simbiotico", { L: Math.min(D("simbiotico").qtd, st.bombona.litros) });
       if (pf.bicarb) { let g = (D("bicarbonato") ? D("bicarbonato").qtd : 0) + (D("alc") ? D("alc").qtd : 0); if (g > 0) A("bicarbonato", { g }); }
       if (pf.carbono && D("farelo")) A("farelo", { g: D("farelo").qtd });
       if (pf.acucar && D("acucar")) A("acucar", { g: D("acucar").qtd });
@@ -1107,7 +1109,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     if (pf.tratos && h === 21 && uma("bandeja")) A("bandeja");
   }
 
-  const API = { _efic: v => (EFIC = v), horasTrato, piloto, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
+  const API = { _efic: v => (EFIC = v), horasTrato, piloto, simbHoje, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
     pctTabela, tratosTabela, curvaPeso, TANK, ITENS, PRECOS, TABELA, CURVA, interp, LC_NO2, LC_NH3, SAFE };
   if (typeof module !== "undefined" && module.exports) module.exports = API; else root.BFEngine = API;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -1131,6 +1133,7 @@ TX.itens = {
   oxitrat: { n: "Oxitrat", d: "Oxigênio em pó para emergência.", cor: "#e7c84e", onde: "tanque", un: "copo", max: 3, passo: 1, min: 1, ac: "oxitrat", par: "g", mult: 240, t: "1 copo de 200 mL efervesce e sobe o oxigênio na hora. É socorro, não rotina." },
   hth: { n: "Cloro HTH 65%", d: "Desinfeta a água crua.", cor: "#f4f4f4", onde: "tanque", un: "g", max: 1000, passo: 5, ac: "cloro", par: "g", t: "10 mg/L de cloro ativo já zeram as bactérias da água e somem em 3 a 5 dias com ar forte (manual; dose 10 a 20 mg/L: manual e Rekha e colegas, IJVASR 49(4)). Conta: mg/L × m³ ÷ 0,65." },
   tiossulfato: { n: "Tiossulfato", d: "Tira o cloro que sobrou.", cor: "#cfe3d3", onde: "tanque", un: "g", max: 500, passo: 5, ac: "tiossulfato", par: "g", t: "7 g por m³ para cada 1 mg/L de cloro. Meça o cloro antes." },
+  nh4cl: { n: "Cloreto de amônio", d: "Amônia para as nitrificantes na maturação.", cor: "#e6e3f0", onde: "tanque", un: "g", max: 200, passo: 5, ac: "nh4cl", par: "g", t: "Maturação da tese do Pimentel: 1 g por m³ por dia (20 g no tanque), junto com o lote do simbiótico, sem camarão. Com amônia acima de 1, não ponha." },
   kcl: { n: "Cloreto de potássio", d: "Repõe potássio.", cor: "#d99a9a", onde: "tanque", un: "g", max: 3000, passo: 50, ac: "kcl", par: "g", t: "Só depois de medir potássio. Corrigir no escuro desequilibra a proporção com o magnésio." },
   mgso4: { n: "Sulfato de magnésio", d: "Repõe magnésio.", cor: "#a9c7a0", onde: "tanque", un: "g", max: 5000, passo: 100, ac: "mgso4", par: "g", t: "Só depois de medir magnésio." },
   nitrificante: { n: "Nitrificante comercial", d: "Inóculo limpo de bactérias nitrificantes.", cor: "#4f7cac", onde: "tanque", fixo: "inocular_nitrificante", t: "Encurta o pico de nitrito sem trazer doença. Só depois do cloro zerar." },
@@ -1144,7 +1147,7 @@ TX.itens = {
   simb: { n: "Balde de simbiótico", d: "Tirado da bombona.", cor: "#b08a3e", onde: "tanque" }
 };
 TX.prat1 = ["nutrat", "bactrat", "catalisador", "farelo", "acucar", "cal_hidratada", "gesso", "bicarbonato", "acido_fosforico", "azomite", "oxitrat"];
-TX.prat2 = ["hth", "tiossulfato", "kcl", "mgso4", "nitrificante", "vizinho"];
+TX.prat2 = ["hth", "tiossulfato", "nh4cl", "kcl", "mgso4", "nitrificante", "vizinho"];
 TX.medidas = [["od", "Oxigênio (sonda)", 5], ["temp", "Temperatura", 2], ["ph", "pH", 5], ["sal", "Salinidade", 5], ["alk", "Alcalinidade", 15], ["tan", "Amônia", 15], ["no2", "Nitrito", 15], ["no3", "Nitrato", 15], ["cl", "Cloro", 10], ["cone", "Cone Imhoff", 30], ["ca", "Cálcio", 15], ["mg", "Magnésio", 15], ["k", "Potássio", 15]];
 TX.faixa = { od: "≥ 5", temp: "26–30", ph: "7,5–8,0", sal: "20–25", alk: "150–200", tan: "< 1", no2: "< 1", no3: "< 150", cone: "10–15", cl: "0" };
 
@@ -1156,8 +1159,8 @@ TX.missoes = [
   { t: "Pegue o cloro HTH na estante de preparo e aplique no tanque (cerca de 310 g dão 10 mg/L).", l: "A água crua traz bactérias, algas e às vezes vírus. O cloro por pelo menos 6 horas zera isso. Dose fraca (abaixo de 5 mg/L) deixa doença viva; o manual usa de 10 a 20.", ok: s => s.agua.ClMax >= 5, d: "Pegue o HTH na estante de preparo e leve até o tanque. São 310 g para os 20 m³ (10 mg/L)." },
   { t: "Abra o ar no máximo no soprador e use o Relógio. Meça o cloro com a maleta até dar zero.", l: "O cloro some com ar forte e sol. Com ar forte leva de 3 a 5 dias (manual); dose maior demora mais. Povoar com cloro mata a larva: só o teste diz que zerou.", ok: (s, g) => g.leu("cl") === 0 && s.agua.ClMax > 1, d: "No Relógio, passe um dia por vez e meça o cloro. Com pressa, o tiossulfato tira o cloro na hora." },
   { t: "Meça a alcalinidade e corrija com bicarbonato até 150 a 180.", l: "A alcalinidade é a reserva que segura o pH. As bactérias do floco gastam alcalinidade todo dia; sem ela o pH despenca.", ok: (s, g) => g.leu("alk") >= 150, d: "A conta em gramas é (160 − medido) × 20 ÷ 0,6. No máximo 1 kg de bicarbonato por dia." },
-  { t: "Na bombona: faça o prebiótico no balde. Depois de 24 h monte o simbiótico com Bactrat P.", l: "O prebiótico fermenta o farelo fechado no sol. Na bombona, com ar forte, os bacilos se multiplicam. O pH da bombona cai: use bicarbonato, porque abaixo de 5 as bactérias morrem.", ok: s => s.bombona.fase === "simbio", d: "O balde fica 24 h fechado. Depois leve o Bactrat P da estante Só Bioflocos até a bombona." },
-  { t: "Escolha um inóculo na estante de preparo (ou siga sem) e aplique o primeiro simbiótico no tanque.", l: "O manual só povoa com amônia e nitrito abaixo de 1 e cone entre 2 e 5: meça antes de soltar a larva. Nitrificante comercial é limpo. Floco do vizinho é rápido, mas pode trazer doença. Sem inóculo o nitrito sobe mais e por mais tempo.", ok: (s, g) => g.feito.simbiotico, d: "O simbiótico se pega na bombona e se despeja no tanque, sobre os difusores." },
+  { t: "Na bombona: faça o lote do simbiótico no balde fechado. Depois de 12 h passe para a bombona com Bactrat P e ar.", l: "Receita da tese do Pimentel: por m³ de tanque 20 g de puim, 2 g de açúcar e 2 g de bicarbonato. 12 h fechado e 12 h com ar; o lote inteiro vai para o tanque. Abaixo de pH 5 as bactérias morrem.", ok: s => s.bombona.fase === "simbio", d: "O balde fica 12 h fechado. Depois leve o Bactrat P da estante Só Bioflocos até a bombona." },
+  { t: "Maturação: todo dia o lote do simbiótico e 20 g de cloreto de amônio (estante de preparo). Inóculo é opcional.", l: "O manual só povoa com amônia e nitrito abaixo de 1 e cone entre 2 e 5: meça antes de soltar a larva. Nitrificante comercial é limpo. Floco do vizinho é rápido, mas pode trazer doença. Sem inóculo o nitrito sobe mais e por mais tempo.", ok: (s, g) => g.feito.simbiotico, d: "O simbiótico se pega na bombona e se despeja no tanque, sobre os difusores." },
   { t: "Pegue as pós-larvas na Chegada das pós-larvas, leve o saco ao tanque e aclimate antes de soltar.", l: "O saco vem com outra salinidade e outra temperatura. Larva solta de uma vez leva choque e parte morre em horas.", ok: s => s.camarao.n > 0, d: "Aclimate devagar: iguale a salinidade e a temperatura do saco com as do tanque antes de soltar." },
   { t: "Dê o primeiro trato (balde de ração no depósito) e confira a bandeja depois.", l: "Bandeja limpa: pode subir um pouco. Sobrou muito: baixe. Sobra apodrece, gasta oxigênio e vira amônia.", ok: (s, g) => g.feito.trato && g.feito.bandeja, d: "O Celular mostra os gramas de cada trato. A bandeja se confere umas 2 horas depois." },
   { t: "Rotina da manhã: olhe a água, meça oxigênio, temperatura e pH, aplique Nutrat e simbiótico.", l: "A espuma conta a história: fina tipo Sprite é equilíbrio; crespa e escura é matéria orgânica sobrando. O celular mostra quanto aplicar com base no que você mediu.", ok: (s, g) => g.feito.nutrat && g.feito.olhar && g.leu("od") != null, d: "Toque em Fazer agora para ver a lista da manhã na ordem. A seta leva a cada lugar." },
@@ -1192,8 +1195,8 @@ TX.gloss = [
   ["Oxigênio dissolvido (OD)", "Só com ar o teto é cerca de 6,8 mg/L a 28 °C e 25 ppt (tabela de saturação). Os difusores de disco (bolha fina, 1 por m²) chegam perto do teto. O Nutrat não mexe no oxigênio: ele limpa a matéria orgânica que o gasta."],
   ["Cone Imhoff", "Mede o volume de floco em 1 litro. Meta 10 a 15 mL/L."],
   ["Floco", "Grumos de bactérias, algas e restos. Come amônia e vira alimento."],
-  ["Prebiótico", "Farelo, açúcar e bicarbonato fermentando 24 h no balde fechado."],
-  ["Simbiótico", "Prebiótico + Bactrat P com ar forte na bombona por 24 h."],
+  ["Lote do simbiótico", "Por m³: 20 g de puim, 2 g de açúcar e 2 g de bicarbonato, 12 h no balde fechado."],
+  ["Simbiótico", "O lote + Bactrat P com ar forte na bombona por 12 h; vai inteiro para o tanque."],
   ["Relação C:N", "Carbono por nitrogênio que entra no tanque. Perto de 10 as bactérias do floco dão conta da amônia."],
   ["Muda", "Troca da casca. Mais comum perto da lua cheia e da nova. Casca mole é hora frágil."],
   ["Academia", "Uma hora de ar no máximo de manhã para revolver tudo."],
@@ -1215,7 +1218,7 @@ TX.emerg = [
   ["Mortalidade de manhã", "Meça OD, amônia, nitrito e temperatura. Faça biometria e olhe brânquia, casca e cauda. Dúvida: microscópio, TCBS ou PCR."],
   ["Água acima de 32 °C", "Sombrite fechado, ar forte, ração −25% acima de 33."]
 ];
-TX.ritual = ["Olhar a espuma e a cor da água", "Medir oxigênio, temperatura e pH", "Nutrat sobre os difusores", "Simbiótico da bombona", "Bicarbonato de rotina e puim", "Academia: 1 h de ar no máximo às 8 h", "Tratos no número da tabela (6 a 3 por dia, conforme o peso), com bandeja", "Sombrite conforme o sol", "Segunda-feira: rodo no fundo", "Balde de prebiótico e bombona em dia"];
+TX.ritual = ["Olhar a espuma e a cor da água", "Medir oxigênio, temperatura e pH", "Nutrat sobre os difusores", "Simbiótico (lote da tese)", "Bicarbonato de rotina e puim", "Academia: 1 h de ar no máximo às 8 h", "Tratos no número da tabela (6 a 3 por dia, conforme o peso), com bandeja", "Sombrite conforme o sol", "Segunda-feira: rodo no fundo", "Lote do simbiótico em dia"];
 TX.fonte = { espaco: "Fróes et al. 2013 (densidade acima de 1.111/m³)", amonia: "Lin e Chen 2001", nitrito: "Lin e Chen 2003", oxigenio: "Vinatea 2009; FURG 2022", calor: "Kumlu e Türkmen 2010; crônico é modelo", frio: "Kumlu e Türkmen 2010", pH: "modelo do jogo (sem estudo de faixa letal)", nitrato: "Kuhn 2010; Furtado 2015", cloro: "regra de zero cloro (sem estudo)", sulfeto: "Li 2017", salinidade: "Burbano-Gallardo 2017", aclimatacao: "limiares §15G (proposta do modelo; Winarni 2022: passos menores, mais sobrevivência)", canibalismo: "modelo da muda", natural: "perda de fundo (modelo)", fome: "modelo", vibriose: "Samocha; modelo", ahpnd: "WOAH", mancha_branca: "Millard 2020; Granja 2006", mionecrose: "modelo", nhp: "modelo", bolha: "modelo", co2: "Furtado 2017", caibra: "Roy 2007", manejo_muda: "modelo da muda (manual: nada de manejo na janela)" };
 TX.causa = { espaco: "Falta de espaço (densidade alta)", amonia: "Amônia", nitrito: "Nitrito", oxigenio: "Falta de oxigênio", calor: "Calor", frio: "Frio", pH: "pH fora da faixa", nitrato: "Nitrato", cloro: "Cloro", sulfeto: "H₂S do fundo", salinidade: "Choque de salinidade", aclimatacao: "Soltura sem aclimatar", canibalismo: "Canibalismo na muda", natural: "Perda normal", fome: "Fome", vibriose: "Vibriose", ahpnd: "AHPND", mancha_branca: "Mancha branca", mionecrose: "Mionecrose", nhp: "NHP", bolha: "Bolha de gás", co2: "CO₂", caibra: "Cãibra", manejo_muda: "Manejo na janela de muda" };
 
@@ -1232,7 +1235,7 @@ TX.desafios = [
   { id: "cone", n: "Cone alto e espuma crespa", dc: 75, h: 6, horas: 72, txt: "Dia 75. Floco demais: cone perto de 30. Em 72 horas traga o cone para menos de 22 sem deixar o oxigênio cair de 4.",
     mut: s => { s.agua.H = 650; s.estufa.decantador = false; }, fim: (v, perda, mn) => [[v.cone < 22, "Cone abaixo de 22 (ficou " + v.cone.toFixed(0) + ")"], [mn.DO >= 4, "Oxigênio mínimo de 4 (foi " + mn.DO.toFixed(1) + ")"]] },
   { id: "verde", n: "Água verde demais", dc: 20, h: 9, horas: 48, txt: "Dia 20. A água esverdeou forte e o pH dispara à tarde. A amônia está em 3 e, com pH alto, vira tóxica (NH₃). No segundo dia a amônia tóxica não pode passar de 0,1 mg/L.",
-    mut: s => { s.agua.alg = 115; s.agua.TAN = Math.max(s.agua.TAN, 3); s.estufa.sombrite = false; s.clima.tipo = "sol"; s.clima.nuvem = 0.15; s.clima.chuva = false; }, fim: (v, perda, mn, mx) => [[mx.nh3fim <= 0.1, "Amônia tóxica até 0,1 mg/L no segundo dia (foi " + mx.nh3fim.toFixed(2) + ")"], [perda < 1, "Perda menor que 1%"]] },
+    mut: s => { s.agua.alg = 115; s.agua.TAN = Math.max(s.agua.TAN, 3); s.estufa.sombrite = false; s.clima.tipo = "sol"; s.clima.nuvem = 0.15; s.clima.chuva = false; }, fim: (v, perda, mn, mx) => [[mx.nh3fim <= 0.1, "Amônia tóxica até 0,1 mg/L no segundo dia (foi " + mx.nh3fim.toFixed(2) + ")"], [perda < 1, "Perda menor que 1% (foi " + perda.toFixed(1) + "%)"]] },
   { id: "floco", n: "Floco morto", dc: 55, h: 6, horas: 36, txt: "Dia 55. O floco morreu: água acinzentada e amônia em 5 mg/L. Em 36 horas traga a amônia para menos de 1 sem perder mais de 5% do lote.",
     mut: s => { s.agua.H *= 0.2; s.agua.Bac = 0; s.agua.AOB *= 0.25; s.agua.NOB *= 0.25; s.agua.C = 0; s.agua.TAN = 5; s.agua.colapso = 1; }, fim: (v, perda) => [[v.TAN < 1, "Amônia abaixo de 1 (ficou " + v.TAN.toFixed(2) + ")"], [perda < 5, "Perda menor que 5% (foi " + perda.toFixed(1) + "%)"]] }
   ,{ id: "od3h", n: "Oxigênio caindo às 3 da manhã", dc: 80, h: 3, horas: 1, txt: "Dia 80, 3 h da manhã. O alarme tocou: oxigênio em 2,2 mg/L e camarão subindo para a borda. Cada minuto conta. Em 1 hora o oxigênio tem que estar em 5 ou mais, sem perder mais de 1% do lote.",
@@ -1265,7 +1268,7 @@ TX.ajuda = {
   sulfeto: [["Ar no máximo antes de mexer no fundo.", "O rodo solta lodo e sulfeto na água."], ["Passe o rodo (Ferramentas).", "Acaba com a zona morta: cada rodo corta o sulfeto pela metade."], ["Ligue o decantador e aplique Nutrat.", "Tira o lodo que subiu."], ["No dia seguinte, rodo de novo.", "Uma vez só não limpa seis semanas."], ["Daqui para frente, rodo toda semana.", "É o que evita o problema."]],
   cloro: [["Pegue o tiossulfato na estante de preparo e aplique 60 g no tanque.", "7 g por m³ para cada 1 mg/L: tira o cloro na hora."], ["Ar no máximo.", "Ajuda o resto do cloro a sair."], ["Meça o cloro: tem que dar zero.", "Só o teste confirma."], ["Aplique simbiótico.", "O cloro também matou parte do floco."]],
   nitrito: [["Meça nitrito, alcalinidade e salinidade.", "O cloreto protege: nível seguro de 15 mg/L a 25 ppt e de 6 mg/L a 15 ppt (Lin e Chen 2003)."], ["Bicarbonato até a alcalinidade passar de 150.", "As bactérias do nitrito param sem alcalinidade."], ["Ração −15% e ar no máximo.", "Menos amônia entrando e mais oxigênio para a nitrificação."], ["Não troque água nem aplique cloro.", "Você perderia as bactérias que estão resolvendo."], ["Paciência: meça todo dia.", "O nitrito cai quando a segunda turma de bactérias cresce."]],
-  vibrio: [["Baixe a ração em 30 a 40% e confira a bandeja.", "Vibrio vive de sobra de ração e matéria orgânica."], ["Descarte a bombona azedada e refaça: prebiótico no balde (24 h) e bombona com Bactrat P (24 h).", "Sem bacilos vivos o Vibrio toma conta. No bioflocos, o probiótico subiu a sobrevivência de 77% para 92% (Aguilera-Rivera 2014)."], ["Enquanto o simbiótico fermenta, 30 g de Bactrat P direto na água por dia (regra do app; sem estudo da dose).", "Põe bacilos na água já, sem esperar 48 h."], ["Com o simbiótico pronto, 40 L por dia até o Vibrio baixar (regra do app, decisão do Wagner; sem estudo da dose).", "Os bacilos do simbiótico tomam o lugar do Vibrio."], ["Ar no máximo, nada de rodo e semeie a placa TCBS.", "Camarão estressado adoece mais; o rodo levanta matéria orgânica; a placa é a única medida de Vibrio que você tem."]],
+  vibrio: [["Baixe a ração em 30 a 40% e confira a bandeja.", "Vibrio vive de sobra de ração e matéria orgânica."], ["Descarte a bombona azedada e refaça: lote no balde fechado (12 h) e bombona com Bactrat P (12 h).", "Sem bacilos vivos o Vibrio toma conta. No bioflocos, o probiótico subiu a sobrevivência de 77% para 92% (Aguilera-Rivera 2014)."], ["Enquanto o simbiótico fermenta, 30 g de Bactrat P direto na água por dia (regra do app; sem estudo da dose).", "Põe bacilos na água já, sem esperar 48 h."], ["Com o lote pronto, lote dobrado todo dia até o Vibrio baixar (o dobro da dose diária, como os 40 L que o Wagner escolheu na bombona; regra do app, sem estudo da dose).", "Os bacilos do simbiótico tomam o lugar do Vibrio."], ["Ar no máximo, nada de rodo e semeie a placa TCBS.", "Camarão estressado adoece mais; o rodo levanta matéria orgânica; a placa é a única medida de Vibrio que você tem."]],
 };
 
 </script>
@@ -1351,20 +1354,20 @@ function tarefas() {
   if (!a.cheio) { add("Encher o tanque com 20 a 25 ppt.", "Caixa d'água e registro"); return out; }
   // bombona e balde
   if (!j.bombona) {
-    if (!bd.on && b.fase === "vazia") add("Fazer o prebiótico no balde (fica 24 h).", "Bombona e balde");
-    if (bd.on && b.fase === "vazia") { const hb = (st.t - bd.t0) / 60; add(hb >= 24 ? "Montar o simbiótico: leve o Bactrat P até a bombona." : "Prebiótico fermentando: faltam " + nf(24 - hb, 0) + " h para montar o simbiótico.", "Estante Só Bioflocos e bombona"); }
-    if (b.fase === "simbio") { const p = E.leit(st, "phBomb"), novo = p && p.t >= b.t0 ? p : null; if (!novo || st.t - novo.t > 8 * 60) add("Medir o pH da bombona.", "Bombona e balde"); else if (novo.v < 7) add("pH da bombona em " + nf(novo.v, 1) + ": pôr 80 g de bicarbonato (faixa 7,0–7,5 do caderno; dose regra do app).", "Bombona e balde", 1);
-      if (!bd.on) add("Deixar um balde novo de prebiótico fermentando.", "Bombona e balde"); }
+    if (!bd.on && b.fase === "vazia") add("Fazer o lote do simbiótico no balde fechado (fica 12 h).", "Bombona e balde");
+    if (bd.on && b.fase === "vazia") { const hb = (st.t - bd.t0) / 60; add(hb >= 12 ? "Passar o lote para a bombona: leve o Bactrat P até ela." : "Lote fechado no balde: faltam " + nf(12 - hb, 0) + " h para passar à bombona.", "Estante Só Bioflocos e bombona"); }
+    if (b.fase === "simbio") { const p = E.leit(st, "phBomb"), novo = p && p.t >= b.t0 ? p : null; if (!novo || st.t - novo.t > 8 * 60) add("Medir o pH da bombona.", "Bombona e balde"); else if (novo.v < 7) add("pH do lote em " + nf(novo.v, 1) + ": pôr bicarbonato (faixa 7,0–7,5 do caderno; 80 g é regra do app).", "Bombona e balde", 1);
+      if (st.t - b.t0 >= 12 * 60 && E.simbHoje(st)) add("O lote está pronto: ponha o lote inteiro no tanque.", "Bombona e tanque"); }
   }
   if (!(cm.n > 0) && !cm.despescado) { // preparo da água
-    const cl = le("cl"), al = le("alk", 72), pronto = b.fase === "simbio" && st.t - b.t0 >= 24 * 60;
+    const cl = le("cl"), al = le("alk", 72), pronto = b.fase === "simbio" && st.t - b.t0 >= 12 * 60;
     if (a.ClMax < 1 && !G.feito.inocular_nitrificante && !G.feito.inocular_vizinho) add("Desinfetar a água com cloro HTH (cerca de 310 g, 10 mg/L).", "Estante de preparo e tanque");
     else if (a.ClMax >= 1 && (!cl || cl.v > 0 || cl.t < st.t - 36 * 60)) { if (st.estufa.aeracao !== "max") add("Abrir o ar no máximo para o cloro sair.", "Soprador"); add(cl && cl.v > 0 ? "Cloro ainda em " + nf(cl.v, 1) + " mg/L: esperar (Relógio) e medir de novo. Tiossulfato tira na hora." : "Medir o cloro até dar zero.", "Bancada de análises"); return out; }
     if (!al) add("Medir a alcalinidade.", "Bancada de análises"); else if (al.v < 150) add("Alcalinidade em " + nf(al.v, 0) + ": corrigir com bicarbonato até 150 a 180.", "Estante Só Bioflocos");
     if (!le("sal", 200)) add("Medir a salinidade.", "Bancada de análises");
-    if (!G.feito.inocular_nitrificante && !G.feito.inocular_vizinho) add("Escolher o inóculo: nitrificante comercial (limpo) ou floco do vizinho.", "Estante de preparo");
+    if (!G.feito.inocular_nitrificante && !G.feito.inocular_vizinho && !G.feito.nh4cl) add("Maturação da tese: todo dia 1 lote do simbiótico + 20 g de cloreto de amônio (estante de preparo). Inóculo é opcional.", "Estante de preparo");
     if (pronto) { if (!G.feito.simbiotico) add("Aplicar o primeiro simbiótico no tanque.", "Bombona e tanque"); { const ta = le("tan", 74), ni = le("no2", 74); if (!ta || !ni) add("Medir amônia e nitrito antes de povoar: o manual só povoa com os dois abaixo de 1.", "Bancada de análises"); else if (ta.v >= 1 || ni.v >= 1) add("Amônia ou nitrito em 1 ou mais: esperar a água amadurecer (simbiótico e Relógio) e medir de novo antes de povoar.", "Relógio"); } add("Povoar: pegar as pós-larvas e aclimatar antes de soltar.", "Chegada das pós-larvas", 1); }
-    else add("Esperar o simbiótico ficar pronto para povoar. Use o Relógio.", "Relógio");
+    else add("Esperar o lote do simbiótico ficar pronto (12 h fechado + 12 h com ar). Use o Relógio.", "Relógio");
     return out;
   }
   if (cm.despescado) return [{ t: "Ciclo despescado.", onde: "", urg: 0 }];
@@ -1480,8 +1483,8 @@ function usarNoTanque() {
   if (k === "simb") return abre("Simbiótico no tanque", c => {
     const b = st.bombona; if (b.fase !== "simbio") { P(c, "A bombona está vazia."); G.mao = null; return; }
     const s = G.modo === "real" ? null : E.appDoses(st).find(x => x.k === "simbiotico");
-    const le = dose(c, { un: "L", min: 1, max: Math.max(1, Math.round(b.litros)), passo: 1, val: Math.min(Math.round(b.litros), s ? s.qtd : 20), nota: (s ? s.txt + " " : "") + "Restam " + Math.round(b.litros) + " L na bombona." });
-    c.appendChild(bt("Despejar sobre os difusores", () => { faz("simbiotico", { L: le() }); if (st.bombona.fase !== "simbio") G.mao = null; fecha(); }, "p")); });
+    P(c, (s ? s.txt + " " : "") + "O lote tem " + nf(b.litros, 1) + " L e vai inteiro.", "nota");
+    c.appendChild(bt("Despejar o lote sobre os difusores", () => { faz("simbiotico"); if (st.bombona.fase !== "simbio") G.mao = null; fecha(); }, "p")); });
   if (it.fixo) return abre(it.n, c => { P(c, it.t); c.appendChild(bt("Colocar no tanque", () => { faz(it.fixo); G.mao = null; fecha(); }, "p")); });
   abre(it.n, c => {
     P(c, it.t); const s = sug(k);
@@ -1550,19 +1553,18 @@ function prateleira(tit, lista) {
 function bombona() {
   abre("Bombona e balde", c => {
     const b = st.bombona, bd = st.balde, hb = (st.t - b.t0) / 60, ph = E.leit(st, "phBomb");
-    P(c, "Balde: " + (bd.on ? "prebiótico fermentando há " + nf((st.t - bd.t0) / 60, 0) + " h (precisa de 24 h)." : "vazio."));
-    P(c, "Bombona: " + (b.fase === "simbio" ? "simbiótico há " + nf(hb, 0) + " h, " + Math.round(b.litros) + " L." + (hb < 24 ? " Ainda maturando (24 h)." : " Pronto para usar.") + (b.morta ? " AZEDOU: bactérias mortas, descarte." : "") + (ph && ph.t >= b.t0 ? " Último pH medido: " + nf(ph.v, 1) + "." : " pH ainda não medido.") : "vazia."));
-    if (!bd.on) c.appendChild(bt(b.fase === "vazia" ? "Fazer 4 baldes de prebiótico (partida)" : "Fazer o balde de prebiótico do dia", () => { faz("prebiotico"); bombona(); }, b.fase === "vazia" ? "p" : ""));
-    if (b.fase === "vazia") { if (G.mao === "bactrat") c.appendChild(bt("Montar o simbiótico com Bactrat P", () => { const r = faz("simbio_iniciar"); if (r.ok) G.mao = null; bombona(); }, "p")); else P(c, "Para montar o simbiótico, traga o Bactrat P da estante Só Bioflocos (com o prebiótico de 24 h pronto).", "nota"); }
+    P(c, "Balde: " + (bd.on ? "lote fechado há " + nf((st.t - bd.t0) / 60, 0) + " h (precisa de 12 h)." : "vazio."));
+    P(c, "Bombona: " + (b.fase === "simbio" ? "lote com ar há " + nf(hb, 0) + " h, " + nf(b.litros, 1) + " L." + (hb < 12 ? " Ainda no ar (12 h)." : " Pronto: vai inteiro para o tanque.") + (b.morta ? " AZEDOU: bactérias mortas, descarte." : "") + (ph && ph.t >= b.t0 ? " Último pH medido: " + nf(ph.v, 1) + "." : " pH ainda não medido.") : "vazia."));
+    if (!bd.on) { c.appendChild(bt("Fazer o lote do simbiótico (receita da tese)", () => { faz("prebiotico"); bombona(); }, b.fase === "vazia" ? "p" : "")); c.appendChild(bt("Fazer lote dobrado (emergência)", () => { faz("prebiotico", { x: 2 }); bombona(); })); }
+    if (b.fase === "vazia") { if (G.mao === "bactrat") c.appendChild(bt("Montar o simbiótico com Bactrat P", () => { const r = faz("simbio_iniciar"); if (r.ok) G.mao = null; bombona(); }, "p")); else P(c, "Para passar o lote à bombona, traga o Bactrat P da estante Só Bioflocos (com o lote de 12 h fechado pronto).", "nota"); }
     else {
-      if (bd.on && st.t - bd.t0 >= 24 * 60 && !b.morta) c.appendChild(bt("Pôr o balde de prebiótico na bombona", () => { faz("simbio_iniciar"); bombona(); }, "p"));
       c.appendChild(bt("Medir o pH da bombona (3 min)", () => { faz("bombona_ph"); bombona(); }));
       c.appendChild(bt("Pôr 80 g de bicarbonato na bombona", () => { faz("bombona_bicarb"); bombona(); }));
       if (G.mao === "catalisador") { const le = dose(c, { un: "mL", min: 10, max: 150, passo: 10, val: 50, nota: "Com o pH da bombona perto de 7. O líquido engrossa e flocula." }); c.appendChild(bt("Pôr o catalisador", () => { faz("bombona_cat", { mL: le() }); bombona(); }, "p")); }
-      c.appendChild(bt("Encher o balde de simbiótico e levar ao tanque", () => pega("simb"), hb >= 24 ? "p" : ""));
+      c.appendChild(bt("Levar o lote ao tanque", () => pega("simb"), hb >= 12 ? "p" : ""));
       let arm = false; const d = bt("Descartar e lavar a bombona", () => { if (!arm) { arm = true; d.textContent = "Toque de novo para confirmar"; return; } faz("bombona_descartar"); bombona(); }, "r"); c.appendChild(d);
     }
-    if (G.modo === "aprender") P(c, "Dica: o pH da bombona cai a cada hora. Abaixo de 5 as bactérias morrem. Mantenha entre 7,0 e 7,5: abaixo de 7, ponha 80 g de bicarbonato (faixa do caderno; a dose é regra do app). Rotina: 4 baldes na partida, depois 1 balde por dia; 24 h depois saem 20 L para o tanque.", "nota");
+    if (G.modo === "aprender") P(c, "Dica: receita da tese do Pimentel. Por m³ de tanque: 20 g de puim + 2 g de açúcar + 2 g de bicarbonato + 0,3 g de Bactrat P, água 10× o farelo. 12 h no balde fechado, 12 h na bombona com ar, e o lote inteiro vai para o tanque. Todo dia na maturação e até o dia 15; depois 3 vezes por semana. Abaixo de pH 5 as bactérias morrem.", "nota");
   });
 }
 function registroAgua() {
@@ -2046,6 +2048,239 @@ function quadro(agora) {
 }
 addEventListener("pagehide", () => { if (G) salva(); });
 capa(); requestAnimationFrame(quadro);
+/* ---------- comando de voz (mãos livres): fala a ação, o jogo executa e responde em voz ----------
+   Usa o reconhecimento e a voz do próprio navegador (Chrome no Android). Sem custo e sem chave.
+   Depois de ligado, escuta de novo sozinho depois de cada resposta. "Parar voz" desliga.
+   As respostas só usam o que o jogo já tem: motor, celular (app), tarefas, glossário, emergências e ajuda dos desafios. */
+{ // bloco próprio: nomes da voz não se misturam com os do jogo
+const V = { on: false, falando: false, ouvindo: false, buf: [], ult: "", erros: 0, quiz: null, conf: null, pend: null, mis: -1, alarme: false, lock: null };
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const sem = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+/* números falados → algarismos ("duzentos e cinquenta" → 250, "sete vírgula cinco" → 7.5, "um e meio" → 1.5) */
+const NUM = { zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13, catorze: 14, quatorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90, cem: 100, cento: 100, duzentos: 200, duzentas: 200, trezentos: 300, trezentas: 300, quatrocentos: 400, quatrocentas: 400, quinhentos: 500, quinhentas: 500, seiscentos: 600, seiscentas: 600, setecentos: 700, setecentas: 700, oitocentos: 800, oitocentas: 800, novecentos: 900, novecentas: 900 };
+function numeros(s) {
+  s = s.replace(/(\d)\.(\d{3})(?!\d)/g, "$1$2").replace(/(\d),(\d)/g, "$1.$2").replace(/%/g, " por cento");
+  const t = s.split(/\s+/), out = []; let i = 0;
+  const ehN = w => w in NUM || w === "mil";
+  while (i < t.length) {
+    if (!ehN(t[i])) { if ((t[i] === "meio" || t[i] === "meia") && !(i && /^(da|de|do|na|no)$/.test(t[i - 1]))) { out.push("0.5"); i++; continue; } out.push(t[i]); i++; continue; }
+    let tot = 0, g = 0, dec = null;
+    while (i < t.length) {
+      const w = t[i];
+      if (w === "mil") { tot += (g || 1) * 1000; g = 0; i++; continue; }
+      if (w in NUM) { g += NUM[w]; i++; continue; }
+      if (w === "e" && i + 1 < t.length && (ehN(t[i + 1]) || t[i + 1] === "meio" || t[i + 1] === "meia")) { if (t[i + 1] === "meio" || t[i + 1] === "meia") { dec = 0.5; i += 2; break; } i++; continue; }
+      if ((w === "virgula" || w === "ponto") && i + 1 < t.length && t[i + 1] in NUM) { i++; let d = ""; while (i < t.length && t[i] in NUM && NUM[t[i]] < 10) { d += NUM[t[i]]; i++; } if (!d && t[i] in NUM) { d = String(NUM[t[i]]); i++; } dec = +("0." + d); break; }
+      break;
+    }
+    out.push(String(tot + g + (dec || 0)));
+  }
+  return out.join(" ").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
+}
+const UNI = [[/^(kg|quilos?|kilos?)$/, "kg"], [/^(g|gramas?|gr)$/, "g"], [/^(ml|mililitros?)$/, "mL"], [/^(l|litros?)$/, "L"], [/^baldes?$/, "balde"], [/^copos?$/, "copo"]];
+function qtd(s) { // primeiro número com unidade opcional
+  const m = s.match(/(\d+(?:\.\d+)?)\s*([a-z]+)?/); if (!m) return null;
+  let v = +m[1], u = null; if (m[2]) for (const [re, n] of UNI) if (re.test(m[2])) { u = n; break; }
+  return { v, u };
+}
+/* texto para a voz: unidades por extenso; oxigênio em % com mg/L entre parênteses (regra do Wagner) */
+function falaTxt(s) {
+  return String(s).replace(/\s*CaCO₃/g, "").replace(/O₂/g, "O2").replace(/NH₃/g, "amônia tóxica").replace(/NH₄⁺/g, "amônio").replace(/CO₂/g, "gás carbônico").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus")
+    .replace(/mg\/L/g, " miligramas por litro").replace(/mL\/L/g, " mililitros por litro").replace(/(\d)\s?mL\b/g, "$1 mililitros").replace(/(\d)\s?kg\b/g, "$1 quilos").replace(/(\d)\s?g\b/g, "$1 gramas").replace(/(\d)\s?L\b/g, "$1 litros")
+    .replace(/(\d)\s?h\b/g, "$1 horas").replace(/\bppt\b/g, "partes por mil").replace(/−/g, "menos ").replace(/×/g, " vezes ").replace(/≥/g, "maior ou igual a ").replace(/≤/g, "menor ou igual a ").replace(/→/g, ", ").replace(/[›•·]/g, ", ").replace(/\s+/g, " ").trim();
+}
+function odTxt(v) { const a = st.agua, s = a.cheio ? E.doSat(a.T, a.S) : 0; return s ? nf(v / s * 100, 0) + "% (" + nf(v, 1) + " mg/L)" : nf(v, 1) + " mg/L"; }
+const PN = { od: "oxigênio", temp: "temperatura", ph: "pH", sal: "salinidade", alk: "alcalinidade", tan: "amônia", no2: "nitrito", no3: "nitrato", cl: "cloro", cone: "cone Imhoff", ca: "cálcio", mg: "magnésio", k: "potássio", peso: "peso médio", phBomb: "pH da bombona" };
+const PU = { temp: "°C", sal: "ppt", alk: "mg/L", tan: "mg/L", no2: "mg/L", no3: "mg/L", cl: "mg/L", cone: "mL/L", ca: "mg/L", mg: "mg/L", k: "mg/L", peso: "g", ph: "", phBomb: "" };
+const leTxt = (k, r) => (PN[k] + " " + (k === "od" ? odTxt(r.v) : nf(r.v, k === "ph" || k === "phBomb" ? 1 : r.v === 0 ? 0 : r.v < 1 ? 2 : r.v < 10 ? 1 : 0) + " " + PU[k])).trim();
+const PW = [[/oxigenio|\bod\b/, "od"], [/temperatura/, "temp"], [/\bph\b|pe aga|p h\b/, "ph"], [/salinidade|\bsal\b/, "sal"], [/alcalinidade/, "alk"], [/amonia/, "tan"], [/nitrito/, "no2"], [/nitrato/, "no3"], [/cloro/, "cl"], [/\bcone\b|imhoff|solidos/, "cone"], [/calcio/, "ca"], [/magnesio/, "mg"], [/potassio/, "k"]];
+const params = s => PW.filter(([re]) => re.test(s)).map(x => x[1]);
+/* produtos: palavra falada → item do jogo (TX.itens) */
+const PROD = [[/acido|fosforico/, "acido_fosforico"], [/nutrat/, "nutrat"], [/puim|farelo/, "farelo"], [/acucar/, "acucar"], [/\bcal\b|cal hidratada/, "cal_hidratada"], [/gesso/, "gesso"], [/bicarbonato/, "bicarbonato"], [/oxitrat/, "oxitrat"], [/tiossulfato/, "tiossulfato"], [/hth|cloro/, "hth"], [/potassio|kcl/, "kcl"], [/magnesio|sulfato/, "mgso4"], [/nitrificante/, "nitrificante"], [/vizinho/, "vizinho"]];
+function diz(t) { if (t && V.buf.indexOf(t) < 0) V.buf.push(t); }
+
+/* ---- o que o jogo responde ---- */
+function idadeTxt(t) { return idade(t).replace("há ", "há "); }
+function estado(curto) {
+  const d = dataLocal(), a = st.agua, cm = st.camarao, out = [];
+  out.push(d.dia + ", " + d.hm + ".");
+  if (!a.cheio) out.push("O tanque está vazio.");
+  else if (cm.n > 0 && cm.povoado != null) out.push("Dia " + Math.floor((st.t - cm.povoado) / 1440) + " de cultivo.");
+  else if (cm.despescado) out.push("Ciclo despescado.");
+  else out.push("Preparo da água, sem camarão.");
+  if (a.cheio) {
+    const ks = curto ? ["od", "temp", "ph", "tan", "no2"] : ["od", "temp", "ph", "tan", "no2", "alk", "sal", "cone", "cl"], ms = [];
+    ks.forEach(k => { const r = E.leit(st, k); if (r && st.t - r.t <= 72 * 60 && !(k === "cl" && cm.n > 0)) ms.push(leTxt(k, r) + ", " + idadeTxt(r.t)); });
+    out.push(ms.length ? "Últimas medidas: " + ms.join("; ") + "." : "Nada medido nos últimos 3 dias. Você só sabe o que medir.");
+    out.push("Ar " + (st.estufa.aeracao === "max" ? "no máximo" : "normal") + ", sombrite " + (st.estufa.sombrite ? "fechado" : "aberto") + ".");
+    if (st.bombona.fase === "simbio") out.push("Bombona com " + Math.round(st.bombona.litros) + " litros de simbiótico" + (st.bombona.morta ? ", azedou" : "") + ".");
+  }
+  const L = E.appLote(st); if (L) out.push("Estimativa do celular: " + nf(L.vivos, 0) + " camarões com " + nf(L.W, 1) + " g, " + nf(L.biomKg, 0) + " kg.");
+  const al = cm.n > 0 ? E.appAlertas(st) : []; if (al.length) out.push("Alertas do celular: " + al.map(x => x.txt).join("; ") + ".");
+  const jm = E.janelaMuda(E.agoraMs(st)); if (jm) out.push("Janela de muda: " + jm + ".");
+  return out.join(" ");
+}
+function dica(n) {
+  const l = tarefas().slice(0, n || 3); let t = l.length ? (l.length > 1 ? "Próximos passos: " : "Próximo passo: ") + l.map((x, i) => (l.length > 1 ? (i + 1) + ", " : "") + x.t).join(" ") : "Nada pendente agora. Diga: avançar até o próximo trato.";
+  if (G.modo === "aprender" && TX.missoes[G.mis]) t += " Missão: " + TX.missoes[G.mis].t;
+  return t;
+}
+function explica(s) {
+  const q = s.replace(/^.*?(o que (e|sao|significa)|explica(r)?|explique|me fala (sobre|de)|fala sobre|conta sobre|como funciona)\s*/, "").replace(/^(o|a|os|as|um|uma)\s+/, ""), ws = q.split(/\s+/).filter(w => w.length >= 3);
+  if (!ws.length) return null;
+  const hit = (txt) => ws.filter(w => sem(txt).indexOf(w) >= 0).length;
+  for (const k in TX.itens) { const it = TX.itens[k]; if (it.d && hit(it.n) && hit(it.n) >= Math.min(ws.length, 1)) return it.n + ": " + it.d; }
+  let best = null, bs = 0; TX.gloss.forEach(g => { const h = hit(g[0]) * 2 + hit(g[1]) * 0.2; if (h > bs) { bs = h; best = g; } });
+  if (best && bs >= 1) return best[0] + ": " + best[1];
+  const em = TX.emerg.find(e => hit(e[0])); if (em) return "Emergência, " + em[0] + ": " + em[1];
+  return null;
+}
+const AJUDA = "Você pode falar: como está o tanque; o que fazer; medir oxigênio e pH; medir tudo; dar o trato; trato de 200 gramas; aplicar Nutrat; puim 600 gramas; bicarbonato 1 quilo; simbiótico 20 litros; fazer o prebiótico; pH da bombona; ar no máximo; fechar o sombrite; passar o rodo; biometria; avançar 2 horas; avançar até o próximo trato; desfazer; o que é nitrito; repetir; e parar voz.";
+
+/* ---- executar ---- */
+function age(tipo, p) { const m0 = G.mis, r = faz(tipo, p, true); diz(r.msg); if (r.ok && G.modo === "aprender" && G.mis !== m0 && TX.missoes[G.mis]) diz("Missão cumprida. Próxima: " + TX.missoes[G.mis].t); return r; }
+function medir(ks) {
+  ks.forEach(k => { const r = faz("medir", { k }, true); if (!r.ok) return diz(r.msg); const v = G.leu(k); diz(k === "od" ? "Oxigênio " + odTxt(v) + "." : r.msg + "." + (TX.faixa[k] ? " Faixa boa: " + TX.faixa[k] + "." : "")); quizMedida(k, v); });
+}
+function aplicar(k, s) {
+  const it = TX.itens[k]; if (!it) return;
+  if (it.fixo) return age(it.fixo);
+  const q = qtd(s); let v = null;
+  if (q) { v = q.v; if (q.u === "kg") v *= 1000; if (q.u === "L" && it.un === "mL") v *= 1000; if (it.mult && q.u === "g") v = v / it.mult; }
+  if (v == null) {
+    let sg = sug(k); if (!sg) { const d = E.appDoses(st).find(x => x.k === k || (k === "bicarbonato" && x.k === "alc")); if (d && typeof d.qtd === "number") sg = [d.qtd, d.txt || ""]; }
+    if (!sg || !(sg[0] > 0)) { V.pend = { k }; return diz("Quanto de " + it.n + "? Diga a quantidade em " + (it.un === "balde" ? "baldes" : it.un === "copo" ? "copos" : it.un) + "."); }
+    v = Math.round(sg[0]); diz("Pela conta do celular: " + nf(v) + " " + it.un + ".");
+  }
+  v = clamp(v, it.min || 0, it.max || 1e9); if (!(v > 0)) return diz("Quantidade inválida.");
+  age(it.ac, { [it.par]: v * (it.mult || 1) });
+}
+function trato(s) {
+  if (!(st.camarao.n > 0)) return diz("Ainda não há camarão no tanque.");
+  const q = qtd(s), r = E.appRacao(st); let g = q ? q.v * (q.u === "kg" ? 1000 : 1) : null;
+  if (g == null) { if (!r) return diz("Diga a quantidade em gramas."); if (r.final === 0) return diz("O celular manda suspender o trato agora pela água. Se quiser mesmo, diga a quantidade."); g = r.porTrato; diz("Trato pela conta do celular: " + g + " gramas."); }
+  age("trato", { g });
+}
+function avanca(min) {
+  if (st.fim) return diz("O ciclo já terminou.");
+  guarda("passar o tempo"); skip = null; const fim = st.t + min; V.alarme = false; const ev0 = V.buf.length;
+  while (st.t < fim && !st.fim && !V.alarme) { const m = Math.min(60 - (st.t % 60 || 0) || 60, fim - st.t); E.avancar(st, m); posTempo(); }
+  salva(); hud(); const d = dataLocal();
+  V.buf.splice(ev0, 0, "Agora é " + d.dia + ", " + d.hm + "." + (V.alarme ? " Parei por causa do alarme." : ""));
+  if (V.buf.length === ev0 + 1) diz("Nada de novo no caminho.");
+  if (G.modo === "desafio" && G.des && G.des.fim) return;
+  diz(dica(1));
+}
+function proxTrato() { const hs = E.horasTrato(st.camarao.W || 1), h = dataLocal().h, n = hs.find(x => x > h + 0.01); return ((n != null ? n : hs[0] + 24) - h) * 60; }
+function trata(bruto) {
+  const s = numeros(sem(bruto)).replace(/[.,!?]+$/g, "").trim(); if (!s) return;
+  const tem = re => re.test(s);
+  if (tem(/\b(parar|desligar|desliga|encerrar|tchau)\b.*\bvoz\b|^(parar|desligar|tchau|encerrar)$/)) return desliga("Comando de voz desligado.");
+  if (tem(/\b(repete|repetir|repita|de novo|nao entendi|fala de novo)\b/) && s.length < 24) return diz(V.ult || "Nada para repetir.");
+  if (tem(/\b(ajuda|comandos|o que (eu )?posso (falar|dizer))\b/) && !(G && G.modo === "desafio" && tem(/desafio|passos/))) return diz(AJUDA);
+  if (!G || !st) { if (tem(/continu|abrir|carregar/)) { for (let k = 0; k < 5; k++) if (meta(k)) { carrega(k); return diz("Abri: " + meta(k) + ". " + dica(1)); } return diz("Não há jogo salvo."); } return diz("Abra ou comece um jogo na tela. Depois é só falar."); }
+  if (V.quiz) { const q = V.quiz, m = s.match(/\b([1-4])\b/); if (m) { V.quiz = null; const i = +m[1] - 1; diz((i === q.c ? "Isso mesmo. " : "Não é o melhor caminho. A certa é: " + q.o[q.c] + ". ") + q.e); fecha(); return; } if (!tem(/repet/)) { V.quiz = null; fecha(); } }
+  if (V.conf) { const c = V.conf; V.conf = null; if (tem(/\b(sim|confirmo|confirmar|pode|isso)\b/)) return c(); diz("Cancelado."); if (!tem(/\b(nao|cancela)\b/)) return trata(bruto); return; }
+  if (V.pend && /^\d/.test(s) && !params(s).length) { const p = V.pend; V.pend = null; return aplicar(p.k, s); } V.pend = null;
+  if (tem(/\b(desfaz|desfazer|volta|voltar atras)\b/)) { if (!desf) return diz("Não tenho o que desfazer."); const n = desf.nome; desfazer(); return diz("Desfeito: " + n + ". Agora " + dataLocal().hm + "."); }
+  if (tem(/\b(fechar|fecha|comecar|continuar|ok|entendi)\b/) && folhaAberta && s.length < 16) { fecha(); return diz(dica(1)); }
+  if (tem(/que horas|que dia|hora[s]? (e|sao)/)) { const d = dataLocal(); return diz(d.dia + ", " + d.hm + "."); }
+  if (tem(/^(o que e|o que sao|o que significa|explica|explique|me fala sobre|fala sobre|como funciona)/)) { const x = explica(s); return diz(x || "Não achei isso no glossário do jogo."); }
+  if (G.modo === "desafio" && tem(/\b(ajuda|passos|desafio|meta)\b/)) { const d = TX.desafios.find(x => x.id === G.des.id), ps = TX.ajuda[d.id] || []; return diz(d.n + ". " + d.txt + " Passos: " + ps.map((p, i) => (i + 1) + ", " + p[0] + " Porque " + p[1]).join(" ")); }
+  if (tem(/\b(missao|licao)\b/)) { const m = TX.missoes[G.mis]; return diz(m ? "Missão: " + m.t + " Dica: " + (m.d || "") + " Lição: " + (m.l || "") : "Sem missão agora."); }
+  if (tem(/\b(como (esta|ta)|estado|status|situacao|resumo|relatorio|me (atualiza|conta))\b/)) return diz(estado(tem(/rapido|curto/)));
+  if (tem(/\b(o que (eu )?(faco|fazer|tenho)|proximo passo|dica|pendente|tarefa|e agora)\b/)) return diz(dica(3));
+  // tempo
+  if (tem(/\b(avanc|passa|passar|pular|pula|esperar|espera|adianta)/)) {
+    if (tem(/proximo trato/)) return avanca(Math.max(10, proxTrato()));
+    if (tem(/amanha/)) { const h = dataLocal().h; return avanca(Math.round(((24 - h) + 6) * 60)); }
+    const q = s.match(/(\d+(?:\.\d+)?)\s*(minutos?|min|horas?|h|dias?)/); let m = 60;
+    if (q) m = +q[1] * (/^d/.test(q[2]) ? 1440 : /^h/.test(q[2]) ? 60 : 1); else if (tem(/meia hora/)) m = 30; else if (tem(/\bdia\b/)) m = 1440;
+    return avanca(clamp(Math.round(m), 5, 3 * 1440));
+  }
+  // bombona
+  if (tem(/bombona|balde/) && tem(/\bph\b/) || tem(/ph da bombona/)) { faz("bombona_ph", null, true); const r = E.leit(st, "phBomb"); return diz(r ? "pH da bombona: " + nf(r.v, 1) + ". Faixa do caderno 7,0 a 7,5; abaixo de 7, 80 gramas de bicarbonato (dose regra do app)." : "Não consegui medir o pH da bombona."); }
+  if (tem(/bicarbonato/) && tem(/bombona/)) return age("bombona_bicarb");
+  if (tem(/prebiotico|fazer o balde|balde do dia/)) return age("prebiotico");
+  if (tem(/(montar|iniciar|comecar).*simbiotico|bactrat|balde na bombona|por o balde/)) return age("simbio_iniciar");
+  if (tem(/catalisador/)) { const q = qtd(s); return age("bombona_cat", { mL: q ? q.v : 50 }); }
+  if (tem(/descartar.*bombona|lavar a bombona/)) { V.conf = () => age("bombona_descartar"); return diz("Descartar e lavar a bombona? Diga sim para confirmar."); }
+  if (tem(/simbiotico/)) { if (st.bombona.fase !== "simbio") return diz("A bombona está vazia. Diga: fazer o prebiótico."); const q = qtd(s), sd = E.appDoses(st).find(x => x.k === "simbiotico"); const L = q ? q.v : sd && typeof sd.qtd === "number" ? sd.qtd : 20; if (!q) diz("Simbiótico: " + nf(L) + " litros" + (sd ? ", pela conta do celular." : ".")); return age("simbiotico", { L: Math.min(L, Math.round(st.bombona.litros)) }); }
+  // medir e consultar
+  const ks = params(s), verbo = tem(/\b(medir|mede|meca|medicao|analisa|analisar|testar|teste|leitura)\b/);
+  if (tem(/\bmedir tudo|mede tudo|todas as medidas|medir (a )?agua/)) return medir(tem(/tudo|todas/) ? ["od", "temp", "ph", "sal", "alk", "tan", "no2", "cone"] : ["od", "temp", "ph"]);
+  if (verbo && ks.length) return medir(ks);
+  if (ks.length && tem(/\b(qual|quanto|ultim)/) && !qtd(s)) return diz(ks.map(k => { const r = E.leit(st, k); return r ? leTxt(k, r) + ", medido " + idadeTxt(r.t) : PN[k] + " ainda não medido. Diga: medir " + PN[k]; }).join(". ") + ".");
+  if (tem(/\b(olhar|olha|ver a agua|como esta a agua)\b/)) { const r = faz("olhar", null, true); st.obsEspuma = E.espuma(st); return diz(r.msg); }
+  if (tem(/bandeja/)) return age("bandeja");
+  if (tem(/microscopio/)) return age("microscopio");
+  if (tem(/tcbs|placa/)) return age("tcbs");
+  if (tem(/\bpcr\b/)) return age("pcr");
+  if (tem(/biometria|pesar/)) return age("biometria");
+  if (tem(/\brodo\b/)) return age("rodo");
+  if (tem(/sonda/)) return age("instalar_sonda");
+  if (tem(/academia|ar no maximo|aeracao (no )?maximo|abrir o ar|ar (forte|maximo)/)) return age("aeracao", { nivel: "max" });
+  if (tem(/ar (no )?normal|baixar o ar|voltar o ar|aeracao normal/)) return age("aeracao", { nivel: "normal" });
+  if (tem(/sombrite/)) return age("sombrite", { fechar: !tem(/\b(abrir|abre|tirar|recolher)\b/) });
+  if (tem(/decantador/)) { const quer = !tem(/\b(desligar|desliga|parar)\b/); if (st.estufa.decantador === quer) return diz("O decantador já está " + (quer ? "ligado." : "desligado.")); return age("decantador"); }
+  if (tem(/\bencher\b/)) { if (st.agua.cheio) return diz("O tanque já está cheio."); const m = s.match(/(\d+(?:\.\d+)?)/); return age("encher", { sal: clamp(m ? +m[1] : 22, 10, 35) }); }
+  if (tem(/agua doce|repor/)) { const q = qtd(s), d = E.appDoses(st).find(x => x.k === "agua_doce"); const L = q ? q.v * (q.u === "kg" ? 1 : 1) : d ? d.qtd : null; if (!L) { return diz("Quantos litros de água doce?"); } return age("agua_doce", { L: clamp(L, 50, 8000), comCloro: tem(/torneira/) }); }
+  if (tem(/\btroca(r)?\b/)) { const q = qtd(s); if (!q) return diz("Quantos litros quer trocar?"); return age("troca", { L: clamp(q.v, 50, 8000), sal: G.leu("sal") || 22 }); }
+  if (tem(/povoar|soltar (as )?(pos|larvas)|povoamento/)) { if (st.camarao.n > 0) return diz("O tanque já está povoado."); const m = s.match(/(250|500|750|1000)/), dens = m ? +m[1] : 500, acl = !tem(/sem aclimatar|direto/); const r = age("povoar", { densidade: dens, aclimatar: acl }); if (r.ok) G.mao = null; return; }
+  if (tem(/despesca/)) { if (tem(/total|tudo|final/)) { V.conf = () => age("despesca", { fracao: 1 }); return diz("Despesca total encerra o ciclo. Diga sim para confirmar."); } return age("despesca", { fracao: 0.3 }); }
+  if (tem(/azomite/)) { const q = qtd(s); return age("azomite_racao", { gkg: clamp(q ? q.v : 3, 0, 6) }); }
+  if (tem(/\b(trato|racao|alimentar|alimenta|comida|tratar)\b/)) return trato(s);
+  const pr = PROD.find(([re]) => re.test(s)); if (pr) return aplicar(pr[1], s);
+  if (ks.length) return medir(ks);
+  if (tem(/^(o que|como|por que|porque|qual)/)) { const x = explica(s); if (x) return diz(x); }
+  V.erros++; if (V.erros <= 2) diz("Não entendi: " + bruto + ". Diga ajuda para ouvir os comandos.");
+}
+
+/* ---- ouvir e falar ---- */
+let rc = null, vozPt = null;
+function escolheVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find(v => /pt[-_]BR/i.test(v.lang) && /google/i.test(v.name)) || vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null; }
+if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = escolheVoz; }
+function fala(txt, depois) {
+  if (!window.speechSynthesis) { if (depois) depois(); return; }
+  V.falando = true; try { rc && rc.abort(); } catch (e) { }
+  speechSynthesis.cancel(); const partes = falaTxt(txt).match(/[^.;:!?]+[.;:!?]*/g) || [txt]; let n = 0, fim = false;
+  const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
+  V.trava = setTimeout(acabou, falaTxt(txt).length * 95 + 4000); // o Chrome às vezes não avisa o fim
+  partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); n++; });
+  mostra("🔊 " + txt);
+}
+function ouve() {
+  if (!V.on || V.falando || V.ouvindo || !rc) return;
+  try { rc.start(); V.ouvindo = true; mostra("🎙️ Ouvindo…"); } catch (e) { }
+}
+function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, ouve); } else ouve(); }
+function vozLiga() {
+  if (!SR) return aviso("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.", "alarme", 8000);
+  rc = new SR(); rc.lang = "pt-BR"; rc.interimResults = false; rc.maxAlternatives = 1; rc.continuous = false;
+  rc.onresult = e => { const t = e.results[e.results.length - 1][0].transcript; V.ouvindo = false; mostra("🗣️ " + t); try { trata(t); if (V.buf.length) V.erros = 0; } catch (er) { diz("Deu um erro ao fazer isso."); } if (V.on) responde(); };
+  rc.onend = () => { V.ouvindo = false; if (V.on && !V.falando) setTimeout(ouve, 300); };
+  rc.onerror = e => { V.ouvindo = false; if (e.error === "not-allowed" || e.error === "service-not-allowed") desliga("Sem permissão para o microfone. Libere o microfone para este site."); };
+  V.on = true; V.erros = 0; botao();
+  try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); } catch (e) { }
+  diz("Comando de voz ligado. " + (G && st ? estado(true) + " " + dica(1) : "Abra ou comece um jogo na tela.") + " Diga ajuda para ouvir os comandos.");
+  responde();
+}
+function desliga(msg) { V.on = false; V.quiz = V.conf = V.pend = null; try { rc && rc.abort(); } catch (e) { } try { V.lock && V.lock.release(); } catch (e) { } V.lock = null; botao(); V.buf = []; if (msg) fala(msg); else { try { speechSynthesis.cancel(); } catch (e) { } mostra(""); } }
+document.addEventListener("visibilitychange", () => { if (V.on && document.visibilityState === "visible" && navigator.wakeLock) navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); });
+/* avisos e perguntas do jogo também saem em voz quando o comando de voz está ligado */
+const avisoTela = aviso; aviso = function (txt, cls, ms) { avisoTela(txt, cls, ms); if (V.on) { if (cls === "alarme") V.alarme = true; diz(txt); } };
+const quizTela = quiz; quiz = function (k) { const ja = G.quiz[k]; quizTela(k); if (V.on && !ja) { const q = TX.quiz[k]; V.quiz = q; diz("Pergunta: " + q.q + " " + q.o.map((t, i) => "Opção " + (i + 1) + ": " + t).join(". ") + ". Responda com o número."); } };
+/* botão e faixa de status */
+const vst = document.createElement("style"); vst.textContent = "#bVoz{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:42%;width:58px;height:58px;border-radius:50%;border:2px solid #ffffff55;background:#16323d;color:#fff;font-size:26px;z-index:30;box-shadow:0 2px 10px #0008}#bVoz.on{background:#b3261e;animation:vozp 1.4s infinite}@keyframes vozp{50%{box-shadow:0 0 0 10px #b3261e33}}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 92px);max-width:min(560px,calc(100% - 32px));background:#0d1b22e6;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:30;pointer-events:none}";
+document.head.appendChild(vst);
+const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); document.body.appendChild(bVoz);
+const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidden = true; document.body.appendChild(vozTxt);
+function mostra(t) { vozTxt.hidden = !t || !V.on && !V.falando; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
+function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹" : "🎤"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
+bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
+window.__voz = { trata: t => { V.buf = []; trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, falaTxt, V };
+}
+
 window.__jogo = { get st() { return st; }, get G() { return G; }, tarefas, desfazer, fazerAgora, usar, EST, celular, relogio, guia, pular, iniciaDesafio, ajudaDes, rumo, relatorio };
 })();
 
