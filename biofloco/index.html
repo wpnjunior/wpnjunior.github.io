@@ -1541,10 +1541,10 @@ function numeros(s) {
       break; }
     out.push(String(tot + g + (dec || 0)));
   }
-  return out.join(" ").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
+  return out.join(" ").replace(/(\d+)\s+(virgula|ponto)\s+(\d+)/g, "$1.$3").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
 }
 function falaTxt(s) {
-  return String(s).replace(/\s*CaCO₃/g, "").replace(/NH₃/g, "amônia tóxica").replace(/O₂/g, "O2").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus").replace(/mg\/L/g, " miligramas por litro").replace(/mL\/L/g, " mililitros por litro")
+  return String(s).replace(/(\d+)\.(\d+)/g, (m, a, b) => b.length === 3 && a !== "0" ? m : a + "," + b).replace(/\s*CaCO₃/g, "").replace(/NH₃/g, "amônia tóxica").replace(/O₂/g, "O2").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus").replace(/mg\/L/g, " miligramas por litro").replace(/mL\/L/g, " mililitros por litro")
     .replace(/UFC\/mL/g, " colônias por mililitro").replace(/(\d)\s?mL\b/g, "$1 mililitros").replace(/(\d)\s?kg\b/g, "$1 quilos").replace(/(\d)\s?g\b/g, "$1 gramas").replace(/(\d)\s?L\b/g, "$1 litros").replace(/\bppt\b/g, "partes por mil")
     .replace(/−/g, "menos ").replace(/×/g, " vezes ").replace(/≥/g, "maior ou igual a ").replace(/[⚠✔·›•]/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -1566,6 +1566,10 @@ async function grava(r, id) { id = id || ("r" + Date.now().toString(36) + Math.r
 function idadeD(data) { const d = diasEntre(data.slice(0, 10), hoje()); return d <= 0 ? (data.length > 10 ? "hoje às " + data.slice(11, 16) : "hoje") : d === 1 ? "ontem" : "há " + d + " dias"; }
 
 /* ---- respostas do app ---- */
+function curtoApp() { const al = alertas(), od = leituraRecente("od", hoje()), it = agendaDo(hoje()).filter(x => !x.feito)[0], o = [];
+  if (od) o.push("Oxigênio " + odFala(od.v) + ", " + idadeD(od.data) + ".");
+  o.push(al.length ? "Alertas: " + al.slice(0, 2).map(a => a[1]).join("; ") + "." : "Sem alertas."); if (it) o.push("Próximo: " + it.hora + ", " + it.t + ".");
+  return o.join(" ") + " Diga resumo completo para ouvir tudo."; }
 function resumo() {
   const out = [], dc = diaCultivo(hoje());
   out.push(dc == null ? "Tanque sem data de povoamento." : dc < 0 ? "Preparo da água, faltam " + (-dc) + " dias para povoar." : "Dia " + dc + " de cultivo.");
@@ -1589,13 +1593,14 @@ async function lancaLeitura(s) {
   await grava({ tipo: "leitura", data: o.data, valores: v, obs: "lançado por voz" });
   diz("Lancei" + ondeGrava() + ": " + Object.keys(v).map(k => PNv(k) + " " + valFala(k, v[k])).join("; ") + ".");
   const fx = Object.keys(v).filter(k => fora(k, v[k])).map(k => PNv(k) + " " + fora(k, v[k]) + ", a faixa boa é " + faixaTxt(k)); if (fx.length) diz("Atenção: " + fx.join("; ") + ".");
-  if (v.od != null && v.od < 3) diz("Oxigênio abaixo de 3: a ração do dia passa para suspender."); else if (v.od != null && v.od < 4) diz("Oxigênio abaixo de 4: a ração do dia cai 20%.");
+  if (v.od != null && v.od < 3) diz("Oxigênio abaixo de " + odFala(3) + ": a ração do dia passa para suspender."); else if (v.od != null && v.od < 4) diz("Oxigênio abaixo de " + odFala(4) + ": a ração do dia cai 20%.");
   const x = nh3(v.tan ?? (leituraRecente("tan", hoje()) || {}).v, v.ph ?? (leituraRecente("ph", hoje()) || {}).v, v.temp); if (x != null && x > 0.03 && (v.tan != null || v.ph != null)) diz("Amônia tóxica calculada: " + f(x, 3) + " mg/L, acima de 0,03.");
   const al = alertas().filter(a => a[0] === "bad"); if (al.length) diz("Alertas críticos: " + al.slice(0, 3).map(a => a[1] + ". " + a[2]).join(" "));
 }
 async function lancaTrato(s) {
   const q = s.match(/(\d+(?:\.\d+)?)\s*(kg|quilos?|kilos?|g|gramas?)?/); if (!q) return diz("Quantos gramas foram no trato?");
-  const g = +q[1] * (/^(kg|qui|kil)/.test(q[2] || "") ? 1000 : 1), dia = hoje(); let i = tratosDoDia(dia).length + 1; while (recs.some(r => r.id === "racao_" + dia + "_" + i)) i++;
+  const g = +q[1] * (/^(kg|qui|kil)/.test(q[2] || "") ? 1000 : 1), dia = hoje(), rr = diaCultivo(dia) >= 0 ? recomendacao(dia) : null;
+  if (!V.ok && rr && rr.porTrato > 0 && g > 1.5 * rr.porTrato) { V.conf = () => { V.ok = true; return lancaTrato(s).finally(() => V.ok = false); }; return diz(n0(g) + " g é mais que uma vez e meia o trato do app, que é " + n0(rr.porTrato) + " g. Confirma? Diga sim."); } let i = tratosDoDia(dia).length + 1; while (recs.some(r => r.id === "racao_" + dia + "_" + i)) i++;
   const d = new Date(), h = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"), b = /bandeja/.test(s) ? (/vazia|zer|limpa|comeu tudo/.test(s) ? "Vazia" : /muita|sobrou muito/.test(s) ? "Muita" : /pouca|pouco|sobr/.test(s) ? "Pouca" : "") : "", rac = prodRacao();
   await grava(Object.assign({ tipo: "racao", dia, trato: i, data: dia + "T" + h, hora: h, qtd: g, bandeja: b, muda: false }, rac ? { produto: rac.id } : {}), "racao_" + dia + "_" + i);
   const tot = tratosDoDia(dia).reduce((x, r) => x + (r.qtd || 0), 0), r = diaCultivo(dia) >= 0 ? recomendacao(dia) : null;
@@ -1607,7 +1612,7 @@ function produtoDe(s) { const a = ALIAS.find(([re]) => re.test(s)); if (a && PRO
 async function lancaAplicacao(s) {
   const p = produtoDe(s); if (!p) return diz("Não achei o produto. Fale o nome como está no Estoque.");
   const q = s.match(/(\d+(?:\.\d+)?)\s*(kg|quilos?|kilos?|g|gramas?|ml|mililitros?|l|litros?)?/); if (!q) return diz("Quanto de " + p + "? Fale com a unidade.");
-  const u = q[2] || "", un = /^(kg|qui|kil)/.test(u) ? "kg" : /^(ml|mili)/.test(u) ? "mL" : /^(l|litro)/.test(u) ? "L" : "g";
+  const u = q[2] || "", un = /^(kg|qui|kil)/.test(u) ? "kg" : /^(ml|mili)/.test(u) ? "mL" : /^(l|litro)/.test(u) ? "L" : /nutrat|acido|catalisador/i.test(p) ? "mL" : "g";
   await grava({ tipo: "aplicacao", data: agora(), produto: p, qtd: +q[1], un, obs: "lançado por voz" });
   diz("Aplicação lançada" + ondeGrava() + ": " + f(+q[1], +q[1] % 1 ? 1 : 0) + " " + un + " de " + p + ". Baixa do Estoque.");
   const ds = typeof doseSug === "function" ? doseSug(p) : ""; if (ds) diz("Dose do Cadastro: " + ds + ".");
@@ -1623,8 +1628,10 @@ async function trata(bruto) {
   if (tem(/\b(ajuda|comandos|o que (eu )?posso (falar|dizer))\b/)) return diz("Você pode falar: como está o tanque; o que tenho para fazer; quanto de ração hoje; lançar oxigênio 95 por cento, temperatura 29, pH 7 vírgula 8; amônia 0 vírgula 5 e nitrito 1; trato de 300 gramas, bandeja vazia; apliquei 600 gramas de puim; mortalidade 12; biometria 3 vírgula 5 gramas; espuma fina; emergência oxigênio; desfazer; repetir; e parar voz.");
   if (V.conf) { const c = V.conf; V.conf = null; if (tem(/\b(sim|confirmo|pode|isso)\b/)) return c(); return diz("Cancelado."); }
   if (tem(/\b(desfaz|desfazer|apaga o ultimo|apagar o ultimo|cancela o ultimo)\b/)) { const id = V.meus.pop(); if (!id) return diz("Não lancei nada por voz para desfazer."); await del(id); try { render(); } catch (e) { } return diz("Apaguei o último lançamento por voz."); }
-  if (tem(/emergencia|socorro/)) return diz(emergFala(s));
-  if (tem(/\b(como (esta|ta)|resumo|status|situacao|alertas?|me (atualiza|conta))\b/) && !leituras(s).od) return diz(resumo());
+  if (tem(/emergencia|socorro|falta de luz|faltou luz|soprador parou/)) return diz(emergFala(s));
+  if (tem(/\b(como (esta|ta)|resumo|status|situacao|alertas?|me (atualiza|conta))\b/) && !leituras(s).od) return diz(tem(/complet|detalh|tudo/) ? resumo() : curtoApp());
+  if (tem(/\b(qual|quanto|ultim)/) && !/\d/.test(s)) { const ks = PWv.filter(([re]) => re.test(s)).map(x => x[1]).filter((k, i, a) => a.indexOf(k) === i && !(k === "ph" && a.indexOf("phb") >= 0)); if (ks.length) return diz(ks.map(k => { const u = leituraRecente(k, hoje()); return u ? PNv(k) + " " + valFala(k, u.v) + ", " + idadeD(u.data) : PNv(k) + ": sem medida lançada"; }).join(". ") + "."); }
+  if (tem(/\b(coloquei|pus|botei|apliquei|joguei)\b.*\b(simbiotico|lote)\b/) && !/\d/.test(s)) { const dia = hoje(), r = ritualDo(dia), it = Object.assign({}, r.itens || {}, { simb: true }); await grava({ tipo: "ritual", dia, data: dia + "T05:00", itens: it, espuma: r.espuma || "" }, "ritual_" + dia); return diz("Simbiótico de hoje marcado como feito" + ondeGrava() + "."); }
   if (tem(/\b(o que (eu )?(tenho|faco|fazer)|agenda|pendente|tarefas?)\b/)) return diz(agendaFala());
   if (tem(/\b(quanto|qual)\b.*\b(racao|trato)\b|racao (de|do) (hoje|dia)/)) return diz(racaoFala());
   if (tem(/espuma/)) return lancaEspuma(s);
@@ -1643,7 +1650,7 @@ function escolheVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find(
 if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = escolheVoz; }
 function fala(txt, depois) {
   if (!window.speechSynthesis) { if (depois) depois(); return; }
-  V.falando = true; try { rc && rc.abort(); } catch (e) { } if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); const ft = falaTxt(txt), partes = ft.match(/[^.;:!?]+[.;:!?]*/g) || [ft]; let fim = false;
+  V.falando = true; try { rc && rc.abort(); } catch (e) { } speechSynthesis.cancel(); const ft = falaTxt(txt), partes = ft.match(/[^.;:!?]+[.;:!?]*/g) || [ft]; let fim = false;
   const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
   V.trava = setTimeout(acabou, ft.length * 95 + 4000);
   partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); });
@@ -1662,12 +1669,12 @@ function vozLiga() {
 }
 function desliga(msg) { V.on = false; V.conf = null; try { rc && rc.abort(); } catch (e) { } try { V.lock && V.lock.release(); } catch (e) { } V.lock = null; botao(); V.buf = []; if (msg) fala(msg); else { try { speechSynthesis.cancel(); } catch (e) { } mostra(""); } }
 document.addEventListener("visibilitychange", () => { if (V.on && document.visibilityState === "visible" && navigator.wakeLock) navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); });
-const vst = document.createElement("style"); vst.textContent = "#bVoz.on{background:#b3261e;border-color:#b3261e;color:#fff}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);max-width:min(560px,calc(100% - 32px));background:#102030ee;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:60;pointer-events:none}";
+const vst = document.createElement("style"); vst.textContent = ".top>div:last-child{flex-wrap:wrap;justify-content:flex-end;min-width:0}.top>div:first-child{min-width:0}#btnNuvem{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media (max-width:430px){.top{gap:8px}.top h1{font-size:17px}#bVoz,#btnNuvem,#btnLancar{padding-left:9px;padding-right:9px}}#bVoz.on{background:#b3261e;border-color:#b3261e;color:#fff}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);max-width:min(560px,calc(100% - 32px));background:#102030ee;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:60;pointer-events:none}";
 document.head.appendChild(vst);
-const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.className = "btn"; bVoz.textContent = "🎤 Voz"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); { const l = document.getElementById("btnLancar"); if (l) l.parentNode.insertBefore(bVoz, l); else document.body.appendChild(bVoz); } // no topo, ao lado do + Lançar: não cobre nada da tela
+const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.className = "btn"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); { const l = document.getElementById("btnLancar"); if (l) l.parentNode.insertBefore(bVoz, l); else document.body.appendChild(bVoz); } // no topo, ao lado do + Lançar: não cobre nada da tela
 const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidden = true; document.body.appendChild(vozTxt);
 function mostra(t) { vozTxt.hidden = !t; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
-function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹ Voz" : "🎤 Voz"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
+function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹" : "🎤"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
 bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
 if (/[?&]teste=1/.test(location.search)) window.__voz = { trata: async t => { V.buf = []; await trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, leituras };
 }
