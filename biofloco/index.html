@@ -1518,6 +1518,159 @@ document.addEventListener("change",async e=>{if(e.target.dataset&&e.target.datas
   if(e.target.id==="notaFoto"&&e.target.files&&e.target.files[0]){try{fotoPend=await fotoReduzida(e.target.files[0]);$("#fotoOk").textContent="foto pronta ✔"}catch(er){toast("Não consegui ler a foto.")}return}
   if(e.target.id==="gSel"){chartSel=e.target.value;e.target.blur();render()}if(e.target.id==="rDia"&&e.target.value){racaoDia=e.target.value;e.target.blur();render()}});
 start();
+/* ===================== comando de voz (mãos livres) =====================
+   Lançar o manejo falando e ouvir a confirmação e a orientação do app. Voz do próprio navegador (Chrome no Android), sem custo.
+   Depois de ligado, escuta de novo sozinho depois de cada resposta. "Parar voz" desliga. Grava no perfil em uso, como o lançamento pela tela. */
+{
+const V = { on: false, falando: false, ouvindo: false, buf: [], ult: "", erros: 0, conf: null, meus: [], lock: null };
+const SRv = window.SpeechRecognition || window.webkitSpeechRecognition;
+const sem = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const NUM = { zero: 0, um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12, treze: 13, catorze: 14, quatorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19, vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90, cem: 100, cento: 100, duzentos: 200, duzentas: 200, trezentos: 300, trezentas: 300, quatrocentos: 400, quatrocentas: 400, quinhentos: 500, quinhentas: 500, seiscentos: 600, seiscentas: 600, setecentos: 700, setecentas: 700, oitocentos: 800, oitocentas: 800, novecentos: 900, novecentas: 900 };
+function numeros(s) {
+  s = s.replace(/(\d)\.(\d{3})(?!\d)/g, "$1$2").replace(/(\d),(\d)/g, "$1.$2").replace(/%/g, " por cento");
+  const t = s.split(/\s+/), out = []; let i = 0; const ehN = w => w in NUM || w === "mil";
+  while (i < t.length) {
+    if (!ehN(t[i])) { if ((t[i] === "meio" || t[i] === "meia") && !(i && /^(da|de|do|na|no)$/.test(t[i - 1]))) { out.push("0.5"); i++; continue; } out.push(t[i]); i++; continue; }
+    let tot = 0, g = 0, dec = null;
+    while (i < t.length) { const w = t[i];
+      if (w === "mil") { tot += (g || 1) * 1000; g = 0; i++; continue; }
+      if (w in NUM) { g += NUM[w]; i++; continue; }
+      if (w === "e" && i + 1 < t.length && (ehN(t[i + 1]) || t[i + 1] === "meio" || t[i + 1] === "meia")) { if (t[i + 1] === "meio" || t[i + 1] === "meia") { dec = 0.5; i += 2; break; } i++; continue; }
+      if ((w === "virgula" || w === "ponto") && i + 1 < t.length && t[i + 1] in NUM) { i++; let d = ""; while (i < t.length && t[i] in NUM && NUM[t[i]] < 10) { d += NUM[t[i]]; i++; } if (!d && t[i] in NUM) { d = String(NUM[t[i]]); i++; } dec = +("0." + d); break; }
+      break; }
+    out.push(String(tot + g + (dec || 0)));
+  }
+  return out.join(" ").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
+}
+function falaTxt(s) {
+  return String(s).replace(/\s*CaCO₃/g, "").replace(/NH₃/g, "amônia tóxica").replace(/O₂/g, "O2").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus").replace(/mg\/L/g, " miligramas por litro").replace(/mL\/L/g, " mililitros por litro")
+    .replace(/UFC\/mL/g, " colônias por mililitro").replace(/(\d)\s?mL\b/g, "$1 mililitros").replace(/(\d)\s?kg\b/g, "$1 quilos").replace(/(\d)\s?g\b/g, "$1 gramas").replace(/(\d)\s?L\b/g, "$1 litros").replace(/\bppt\b/g, "partes por mil")
+    .replace(/−/g, "menos ").replace(/×/g, " vezes ").replace(/≥/g, "maior ou igual a ").replace(/[⚠✔·›•]/g, " ").replace(/\s+/g, " ").trim();
+}
+/* parâmetros falados → chaves do app (PARAMS) */
+const PWv = [[/ph (da|do) (bombona|lote|simbiotico)/, "phb"], [/vibrio verde|colonias verdes|verdes/, "vibV"], [/vibrio amarel|colonias amarel|amarelas/, "vibA"], [/oxigenio|\bod\b/, "od"], [/temperatura/, "temp"], [/\bph\b|pe aga/, "ph"], [/salinidade/, "sal"], [/alcalinidade/, "alc"], [/amonia/, "tan"], [/nitrito/, "no2"], [/nitrato/, "no3"], [/\bcone\b|imhoff|solidos/, "ss"], [/calcio/, "ca"], [/magnesio/, "mg"], [/potassio/, "k"], [/cloro/, "cl"]];
+function leituras(s) { // "oxigênio 95 por cento temperatura 29 pH 7.8" → {odp:95,temp:29,ph:7.8}
+  const ach = []; PWv.forEach(([re, k]) => { const g = new RegExp(re.source, "g"); let m; while ((m = g.exec(s))) { if (!ach.some(a => m.index >= a.i && m.index < a.f)) ach.push({ k, i: m.index, f: m.index + m[0].length }); } });
+  ach.sort((a, b) => a.i - b.i); const o = {};
+  ach.forEach((a, j) => { const fim = j + 1 < ach.length ? ach[j + 1].i : s.length, tr = s.slice(a.f, fim), m = tr.match(/(\d+(?:\.\d+)?)/); if (!m) return; const v = +m[1];
+    if (a.k === "od") { if (/por cento|porcento|satura/.test(tr) || v > 20) o.odp = String(v); else o.od = String(v); } else o[a.k] = String(v); });
+  return o;
+}
+const PNv = k => (PARAMS.find(p => p.k === k) || { n: k }).n.replace(/\s*\(.*\)/, "");
+const odFala = v => typeof odT === "function" ? odT(v) : f(v, 1) + " mg/L";
+const valFala = (k, v) => (k === "od" ? odFala(v) : f(v, (PARAMS.find(p => p.k === k) || { d: 1 }).d) + " " + ((PARAMS.find(p => p.k === k) || {}).u || "")).trim();
+function diz(t) { if (t && V.buf.indexOf(t) < 0) V.buf.push(t); }
+const ondeGrava = () => typeof nomePerfil === "function" && nomePerfil() ? " no " + nomePerfil() : "";
+async function grava(r, id) { id = id || ("r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)); await put(r, id); V.meus.push(id); try { render(); } catch (e) { } return id; }
+function idadeD(data) { const d = diasEntre(data.slice(0, 10), hoje()); return d <= 0 ? (data.length > 10 ? "hoje às " + data.slice(11, 16) : "hoje") : d === 1 ? "ontem" : "há " + d + " dias"; }
+
+/* ---- respostas do app ---- */
+function resumo() {
+  const out = [], dc = diaCultivo(hoje());
+  out.push(dc == null ? "Tanque sem data de povoamento." : dc < 0 ? "Preparo da água, faltam " + (-dc) + " dias para povoar." : "Dia " + dc + " de cultivo.");
+  const ms = []; ["od", "temp", "ph", "tan", "no2", "alc", "sal", "ss"].forEach(k => { const u = leituraRecente(k, hoje()); if (u && diasEntre(u.data.slice(0, 10), hoje()) <= 3) ms.push(PNv(k) + " " + valFala(k, u.v) + ", " + idadeD(u.data)); });
+  out.push(ms.length ? "Últimas medidas: " + ms.join("; ") + "." : "Nenhuma medida nos últimos 3 dias.");
+  if (dc != null && dc >= 0) { const r = recomendacao(hoje()), tot = tratosDoDia(hoje()).reduce((s, x) => s + (x.qtd || 0), 0); out.push("Ração de hoje: " + n0(r.final) + " g em " + r.nt + " tratos, cerca de " + n0(r.porTrato) + " g por trato (" + r.acao.toLowerCase() + "). Já lançado hoje: " + n0(tot) + " g."); }
+  const al = alertas(); out.push(al.length ? "Alertas: " + al.slice(0, 5).map(a => a[1]).join("; ") + "." : "Sem alertas.");
+  return out.join(" ");
+}
+function agendaFala() { const it = agendaDo(hoje()).filter(x => !x.feito).slice(0, 5); return it.length ? "Pendente hoje: " + it.map(x => x.hora + ", " + x.t).join("; ") + "." : "Nada pendente na agenda de hoje."; }
+function racaoFala() { const dc = diaCultivo(hoje()); if (dc == null || dc < 0) return "Ainda não há camarão no tanque."; const r = recomendacao(hoje()), tr = tratosDoDia(hoje()), tot = tr.reduce((s, x) => s + (x.qtd || 0), 0);
+  return "Ração de hoje: " + n0(r.final) + " g em " + r.nt + " tratos, cerca de " + n0(r.porTrato) + " g por trato. " + r.acao + " em relação à base. Lançados " + tr.length + " tratos, " + n0(tot) + " g. " + (r.motivos && r.motivos.length > 2 ? "Motivo: " + r.motivos[r.motivos.length - 1].t + "." : ""); }
+function emergFala(s) { if (/oxigenio|boquej/.test(s)) s += " borda"; if (/energia|soprador/.test(s)) s += " falta luz"; const k = Object.keys(EMERG).find(k => sem(EMERG[k][0]).split(/\s+/).some(w => w.length > 3 && s.indexOf(w) >= 0)); if (!k) return "Emergências do app: " + Object.values(EMERG).map(e => e[0]).join("; ") + ". Diga emergência e o nome."; const e = EMERG[k]; return e[0] + ". Faça agora: " + e[2]().map(r => r[0] + ": " + r[1]).join(". ") + "."; }
+
+/* ---- lançar ---- */
+async function lancaLeitura(s) {
+  const o = leituras(s); if (!Object.keys(o).length) return diz("Não peguei os valores. Fale assim: oxigênio 95 por cento, temperatura 29, pH 7 vírgula 8.");
+  o.data = agora(); if (typeof odDePct === "function") odDePct(o); else if (o.odp && !o.od) return diz("Este app ainda lê o oxigênio só em miligramas por litro. Fale o valor em miligramas.");
+  if (o.odp && !o.od) return diz("Para converter o oxigênio de por cento para miligramas, preciso da temperatura e da salinidade. Fale junto: temperatura e salinidade.");
+  const v = {}; PARAMS.forEach(p => { const x = num(o[p.k]); if (x != null) v[p.k] = x; }); if (!Object.keys(v).length) return diz("Nada para lançar.");
+  await grava({ tipo: "leitura", data: o.data, valores: v, obs: "lançado por voz" });
+  diz("Lancei" + ondeGrava() + ": " + Object.keys(v).map(k => PNv(k) + " " + valFala(k, v[k])).join("; ") + ".");
+  const fx = Object.keys(v).filter(k => fora(k, v[k])).map(k => PNv(k) + " " + fora(k, v[k]) + ", a faixa boa é " + faixaTxt(k)); if (fx.length) diz("Atenção: " + fx.join("; ") + ".");
+  if (v.od != null && v.od < 3) diz("Oxigênio abaixo de 3: a ração do dia passa para suspender."); else if (v.od != null && v.od < 4) diz("Oxigênio abaixo de 4: a ração do dia cai 20%.");
+  const x = nh3(v.tan ?? (leituraRecente("tan", hoje()) || {}).v, v.ph ?? (leituraRecente("ph", hoje()) || {}).v, v.temp); if (x != null && x > 0.03 && (v.tan != null || v.ph != null)) diz("Amônia tóxica calculada: " + f(x, 3) + " mg/L, acima de 0,03.");
+  const al = alertas().filter(a => a[0] === "bad"); if (al.length) diz("Alertas críticos: " + al.slice(0, 3).map(a => a[1] + ". " + a[2]).join(" "));
+}
+async function lancaTrato(s) {
+  const q = s.match(/(\d+(?:\.\d+)?)\s*(kg|quilos?|kilos?|g|gramas?)?/); if (!q) return diz("Quantos gramas foram no trato?");
+  const g = +q[1] * (/^(kg|qui|kil)/.test(q[2] || "") ? 1000 : 1), dia = hoje(); let i = tratosDoDia(dia).length + 1; while (recs.some(r => r.id === "racao_" + dia + "_" + i)) i++;
+  const d = new Date(), h = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"), b = /bandeja/.test(s) ? (/vazia|zer|limpa|comeu tudo/.test(s) ? "Vazia" : /muita|sobrou muito/.test(s) ? "Muita" : /pouca|pouco|sobr/.test(s) ? "Pouca" : "") : "", rac = prodRacao();
+  await grava(Object.assign({ tipo: "racao", dia, trato: i, data: dia + "T" + h, hora: h, qtd: g, bandeja: b, muda: false }, rac ? { produto: rac.id } : {}), "racao_" + dia + "_" + i);
+  const tot = tratosDoDia(dia).reduce((x, r) => x + (r.qtd || 0), 0), r = diaCultivo(dia) >= 0 ? recomendacao(dia) : null;
+  diz("Trato " + i + " lançado" + ondeGrava() + ": " + n0(g) + " g" + (b ? ", bandeja " + b.toLowerCase() : "") + ". Total de hoje " + n0(tot) + " g" + (r ? " de " + n0(r.final) + " recomendados em " + r.nt + " tratos." : "."));
+  if (b === "Muita") diz("Sobrou muito na bandeja: o próximo trato deve ser menor. Sobra de ração gasta oxigênio e alimenta o Vibrio.");
+}
+const ALIAS = [[/puim|farelo/, "Farelo de arroz (puim)"], [/bicarbonato/, "Bicarbonato de sódio"], [/\bcal\b/, "Cal hidratada"], [/acido|fosforico/, "Ácido fosfórico 85%"], [/hth|cloro/, "Cloro HTH 65%"], [/potassio|kcl/, "Cloreto de potássio (KCl)"], [/magnesio/, "Sulfato de magnésio"], [/vitamina c/, "Vitamina C (ácido ascórbico)"], [/simbiotico|lote/, "Simbiótico (lote da tese)"], [/cloreto de amonio/, "Cloreto de amônio (maturação)"], [/sal marinho|\bsal\b/, "Sal marinho (salinizar a água)"], [/bactrat|probiotico/, "Bactrat P (probiótico)"]];
+function produtoDe(s) { const a = ALIAS.find(([re]) => re.test(s)); if (a && PRODUTOS.indexOf(a[1]) >= 0) return a[1]; return PRODUTOS.find(p => sem(p).split(/[\s()]+/).some(w => w.length >= 4 && s.indexOf(w) >= 0)) || null; }
+async function lancaAplicacao(s) {
+  const p = produtoDe(s); if (!p) return diz("Não achei o produto. Fale o nome como está no Estoque.");
+  const q = s.match(/(\d+(?:\.\d+)?)\s*(kg|quilos?|kilos?|g|gramas?|ml|mililitros?|l|litros?)?/); if (!q) return diz("Quanto de " + p + "? Fale com a unidade.");
+  const u = q[2] || "", un = /^(kg|qui|kil)/.test(u) ? "kg" : /^(ml|mili)/.test(u) ? "mL" : /^(l|litro)/.test(u) ? "L" : "g";
+  await grava({ tipo: "aplicacao", data: agora(), produto: p, qtd: +q[1], un, obs: "lançado por voz" });
+  diz("Aplicação lançada" + ondeGrava() + ": " + f(+q[1], +q[1] % 1 ? 1 : 0) + " " + un + " de " + p + ". Baixa do Estoque.");
+  const ds = typeof doseSug === "function" ? doseSug(p) : ""; if (ds) diz("Dose do Cadastro: " + ds + ".");
+  if (p === "Azomite") diz("Azomite vai na ração, 3 g por kg, teto 4."); if (p === "Cal hidratada") diz("Até 200 g por vez; meça o pH 1 hora depois.");
+}
+async function lancaEspuma(s) { const e = /fina|limpa|sprite/.test(s) ? "sprite" : /crespa|densa|marrom/.test(s) ? "marrom" : /sumiu|clara|sem espuma/.test(s) ? "sem" : null; if (!e) return diz("Como está a espuma: fina e limpa, crespa ou marrom, ou sumiu?");
+  const dia = hoje(), r = ritualDo(dia); await grava({ tipo: "ritual", dia, data: dia + "T05:00", itens: r.itens || {}, espuma: e }, "ritual_" + dia);
+  diz({ sprite: "Espuma boa: Nutrat na dose normal.", marrom: "Espuma crespa: Nutrat de hoje dobra, metade de manhã e metade à noite. Antes, esvazie o copo do skimmer.", sem: "Espuma sumiu: manter ou pausar o Nutrat e reduzir o simbiótico." }[e]); }
+async function trata(bruto) {
+  const s = numeros(sem(bruto)).replace(/[.,!?]+$/g, "").trim(); if (!s) return; const tem = re => re.test(s);
+  if (tem(/\b(parar|desligar|desliga|encerrar|tchau)\b.*\bvoz\b|^(parar|desligar|tchau|encerrar)$/)) return desliga("Comando de voz desligado.");
+  if (tem(/\b(repete|repetir|repita|de novo|nao entendi)\b/) && s.length < 24) return diz(V.ult || "Nada para repetir.");
+  if (tem(/\b(ajuda|comandos|o que (eu )?posso (falar|dizer))\b/)) return diz("Você pode falar: como está o tanque; o que tenho para fazer; quanto de ração hoje; lançar oxigênio 95 por cento, temperatura 29, pH 7 vírgula 8; amônia 0 vírgula 5 e nitrito 1; trato de 300 gramas, bandeja vazia; apliquei 600 gramas de puim; mortalidade 12; biometria 3 vírgula 5 gramas; espuma fina; emergência oxigênio; desfazer; repetir; e parar voz.");
+  if (V.conf) { const c = V.conf; V.conf = null; if (tem(/\b(sim|confirmo|pode|isso)\b/)) return c(); return diz("Cancelado."); }
+  if (tem(/\b(desfaz|desfazer|apaga o ultimo|apagar o ultimo|cancela o ultimo)\b/)) { const id = V.meus.pop(); if (!id) return diz("Não lancei nada por voz para desfazer."); await del(id); try { render(); } catch (e) { } return diz("Apaguei o último lançamento por voz."); }
+  if (tem(/emergencia|socorro/)) return diz(emergFala(s));
+  if (tem(/\b(como (esta|ta)|resumo|status|situacao|alertas?|me (atualiza|conta))\b/) && !leituras(s).od) return diz(resumo());
+  if (tem(/\b(o que (eu )?(tenho|faco|fazer)|agenda|pendente|tarefas?)\b/)) return diz(agendaFala());
+  if (tem(/\b(quanto|qual)\b.*\b(racao|trato)\b|racao (de|do) (hoje|dia)/)) return diz(racaoFala());
+  if (tem(/espuma/)) return lancaEspuma(s);
+  if (tem(/mortalidade|morreram|mortos|morte/)) { const m = s.match(/(\d+)/); if (!m) return diz("Quantos mortos?"); await grava({ tipo: "mortalidade", data: hoje(), qtd: +m[1], obs: "lançado por voz" }); const L = lote(hoje()), p = L.vivos ? +m[1] / L.vivos * 100 : 0; diz("Mortalidade lançada" + ondeGrava() + ": " + m[1] + " camarões, " + f(p, 2) + "% do lote estimado." + (p > 0.5 ? " Acima de 0,5%: a ração de amanhã cai 20%." : "")); return; }
+  if (tem(/biometria|peso medio|pesei/)) { const ns = (s.match(/\d+(?:\.\d+)?/g) || []).map(Number); let peso = null, r = { tipo: "biometria", data: hoje(), obs: "lançado por voz" };
+    if (ns.length >= 2 && /camaroes/.test(s)) { r.n = ns[0]; r.pesoTotal = ns[1]; peso = ns[1] / ns[0]; } else if (ns.length) peso = ns[0]; if (!peso) return diz("Fale o peso médio em gramas, ou quantos camarões e o peso total.");
+    r.peso = Math.round(peso * 1000) / 1000; await grava(r); return diz("Biometria lançada" + ondeGrava() + ": peso médio " + f(peso, peso < 1 ? 3 : 2) + " g. A ração passa a usar este peso. " + racaoFala()); }
+  if (tem(/\b(trato|tratei|racao|alimentei|dei)\b/) && !produtoDe(s.replace(/racao/g, ""))) return lancaTrato(s);
+  if (Object.keys(leituras(s)).length && !tem(/\b(apliquei|coloquei|botei|pus|aplicar|aplicacao)\b/)) return lancaLeitura(s);
+  if (tem(/\b(apliquei|coloquei|botei|pus|joguei|aplicar|aplicacao|dei)\b/) || produtoDe(s)) return lancaAplicacao(s);
+  V.erros++; if (V.erros <= 2) diz("Não entendi: " + bruto + ". Diga ajuda para ouvir os comandos.");
+}
+/* ---- ouvir e falar ---- */
+let rc = null, vozPt = null;
+function escolheVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find(v => /pt[-_]BR/i.test(v.lang) && /google/i.test(v.name)) || vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null; }
+if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = escolheVoz; }
+function fala(txt, depois) {
+  if (!window.speechSynthesis) { if (depois) depois(); return; }
+  V.falando = true; try { rc && rc.abort(); } catch (e) { } speechSynthesis.cancel(); const ft = falaTxt(txt), partes = ft.match(/[^.;:!?]+[.;:!?]*/g) || [ft]; let fim = false;
+  const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
+  V.trava = setTimeout(acabou, ft.length * 95 + 4000);
+  partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); });
+  mostra("🔊 " + txt);
+}
+function ouve() { if (!V.on || V.falando || V.ouvindo || !rc) return; try { rc.start(); V.ouvindo = true; mostra("🎙️ Ouvindo…"); } catch (e) { } }
+function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, ouve); } else ouve(); }
+function vozLiga() {
+  if (!SRv) return toast("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.");
+  rc = new SRv(); rc.lang = "pt-BR"; rc.interimResults = false; rc.maxAlternatives = 1; rc.continuous = false;
+  rc.onresult = async e => { const t = e.results[e.results.length - 1][0].transcript; V.ouvindo = false; mostra("🗣️ " + t); try { await trata(t); if (V.buf.length) V.erros = 0; } catch (er) { diz("Não consegui salvar: " + ((er && er.message) || "erro") + "."); } if (V.on) responde(); };
+  rc.onend = () => { V.ouvindo = false; if (V.on && !V.falando) setTimeout(ouve, 300); };
+  rc.onerror = e => { V.ouvindo = false; if (e.error === "not-allowed" || e.error === "service-not-allowed") desliga("Sem permissão para o microfone. Libere o microfone para este site."); };
+  V.on = true; V.erros = 0; botao(); try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); } catch (e) { }
+  diz("Comando de voz ligado" + ondeGrava() + ". " + resumo() + " Diga ajuda para ouvir os comandos."); responde();
+}
+function desliga(msg) { V.on = false; V.conf = null; try { rc && rc.abort(); } catch (e) { } try { V.lock && V.lock.release(); } catch (e) { } V.lock = null; botao(); V.buf = []; if (msg) fala(msg); else { try { speechSynthesis.cancel(); } catch (e) { } mostra(""); } }
+document.addEventListener("visibilitychange", () => { if (V.on && document.visibilityState === "visible" && navigator.wakeLock) navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); });
+const vst = document.createElement("style"); vst.textContent = "#bVoz{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);width:58px;height:58px;border-radius:50%;border:2px solid #fff;background:#1d4f91;color:#fff;font-size:26px;z-index:60;box-shadow:0 2px 10px #0006;cursor:pointer}#bVoz.on{background:#b3261e;animation:vozp 1.4s infinite}@keyframes vozp{50%{box-shadow:0 0 0 10px #b3261e33}}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);max-width:min(560px,calc(100% - 32px));background:#102030ee;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:60;pointer-events:none}";
+document.head.appendChild(vst);
+const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); document.body.appendChild(bVoz);
+const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidden = true; document.body.appendChild(vozTxt);
+function mostra(t) { vozTxt.hidden = !t; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
+function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹" : "🎤"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
+bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
+if (/[?&]teste=1/.test(location.search)) window.__voz = { trata: async t => { V.buf = []; await trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, leituras };
+}
+/* ===================== fim do comando de voz ===================== */
 })();
 </script>
 </body></html>
