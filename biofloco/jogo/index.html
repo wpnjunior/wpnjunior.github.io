@@ -729,8 +729,8 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
         const x = bd.x || 1, gb = Math.max(1, Math.round(0.3 * V * x)); if (!gasta(st, "bactrat", gb)) { ok = false; msg = "Falta Bactrat P."; break; } /* tese: 0,2–0,4 g de Bacillus por m³; a quantidade de Bactrat é regra do app */
         const lit = 0.2 * V * x; Object.assign(b, { fase: "simbio", t0: st.t, tf: st.t, pH: 7.2, litros: lit, lit0: lit, x, Cg: 8.376 * V * x, Ng: 0.4344 * V * x, qual: 0, bicarb: false, cat: false, avisou2: false, morta: false }); bd.on = false;
         msg = `Lote na bombona com ${gb} g de Bactrat P, ar forte por 12 h. Depois vai inteiro para o tanque.`; min = TEMPO.bombona; logA(st, msg); break; }
-      case "bombona_bicarb": { const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Sem simbiótico na bombona."; break; } if (!gasta(st, "bicarbonato", 80)) { ok = false; msg = "Falta bicarbonato."; break; }
-        b.bicarb = true; b.pH = Math.min(7.5, b.pH + 1.2); msg = b.morta ? "80 g de bicarbonato na bombona, mas as bactérias já morreram (pH passou abaixo de 5)." : "80 g de bicarbonato na bombona: o pH sobe de novo."; min = 5; logA(st, msg); break; }
+      case "bombona_bicarb": { const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Sem simbiótico na bombona."; break; } const gB = Math.round(2 * V * (b.x || 1)); if (!gasta(st, "bicarbonato", gB)) { ok = false; msg = "Falta bicarbonato."; break; } /* mais uma dose de bicarbonato do lote da tese (2 g/m³); o resgate e o efeito no pH são regra do app */
+        b.bicarb = true; b.pH = Math.min(7.5, b.pH + 1.2); msg = b.morta ? gB + " g de bicarbonato na bombona, mas as bactérias já morreram (pH passou abaixo de 5)." : gB + " g de bicarbonato na bombona (a dose do lote): o pH sobe de novo."; min = 5; logA(st, msg); break; }
       case "bombona_cat": { const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Sem simbiótico na bombona."; break; } const mL = p.mL || 50; if (!gasta(st, "catalisador", mL)) { ok = false; msg = "Falta catalisador."; break; }
         if (b.pH < 6.8) { ok = false; msg = "Suba o pH da bombona para 7 com bicarbonato antes do catalisador."; st.estoque.catalisador += mL; break; }
         b.cat = true; msg = "Catalisador na bombona: o líquido engrossa e flocula na hora."; min = 5; logA(st, msg); break; }
@@ -1109,7 +1109,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     if (pf.tratos && h === 21 && uma("bandeja")) A("bandeja");
   }
 
-  const API = { _efic: v => (EFIC = v), horasTrato, piloto, simbHoje, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
+  const API = { _efic: v => (EFIC = v), vol: Vm3, horasTrato, piloto, simbHoje, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
     pctTabela, tratosTabela, curvaPeso, TANK, ITENS, PRECOS, TABELA, CURVA, interp, LC_NO2, LC_NH3, SAFE };
   if (typeof module !== "undefined" && module.exports) module.exports = API; else root.BFEngine = API;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -1136,7 +1136,7 @@ TX.itens = {
   nh4cl: { n: "Cloreto de amônio", d: "Amônia para as nitrificantes na maturação.", cor: "#e6e3f0", onde: "tanque", un: "g", max: 200, passo: 5, ac: "nh4cl", par: "g", t: "Maturação da tese do Pimentel: 1 g por m³ por dia (20 g no tanque), junto com o lote do simbiótico, sem camarão. Com amônia acima de 1, não ponha." },
   kcl: { n: "Cloreto de potássio", d: "Repõe potássio.", cor: "#d99a9a", onde: "tanque", un: "g", max: 3000, passo: 50, ac: "kcl", par: "g", t: "Só depois de medir potássio. Corrigir no escuro desequilibra a proporção com o magnésio." },
   mgso4: { n: "Sulfato de magnésio", d: "Repõe magnésio.", cor: "#a9c7a0", onde: "tanque", un: "g", max: 5000, passo: 100, ac: "mgso4", par: "g", t: "Só depois de medir magnésio." },
-  nitrificante: { n: "Nitrificante comercial", d: "Inóculo limpo de bactérias nitrificantes.", cor: "#4f7cac", onde: "tanque", fixo: "inocular_nitrificante", t: "Encurta o pico de nitrito sem trazer doença. Só depois do cloro zerar." },
+  nitrificante: { n: "Nitrificante comercial", d: "Inóculo limpo de nitrificante 1 (Nitrosomonas: amônia em nitrito) e nitrificante 2 (Nitrobacter e Nitrospira: nitrito em nitrato).", cor: "#4f7cac", onde: "tanque", fixo: "inocular_nitrificante", t: "Encurta o pico de nitrito sem trazer doença. Só depois do cloro zerar." },
   vizinho: { n: "Floco do vizinho", d: "200 L de água madura. Rápido, com risco.", cor: "#7a5a33", onde: "tanque", fixo: "inocular_vizinho", t: "Traz floco pronto, mas pode trazer doença junto." },
   maleta: { n: "Bancada de análises", d: "Sonda, kits, cone, microscópio.", cor: "#e0a13a", onde: "tanque" },
   racao: { n: "Balde de ração", d: "Ração 40% de proteína.", cor: "#6b4a2b", onde: "tanque" },
@@ -1260,7 +1260,7 @@ TX.ajuda = {
   alc: [["Meça alcalinidade e pH.", "Para saber quanto falta."], ["Bicarbonato: (160 − alcalinidade) × m³ ÷ 0,6. Divida em 2 ou 3 aplicações no dia.", "Bicarbonato sobe a reserva sem dar pico de pH."], ["Se usar cal hidratada, no máximo 200 g por vez.", "Cal demais dispara o pH e passa de 8,6."], ["No dia seguinte, meça e complete.", "A nitrificação continua gastando alcalinidade."]],
   calor: [["Feche o sombrite já.", "Corta metade da luz e do calor que entra."], ["Ar no máximo.", "Água quente segura menos oxigênio e o camarão gasta mais."], ["Meça a temperatura às 9, 12 e 15 h.", "Para ver se está cedendo."], ["Baixe a ração em 10 a 25% enquanto passar de 32 °C.", "Acima de 32 o apetite cai e a sobra vira problema."], ["Mantenha o sombrite fechado nos três dias.", "Abrir à tarde devolve o calor."]],
   cone: [["Ligue o decantador.", "É o que tira floco de verdade."], ["Nutrat em dobro (manhã e tarde) e ar no máximo.", "Sólido alto gasta oxigênio."], ["Ração −15% e sem puim extra.", "Menos comida, menos sólido novo."], ["Meça o cone todo dia.", "Desligue o decantador quando chegar a 10 para não tirar o floco bom."]],
-  verde: [["Feche o sombrite e deixe fechado.", "Sem luz a alga para de consumir CO₂ e o pH para de subir."], ["Meça o pH às 10 e às 13 h.", "É a hora do pico."], ["Com pH acima de 8,5 e amônia tóxica acima de 0,1: ácido fosfórico 0,5 mL por m³ por vez, até 7,5 a 7,8.", "Baixa o pH na hora; gasta alcalinidade e deixa fósforo, por isso em dose pequena."], ["Amônia acima de 1: menos ração e açúcar (20 g por grama de amônia por m³).", "Tira a amônia sem mexer no pH."], ["Siga com simbiótico e puim.", "O floco de bactéria toma o lugar da alga."], ["Nada de ácido se for janela de muda.", "pH mexido estressa o camarão de casca mole."]],
+  verde: [["Feche o sombrite e deixe fechado.", "Sem luz a alga para de consumir CO₂ e o pH para de subir."], ["Meça o pH às 10 e às 13 h.", "É a hora do pico."], ["Com pH acima de 8,5 e amônia tóxica acima de 0,1: ácido fosfórico 0,5 mL por m³ por vez, até 7,5 a 7,8.", "Baixa o pH na hora; gasta alcalinidade e deixa fósforo, por isso em dose pequena."], ["Amônia acima de 1: menos ração e açúcar (20 g por grama de amônia por m³).", "Tira a amônia sem mexer no pH."], ["Amônia acima de 1: troque 10% da água (2 mil litros).", "Dilui a amônia na hora; é o que a tese do Pimentel fazia com amônia acima de 1."], ["Siga com simbiótico e puim.", "O floco de bactéria toma o lugar da alga."], ["Nada de ácido se for janela de muda.", "pH mexido estressa o camarão de casca mole."]],
   floco: [["Nada de troca grande de água.", "Você jogaria fora as poucas bactérias que sobraram."], ["Açúcar: amônia × m³ × 20 g.", "Carbono para as bactérias novas pegarem a amônia."], ["Simbiótico na dose de formação (1 L por m³ por dia) e Nutrat.", "Repõe as bactérias que morreram."], ["Ar no máximo e ração −30%.", "Menos carga enquanto o floco volta."], ["Meça a amônia a cada 6 a 12 horas e repita o açúcar se preciso.", "Costuma voltar em 1 a 3 dias."]],
   od3h: [["Ar no máximo agora.", "Abaixo de 2,8 mg/L o camarão entra em hipóxia; perto de 0,65 morre (Vinatea 2009)."], ["Oxitrat: 1 copo sobre a água (no máximo 1 em 24 h, Furtado 2014).", "Sobe o oxigênio na hora enquanto o ar faz efeito."], ["Ligue o decantador e aplique Nutrat.", "O decantador tira carga; o Nutrat ajuda as bactérias a quebrar a gordura (não põe oxigênio)."], ["Não dê trato antes de medir 6 ou mais.", "Comida em oxigênio baixo vira sobra."], ["De dia, descubra a causa: cone alto, sobra de ração, rodo atrasado.", "Senão volta amanhã."]],
   sal: [["Meça a salinidade.", "Para confirmar e saber quanto repor."], ["No registro de água, reponha com água doce SEM cloro na dose do celular (até 2 ppt por vez).", "A evaporação leva água e deixa o sal. Repor o volume devolve a salinidade."], ["Não use água da torneira.", "O cloro mata camarão e floco."], ["Meça de novo.", "Mudança de salinidade tem que ser conferida."]],
@@ -1356,7 +1356,7 @@ function tarefas() {
   if (!j.bombona) {
     if (!bd.on && b.fase === "vazia") add("Fazer o lote do simbiótico no balde fechado (fica 12 h).", "Bombona e balde");
     if (bd.on && b.fase === "vazia") { const hb = (st.t - bd.t0) / 60; add(hb >= 12 ? "Passar o lote para a bombona: leve o Bactrat P até ela." : "Lote fechado no balde: faltam " + nf(12 - hb, 0) + " h para passar à bombona.", "Estante Só Bioflocos e bombona"); }
-    if (b.fase === "simbio") { const p = E.leit(st, "phBomb"), novo = p && p.t >= b.t0 ? p : null; if (!novo || st.t - novo.t > 8 * 60) add("Medir o pH da bombona.", "Bombona e balde"); else if (novo.v < 7) add("pH do lote em " + nf(novo.v, 1) + ": pôr bicarbonato (faixa 7,0–7,5 do caderno; 80 g é regra do app).", "Bombona e balde", 1);
+    if (b.fase === "simbio") { const p = E.leit(st, "phBomb"), novo = p && p.t >= b.t0 ? p : null; if (!novo || st.t - novo.t > 8 * 60) add("Medir o pH da bombona.", "Bombona e balde"); else if (novo.v < 7) add("pH do lote em " + nf(novo.v, 1) + ": pôr bicarbonato (faixa 7,0–7,5 do caderno; mais uma dose do lote, 2 g por m³, é regra do app).", "Bombona e balde", 1);
       if (st.t - b.t0 >= 12 * 60 && E.simbHoje(st)) add("O lote está pronto: ponha o lote inteiro no tanque.", "Bombona e tanque"); }
   }
   if (!(cm.n > 0) && !cm.despescado) { // preparo da água
@@ -1559,7 +1559,7 @@ function bombona() {
     if (b.fase === "vazia") { if (G.mao === "bactrat") c.appendChild(bt("Montar o simbiótico com Bactrat P", () => { const r = faz("simbio_iniciar"); if (r.ok) G.mao = null; bombona(); }, "p")); else P(c, "Para passar o lote à bombona, traga o Bactrat P da estante Só Bioflocos (com o lote de 12 h fechado pronto).", "nota"); }
     else {
       c.appendChild(bt("Medir o pH da bombona (3 min)", () => { faz("bombona_ph"); bombona(); }));
-      c.appendChild(bt("Pôr 80 g de bicarbonato na bombona", () => { faz("bombona_bicarb"); bombona(); }));
+      c.appendChild(bt("Pôr " + Math.round(2 * E.vol(st) * (b.x || 1)) + " g de bicarbonato na bombona (dose do lote)", () => { faz("bombona_bicarb"); bombona(); }));
       if (G.mao === "catalisador") { const le = dose(c, { un: "mL", min: 10, max: 150, passo: 10, val: 50, nota: "Com o pH da bombona perto de 7. O líquido engrossa e flocula." }); c.appendChild(bt("Pôr o catalisador", () => { faz("bombona_cat", { mL: le() }); bombona(); }, "p")); }
       c.appendChild(bt("Levar o lote ao tanque", () => pega("simb"), hb >= 12 ? "p" : ""));
       let arm = false; const d = bt("Descartar e lavar a bombona", () => { if (!arm) { arm = true; d.textContent = "Toque de novo para confirmar"; return; } faz("bombona_descartar"); bombona(); }, "r"); c.appendChild(d);
@@ -2075,7 +2075,7 @@ function numeros(s) {
     }
     out.push(String(tot + g + (dec || 0)));
   }
-  return out.join(" ").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
+  return out.join(" ").replace(/(\d+)\s+(virgula|ponto)\s+(\d+)/g, "$1.$3").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
 }
 const UNI = [[/^(kg|quilos?|kilos?)$/, "kg"], [/^(g|gramas?|gr)$/, "g"], [/^(ml|mililitros?)$/, "mL"], [/^(l|litros?)$/, "L"], [/^baldes?$/, "balde"], [/^copos?$/, "copo"]];
 function qtd(s) { // primeiro número com unidade opcional
@@ -2085,7 +2085,7 @@ function qtd(s) { // primeiro número com unidade opcional
 }
 /* texto para a voz: unidades por extenso; oxigênio em % com mg/L entre parênteses (regra do Wagner) */
 function falaTxt(s) {
-  return String(s).replace(/\s*CaCO₃/g, "").replace(/O₂/g, "O2").replace(/NH₃/g, "amônia tóxica").replace(/NH₄⁺/g, "amônio").replace(/CO₂/g, "gás carbônico").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus")
+  return String(s).replace(/(\d+)\.(\d+)/g, (m, a, b) => b.length === 3 && a !== "0" ? m : a + "," + b).replace(/\s*CaCO₃/g, "").replace(/O₂/g, "O2").replace(/NH₃/g, "amônia tóxica").replace(/NH₄⁺/g, "amônio").replace(/CO₂/g, "gás carbônico").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus")
     .replace(/mg\/L/g, " miligramas por litro").replace(/mL\/L/g, " mililitros por litro").replace(/(\d)\s?mL\b/g, "$1 mililitros").replace(/(\d)\s?kg\b/g, "$1 quilos").replace(/(\d)\s?g\b/g, "$1 gramas").replace(/(\d)\s?L\b/g, "$1 litros")
     .replace(/(\d)\s?h\b/g, "$1 horas").replace(/\bppt\b/g, "partes por mil").replace(/−/g, "menos ").replace(/×/g, " vezes ").replace(/≥/g, "maior ou igual a ").replace(/≤/g, "menor ou igual a ").replace(/→/g, ", ").replace(/[›•·]/g, ", ").replace(/\s+/g, " ").trim();
 }
@@ -2120,14 +2120,27 @@ function estado(curto) {
   const jm = E.janelaMuda(E.agoraMs(st)); if (jm) out.push("Janela de muda: " + jm + ".");
   return out.join(" ");
 }
+function curto() { // resumo para ouvir dirigindo: hora, oxigênio, alertas e próximo passo
+  const d = dataLocal(), od = E.leit(st, "od"), al = st.camarao.n > 0 ? E.appAlertas(st) : [], l = tarefas()[0], o = [d.hm + "."];
+  if (od && st.t - od.t <= 24 * 60) o.push("Oxigênio " + odTxt(od.v) + ", " + idade(od.t) + ".");
+  o.push(al.length ? "Alertas: " + al.slice(0, 2).map(x => x.txt).join("; ") + "." : "Sem alertas do celular.");
+  if (l) o.push("Próximo: " + l.t); return o.join(" ") + " Diga estado completo para ouvir tudo.";
+}
+function emerg(s) { // emergências do jogo (TX.emerg); oxigênio em % com mg/L entre parênteses
+  if (/falta de luz|faltou luz|energia|soprador parou/.test(s)) return "No jogo o soprador e os equipamentos nunca falham. No app, diga: emergência falta de luz.";
+  const pal = s.replace(/emergencia|socorro|o que eu faco|o que fazer|ta|esta|baixo|alto/g, " ").split(/\s+/).filter(w => w.length > 3);
+  const e = TX.emerg.find(x => pal.some(w => sem(x[0]).indexOf(w.slice(0, 6)) >= 0)); if (!e) return "Emergências do jogo: " + TX.emerg.map(x => x[0]).join("; ") + ". Diga emergência e o nome.";
+  let t = e[0] + ". " + e[1]; if (/^Oxig/.test(e[0])) t = t.replace(/(abaixo de|acima de) (\d+(?:,\d+)?)(?!\s*%)/gi, (m, a, n) => a + " " + odTxt(+n.replace(",", "."))); return "Emergência, " + t;
+}
 function dica(n) {
   const l = tarefas().slice(0, n || 3); let t = l.length ? (l.length > 1 ? "Próximos passos: " : "Próximo passo: ") + l.map((x, i) => (l.length > 1 ? (i + 1) + ", " : "") + x.t).join(" ") : "Nada pendente agora. Diga: avançar até o próximo trato.";
   if (G.modo === "aprender" && TX.missoes[G.mis]) t += " Missão: " + TX.missoes[G.mis].t;
   return t;
 }
 function explica(s) {
-  const q = s.replace(/^.*?(o que (e|sao|significa)|explica(r)?|explique|me fala (sobre|de)|fala sobre|conta sobre|como funciona)\s*/, "").replace(/^(o|a|os|as|um|uma)\s+/, ""), ws = q.split(/\s+/).filter(w => w.length >= 3);
+  const q = s.replace(/^.*?(o que (e|sao|significa)\b|explica(r)?|explique|me fala (sobre|de)|fala sobre|conta sobre|como funciona)\s*/, "").replace(/^(o|a|os|as|um|uma)\s+/, ""), ws = q.split(/\s+/).filter(w => w.length >= 3);
   if (!ws.length) return null;
+  if (/nitrific|nitrosomonas|nitrobacter|nitrospira/.test(q)) return "Nitrificantes: nitrificante 1 (Nitrosomonas) transforma a amônia em nitrito; nitrificante 2 (Nitrobacter e Nitrospira) transforma o nitrito em nitrato. " + TX.itens.nitrificante.t;
   const hit = (txt) => ws.filter(w => sem(txt).indexOf(w) >= 0).length;
   for (const k in TX.itens) { const it = TX.itens[k]; if (it.d && hit(it.n) && hit(it.n) >= Math.min(ws.length, 1)) return it.n + ": " + it.d; }
   let best = null, bs = 0; TX.gloss.forEach(g => { const h = hit(g[0]) * 2 + hit(g[1]) * 0.2; if (h > bs) { bs = h; best = g; } });
@@ -2135,7 +2148,7 @@ function explica(s) {
   const em = TX.emerg.find(e => hit(e[0])); if (em) return "Emergência, " + em[0] + ": " + em[1];
   return null;
 }
-const AJUDA = "Você pode falar: como está o tanque; o que fazer; medir oxigênio e pH; medir tudo; dar o trato; trato de 200 gramas; aplicar Nutrat; puim 600 gramas; bicarbonato 1 quilo; simbiótico 20 litros; fazer o prebiótico; pH da bombona; ar no máximo; fechar o sombrite; passar o rodo; biometria; avançar 2 horas; avançar até o próximo trato; desfazer; o que é nitrito; repetir; e parar voz.";
+const AJUDA = "Você pode falar: como está o tanque; o que fazer; medir oxigênio e pH; medir tudo; dar o trato; trato de 200 gramas; aplicar Nutrat; puim 600 gramas; bicarbonato 1 quilo; aplicar o simbiótico; fazer o lote do simbiótico; pH da bombona; ar no máximo; fechar o sombrite; passar o rodo; biometria; avançar 2 horas; avançar até o próximo trato; desfazer; o que é nitrito; repetir; e parar voz.";
 
 /* ---- executar ---- */
 function age(tipo, p) { const m0 = G.mis, r = faz(tipo, p, true); diz(r.msg); if (r.ok && G.modo === "aprender" && G.mis !== m0 && TX.missoes[G.mis]) diz("Missão cumprida. Próxima: " + TX.missoes[G.mis].t); return r; }
@@ -2152,13 +2165,26 @@ function aplicar(k, s) {
     if (!sg || !(sg[0] > 0)) { V.pend = { k }; return diz("Quanto de " + it.n + "? Diga a quantidade em " + (it.un === "balde" ? "baldes" : it.un === "copo" ? "copos" : it.un) + "."); }
     v = Math.round(sg[0]); diz("Pela conta do celular: " + nf(v) + " " + it.un + ".");
   }
-  v = clamp(v, it.min || 0, it.max || 1e9); if (!(v > 0)) return diz("Quantidade inválida.");
-  age(it.ac, { [it.par]: v * (it.mult || 1) });
+  if (!(v > 0)) return diz("Quantidade inválida.");
+  const vai = () => age(it.ac, { [it.par]: clamp(v, it.min || 0, it.max || 1e9) * (it.mult || 1) });
+  if (it.max && v > it.max) return confirma("O máximo de " + it.n + " por vez no jogo é " + nf(it.max) + " " + it.un + ". Vou pôr " + nf(it.max) + ".", () => { v = it.max; vai(); });
+  if (q) { let ref = sug(k); if (!ref) { const d = E.appDoses(st).find(x => x.k === k || (k === "bicarbonato" && x.k === "alc")); if (d && typeof d.qtd === "number") ref = [d.qtd]; } if (ref && ref[0] > 0 && v > 1.5 * ref[0]) return confirma(nf(v) + " " + it.un + " de " + it.n + " é mais que uma vez e meia a conta do celular, que é " + nf(Math.round(ref[0])) + ".", vai); }
+  vai();
 }
+function informa(s) { // pergunta não executa: só diz a dose da conta do celular
+  if (tem2(s, /\b(trato|racao|comida)\b/)) { const r = E.appRacao(st); return r ? "Ração de hoje pela conta do celular: " + nf(r.final, 0) + " g em " + r.nt + " tratos, " + r.porTrato + " g por trato. Para dar, diga: dar o trato." : "Ainda não há camarão no tanque."; }
+  if (tem2(s, /simbiotico|lote/)) { const d = E.appDoses(st).find(x => x.k === "simbiotico"); return d ? "Simbiótico: " + d.txt : "Hoje o celular não pede simbiótico."; }
+  if (params(s).length && !/\b(dou|ponho|boto|aplico|coloco|jogo|dar|por|aplicar)\b/.test(s)) return null;
+  const pr = PROD.find(([re]) => re.test(s)); if (!pr) return null; const it = TX.itens[pr[1]]; let sg = sug(pr[1]); if (!sg) { const d = E.appDoses(st).find(x => x.k === pr[1] || (pr[1] === "bicarbonato" && x.k === "alc")); if (d && typeof d.qtd === "number") sg = [d.qtd, d.txt || ""]; }
+  return sg && sg[0] > 0 ? it.n + " pela conta do celular: " + nf(Math.round(sg[0])) + " " + it.un + ". " + (sg[1] || "") + " Para aplicar, diga: aplicar " + it.n + "." : "O celular não tem dose de " + it.n + " para agora. " + (it.d || "");
+}
+const tem2 = (s, re) => re.test(s);
+function confirma(txt, f) { V.conf = f; diz(txt + " Confirma? Diga sim."); }
 function trato(s) {
   if (!(st.camarao.n > 0)) return diz("Ainda não há camarão no tanque.");
   const q = qtd(s), r = E.appRacao(st); let g = q ? q.v * (q.u === "kg" ? 1000 : 1) : null;
   if (g == null) { if (!r) return diz("Diga a quantidade em gramas."); if (r.final === 0) return diz("O celular manda suspender o trato agora pela água. Se quiser mesmo, diga a quantidade."); g = r.porTrato; diz("Trato pela conta do celular: " + g + " gramas."); }
+  if (q && r && r.porTrato > 0 && g > 1.5 * r.porTrato) return confirma(nf(g, 0) + " g é mais que uma vez e meia o trato do celular, que é " + r.porTrato + " g.", () => age("trato", { g }));
   age("trato", { g });
 }
 function avanca(min) {
@@ -2185,10 +2211,12 @@ function trata(bruto) {
   if (tem(/\b(desfaz|desfazer|volta|voltar atras)\b/)) { if (!desf) return diz("Não tenho o que desfazer."); const n = desf.nome; desfazer(); return diz("Desfeito: " + n + ". Agora " + dataLocal().hm + "."); }
   if (tem(/\b(fechar|fecha|comecar|continuar|ok|entendi)\b/) && folhaAberta && s.length < 16) { fecha(); return diz(dica(1)); }
   if (tem(/que horas|que dia|hora[s]? (e|sao)/)) { const d = dataLocal(); return diz(d.dia + ", " + d.hm + "."); }
-  if (tem(/^(o que e|o que sao|o que significa|explica|explique|me fala sobre|fala sobre|como funciona)/)) { const x = explica(s); return diz(x || "Não achei isso no glossário do jogo."); }
+  if (tem(/^(o que (e|sao|significa)\b|explica|explique|me fala sobre|fala sobre|como funciona)/)) { const x = explica(s); return diz(x || "Não achei isso no glossário do jogo."); }
   if (G.modo === "desafio" && tem(/\b(ajuda|passos|desafio|meta)\b/)) { const d = TX.desafios.find(x => x.id === G.des.id), ps = TX.ajuda[d.id] || []; return diz(d.n + ". " + d.txt + " Passos: " + ps.map((p, i) => (i + 1) + ", " + p[0] + " Porque " + p[1]).join(" ")); }
   if (tem(/\b(missao|licao)\b/)) { const m = TX.missoes[G.mis]; return diz(m ? "Missão: " + m.t + " Dica: " + (m.d || "") + " Lição: " + (m.l || "") : "Sem missão agora."); }
-  if (tem(/\b(como (esta|ta)|estado|status|situacao|resumo|relatorio|me (atualiza|conta))\b/)) return diz(estado(tem(/rapido|curto/)));
+  if (tem(/\b(como (esta|ta)|estado|status|situacao|resumo|relatorio|me (atualiza|conta))\b/)) return diz(tem(/complet|detalh|tudo/) ? estado(false) : curto());
+  if (tem(/emergencia|socorro|falta de luz|faltou luz|soprador parou/) || tem(/\b(oxigenio|amonia|nitrito|ph)\b.*\b(baixo|alto|caiu|subiu)\b.*\b(faco|fazer)\b/)) return diz(emerg(s));
+  if (tem(/\b(quanto|quantos|quantas|qual|devo)\b/) && !tem(/\b(medir|mede|avanc|passa|ultim)/)) { const x = informa(s); if (x) return diz(x); }
   if (tem(/\b(o que (eu )?(faco|fazer|tenho)|proximo passo|dica|pendente|tarefa|e agora)\b/)) return diz(dica(3));
   // tempo
   if (tem(/\b(avanc|passa|passar|pular|pula|esperar|espera|adianta)/)) {
@@ -2199,13 +2227,13 @@ function trata(bruto) {
     return avanca(clamp(Math.round(m), 5, 3 * 1440));
   }
   // bombona
-  if (tem(/bombona|balde/) && tem(/\bph\b/) || tem(/ph da bombona/)) { faz("bombona_ph", null, true); const r = E.leit(st, "phBomb"); return diz(r ? "pH da bombona: " + nf(r.v, 1) + ". Faixa do caderno 7,0 a 7,5; abaixo de 7, 80 gramas de bicarbonato (dose regra do app)." : "Não consegui medir o pH da bombona."); }
+  if (tem(/bombona|balde/) && tem(/\bph\b/) || tem(/ph da bombona/)) { faz("bombona_ph", null, true); const r = E.leit(st, "phBomb"); return diz(r ? "pH da bombona: " + nf(r.v, 1) + ". Faixa do caderno 7,0 a 7,5. Abaixo de 7, bicarbonato aos poucos até voltar a 7; não há dose em estudo para o lote. Abaixo de 5 as bactérias morrem." : "Não consegui medir o pH da bombona."); }
   if (tem(/bicarbonato/) && tem(/bombona/)) return age("bombona_bicarb");
-  if (tem(/prebiotico|fazer o balde|balde do dia/)) return age("prebiotico");
+  if (tem(/prebiotico|fazer o balde|balde do dia|fazer o lote|lote do simbiotico/)) return age("prebiotico");
   if (tem(/(montar|iniciar|comecar).*simbiotico|bactrat|balde na bombona|por o balde/)) return age("simbio_iniciar");
   if (tem(/catalisador/)) { const q = qtd(s); return age("bombona_cat", { mL: q ? q.v : 50 }); }
   if (tem(/descartar.*bombona|lavar a bombona/)) { V.conf = () => age("bombona_descartar"); return diz("Descartar e lavar a bombona? Diga sim para confirmar."); }
-  if (tem(/simbiotico/)) { if (st.bombona.fase !== "simbio") return diz("A bombona está vazia. Diga: fazer o prebiótico."); const q = qtd(s), sd = E.appDoses(st).find(x => x.k === "simbiotico"); const L = q ? q.v : sd && typeof sd.qtd === "number" ? sd.qtd : 20; if (!q) diz("Simbiótico: " + nf(L) + " litros" + (sd ? ", pela conta do celular." : ".")); return age("simbiotico", { L: Math.min(L, Math.round(st.bombona.litros)) }); }
+  if (tem(/simbiotico/)) { if (st.bombona.fase !== "simbio") return diz("A bombona está vazia. Diga: fazer o lote do simbiótico."); const q = qtd(s), L = q && q.u !== "balde" ? q.v : Math.round(st.bombona.litros); if (!q) diz("Simbiótico: o lote inteiro, " + nf(L) + " litros (receita da tese)."); return age("simbiotico", { L: Math.min(L, Math.round(st.bombona.litros)) }); }
   // medir e consultar
   const ks = params(s), verbo = tem(/\b(medir|mede|meca|medicao|analisa|analisar|testar|teste|leitura)\b/);
   if (tem(/\bmedir tudo|mede tudo|todas as medidas|medir (a )?agua/)) return medir(tem(/tudo|todas/) ? ["od", "temp", "ph", "sal", "alk", "tan", "no2", "cone"] : ["od", "temp", "ph"]);
@@ -2227,7 +2255,7 @@ function trata(bruto) {
   if (tem(/agua doce|repor/)) { const q = qtd(s), d = E.appDoses(st).find(x => x.k === "agua_doce"); const L = q ? q.v * (q.u === "kg" ? 1 : 1) : d ? d.qtd : null; if (!L) { return diz("Quantos litros de água doce?"); } return age("agua_doce", { L: clamp(L, 50, 8000), comCloro: tem(/torneira/) }); }
   if (tem(/\btroca(r)?\b/)) { const q = qtd(s); if (!q) return diz("Quantos litros quer trocar?"); return age("troca", { L: clamp(q.v, 50, 8000), sal: G.leu("sal") || 22 }); }
   if (tem(/povoar|soltar (as )?(pos|larvas)|povoamento/)) { if (st.camarao.n > 0) return diz("O tanque já está povoado."); const m = s.match(/(250|500|750|1000)/), dens = m ? +m[1] : 500, acl = !tem(/sem aclimatar|direto/); const r = age("povoar", { densidade: dens, aclimatar: acl }); if (r.ok) G.mao = null; return; }
-  if (tem(/despesca/)) { if (tem(/total|tudo|final/)) { V.conf = () => age("despesca", { fracao: 1 }); return diz("Despesca total encerra o ciclo. Diga sim para confirmar."); } return age("despesca", { fracao: 0.3 }); }
+  if (tem(/despesca/)) { if (tem(/total|tudo|final/)) { V.conf = () => age("despesca", { fracao: 1 }); return diz("Despesca total encerra o ciclo. Diga sim para confirmar."); } return confirma("Despesca parcial de 30% do lote." + (E.janelaMuda(E.agoraMs(st)) ? " Atenção: janela de muda." : ""), () => age("despesca", { fracao: 0.3 })); }
   if (tem(/azomite/)) { const q = qtd(s); return age("azomite_racao", { gkg: clamp(q ? q.v : 3, 0, 6) }); }
   if (tem(/\b(trato|racao|alimentar|alimenta|comida|tratar)\b/)) return trato(s);
   const pr = PROD.find(([re]) => re.test(s)); if (pr) return aplicar(pr[1], s);
@@ -2243,7 +2271,7 @@ if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = es
 function fala(txt, depois) {
   if (!window.speechSynthesis) { if (depois) depois(); return; }
   V.falando = true; try { rc && rc.abort(); } catch (e) { }
-  speechSynthesis.cancel(); const partes = falaTxt(txt).match(/[^.;:!?]+[.;:!?]*/g) || [txt]; let n = 0, fim = false;
+  if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); const partes = falaTxt(txt).match(/[^.;:!?]+[.;:!?]*/g) || [txt]; let n = 0, fim = false;
   const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
   V.trava = setTimeout(acabou, falaTxt(txt).length * 95 + 4000); // o Chrome às vezes não avisa o fim
   partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); n++; });
@@ -2251,11 +2279,11 @@ function fala(txt, depois) {
 }
 function ouve() {
   if (!V.on || V.falando || V.ouvindo || !rc) return;
-  try { rc.start(); V.ouvindo = true; mostra("🎙️ Ouvindo…"); } catch (e) { }
+  try { rc.start(); V.ouvindo = true; V.tenta = 0; mostra("🎙️ Ouvindo…"); } catch (e) { if ((V.tenta = (V.tenta || 0) + 1) <= 4) setTimeout(ouve, 600); } // iPhone: o microfone demora a soltar depois da fala
 }
-function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, ouve); } else ouve(); }
+function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, () => setTimeout(ouve, 350)); } else ouve(); }
 function vozLiga() {
-  if (!SR) return aviso("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.", "alarme", 8000);
+  if (!SR) return aviso("Este navegador não tem reconhecimento de voz. No iPhone, abra pelo Safari (não pelo ícone da tela inicial); no Android, pelo Chrome.", "alarme", 8000);
   rc = new SR(); rc.lang = "pt-BR"; rc.interimResults = false; rc.maxAlternatives = 1; rc.continuous = false;
   rc.onresult = e => { const t = e.results[e.results.length - 1][0].transcript; V.ouvindo = false; mostra("🗣️ " + t); try { trata(t); if (V.buf.length) V.erros = 0; } catch (er) { diz("Deu um erro ao fazer isso."); } if (V.on) responde(); };
   rc.onend = () => { V.ouvindo = false; if (V.on && !V.falando) setTimeout(ouve, 300); };
@@ -2271,12 +2299,12 @@ document.addEventListener("visibilitychange", () => { if (V.on && document.visib
 const avisoTela = aviso; aviso = function (txt, cls, ms) { avisoTela(txt, cls, ms); if (V.on) { if (cls === "alarme") V.alarme = true; diz(txt); } };
 const quizTela = quiz; quiz = function (k) { const ja = G.quiz[k]; quizTela(k); if (V.on && !ja) { const q = TX.quiz[k]; V.quiz = q; diz("Pergunta: " + q.q + " " + q.o.map((t, i) => "Opção " + (i + 1) + ": " + t).join(". ") + ". Responda com o número."); } };
 /* botão e faixa de status */
-const vst = document.createElement("style"); vst.textContent = "#bVoz{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:42%;width:58px;height:58px;border-radius:50%;border:2px solid #ffffff55;background:#16323d;color:#fff;font-size:26px;z-index:30;box-shadow:0 2px 10px #0008}#bVoz.on{background:#b3261e;animation:vozp 1.4s infinite}@keyframes vozp{50%{box-shadow:0 0 0 10px #b3261e33}}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 92px);max-width:min(560px,calc(100% - 32px));background:#0d1b22e6;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:30;pointer-events:none}";
+const vst = document.createElement("style"); vst.textContent = "#bVoz.on{background:#b3261e;border-color:#b3261e;color:#fff}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 92px);max-width:min(560px,calc(100% - 32px));background:#0d1b22e6;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:30;pointer-events:none}";
 document.head.appendChild(vst);
-const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); document.body.appendChild(bVoz);
+const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.className = "bt"; bVoz.textContent = "🎤 Voz"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); $("botoes").insertBefore(bVoz, $("bFazer")); // fica na barra de cima do jogo: não cobre os botões da capa
 const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidden = true; document.body.appendChild(vozTxt);
 function mostra(t) { vozTxt.hidden = !t || !V.on && !V.falando; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
-function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹" : "🎤"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
+function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹ Voz" : "🎤 Voz"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
 bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
 window.__voz = { trata: t => { V.buf = []; trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, falaTxt, V };
 }

@@ -362,7 +362,7 @@ function recomendacao(dia){
   const rec=(k,d)=>{const u=leituraRecente(k,dia);return u&&diasEntre(u.data,dia)<=d?u:null};
   const od=rec("od",1),tan=rec("tan",3),no2=rec("no2",3),ss=rec("ss",2),tp=rec("temp",1);
   const jm=janelaMuda(toDate(dia));const mudaVista=tr.some(r=>r.muda);
-  const bloqueios=[];if(od&&od.v<5)bloqueios.push("OD "+f(od.v,1)+" mg/L abaixo de 5");if(tan&&tan.v>=1)bloqueios.push("amônia "+f(tan.v,2)+" mg/L");if(no2&&no2.v>=1)bloqueios.push("nitrito "+f(no2.v,2)+" mg/L");if(jm.on)bloqueios.push("janela de muda ("+jm.qual+")");if(mudaVista)bloqueios.push("muda vista ontem");
+  const bloqueios=[];if(od&&od.v<5)bloqueios.push("OD "+odT(od.v)+" abaixo de 72% (5 mg/L)");if(tan&&tan.v>=1)bloqueios.push("amônia "+f(tan.v,2)+" mg/L");if(no2&&no2.v>=1)bloqueios.push("nitrito "+f(no2.v,2)+" mg/L");if(jm.on)bloqueios.push("janela de muda ("+jm.qual+")");if(mudaVista)bloqueios.push("muda vista ontem");
   let base=tabela,ref=tabela;
   if(totOntem>0){ref=totOntem;
     const bj=tr.map(r=>r.bandeja).filter(Boolean);const muita=bj.filter(b=>b==="Muita").length,vazia=bj.filter(b=>b==="Vazia").length;
@@ -383,7 +383,7 @@ function recomendacao(dia){
     if(base>tabela*1.3){base=tabela*1.3;motivos.push({ef:"dn",t:"Limitei a 130% da tabela",p:"Passar muito da tabela costuma ser erro de biometria ou de contagem. Faça uma biometria para confirmar."})}
   } else motivos.push({ef:"eq",t:"Sem tratos lançados ontem: usei a tabela",p:"Lance cada trato com a bandeja em Digitação de Ração. Daí em diante a ração de cada dia sai do que o camarão comeu no dia anterior."});
   let trava=1;const add=(fator,t,p)=>{trava=Math.min(trava,fator);motivos.push({ef:"dn",t,p})};
-  if(od){if(od.v<3)add(0,`OD ${odT(od.v)}: SUSPENDER o trato`,"Abaixo de 3 mg/L o camarão para de comer e digerir gasta oxigênio que ele não tem. Ligue toda a aeração, o soprador reserva e o cilindro de O₂ com pedra porosa.");
+  if(od){if(od.v<3)add(0,`OD ${odT(od.v)}: SUSPENDER o trato`,"Abaixo de 43% (3 mg/L) o camarão para de comer e digerir gasta oxigênio que ele não tem. Ligue toda a aeração, o soprador reserva e o cilindro de O₂ com pedra porosa.");
     else if(od.v<4)add(0.8,`OD ${odT(od.v)}: baixar 20% e Nutrat em dobro`,"Com oxigênio baixo o apetite cai e a sobra consome mais oxigênio ainda. Reforce o ar e corte o trato da madrugada. O Nutrat age como emulsificante (ajuda as bactérias a quebrar gordura); não põe oxigênio.");}
   if(tan&&(tan.v>1||(()=>{const p=leituraRecente("ph",hoje()),t=leituraRecente("temp",hoje()),x=p?nh3(tan.v,p.v,t&&t.v):null;return x!=null&&x>0.1})())){const _ph=leituraRecente("ph",hoje()),_tp=leituraRecente("temp",hoje()),_x=_ph?nh3(tan.v,_ph.v,_tp&&_tp.v):null,_crit=tan.v>3||(_x!=null&&_x>0.1);add(_crit?0.7:1,_crit?`Amônia ${f(tan.v,2)} mg/L${_x!=null?" (NH₃ "+f(_x,3)+")":""}: nível crítico, baixar 30% e dar açúcar`:`Amônia ${f(tan.v,2)} mg/L: alerta, dar açúcar e manter a ração`,`${_crit?"Passou do nível crítico (amônia acima de 3 ou NH₃ acima de 0,1 mg/L, perto dos níveis seguros de Lin e Chen 2001: 3,55 de amônia total e 0,16 de NH₃ a 25 ppt): agora sim corta a ração. Menos ração, menos amônia (Alune 2020, The Fish Site: reduzir 30 a 40%).":"Entre 1 e 3 o app só avisa e corrige com carbono: o corte de ração fica para o nível crítico (amônia acima de 3 ou NH₃ acima de 0,1), que está perto dos níveis seguros de Lin e Chen 2001: 3,55 de amônia total e 0,16 de NH₃ a 25 ppt. Cortar cedo demais atrasa o crescimento."} Açúcar: ${f(tan.v,2)} × ${f(tanque().vol,0)} m³ × ${n0(cfg.doses.acucar)} g = ${n0(tan.v*tanque().vol*cfg.doses.acucar)} g ao longo do dia.`)}
   if(no2&&no2.v>1)add(no2.v>5?0.85:1,no2.v>5?`Nitrito ${f(no2.v,2)} mg/L: nível crítico, baixar 15%`:`Nitrito ${f(no2.v,2)} mg/L: alerta, manter a ração`,no2.v>5?"Acima de 5 mg/L, perto do nível seguro de Lin e Chen 2003: 15,2 a 25 ppt e 6,1 a 15 ppt para a nossa salinidade: menos ração e alcalinidade no alto da faixa. O tamanho do corte (15%) é regra do app.":"Entre 1 e 5 as bactérias nitrificantes estão atrasadas: alcalinidade no alto da faixa e Nutrat em dobro. O corte de ração fica para acima de 5 (perto do nível seguro de Lin e Chen 2003: 15,2 a 25 ppt e 6,1 a 15 ppt).");
@@ -404,7 +404,7 @@ function nutratPlano(dia){const base=cfg.doses.nutrat*tanque().vol;const rit=rit
   if(ss&&ss.v>20)m.push(`cone ${f(ss.v,1)} mL/L acima de 20 (junto com o decantador ligado e ração −10 a −20%)`);
   if(tan&&tan.v>1)m.push(`amônia ${f(tan.v,2)} mg/L acima de 1 (junto: açúcar ~20 g por g de N, simbiótico e ar no máximo)`);
   if(no2&&no2.v>1)m.push(`nitrito ${f(no2.v,2)} mg/L acima de 1 (junto: ar no máximo e alcalinidade ≥ 150)`);
-  if(od&&od.v<4){antes.push("PRIMEIRO abrir todos os registros e ligar o soprador reserva");if(od.v<3)antes.push("abaixo de 3 mg/L: cilindro de O₂ na pedra porosa e Oxitrat");m.push(`OD ${odT(od.v)} abaixo de 4, só depois do ar`)}
+  if(od&&od.v<4){antes.push("PRIMEIRO abrir todos os registros e ligar o soprador reserva");if(od.v<3)antes.push("abaixo de 43% (3 mg/L): cilindro de O₂ na pedra porosa e Oxitrat");m.push(`OD ${odT(od.v)} abaixo de 58% (4 mg/L), só depois do ar`)}
   if(jm.on)m.push(`janela da ${jm.qual} (junto: ar reforçado e ração −40%)`);
   if(rit.espuma==="sem")return{ml:base,pausa:true,motivos:["espuma sumiu e água clara: manter a dose ou pausar, e reduzir a bactéria (menos simbiótico)"],antes};
   return{ml:m.length?base*2:base,dobra:m.length>0,motivos:m,antes}}
@@ -443,7 +443,7 @@ function alertas(){const out=[];
   const vv=leituraRecente("vibV",hoje());if(vv&&vv.v>cfg.faixas.vibV.max)out.push([vv.v>(cfg.faixas.vibV.cmax||1e9)?"bad":"w",`Vibrio verde na placa TCBS: ${f(vv.v,0)} UFC/mL (atenção acima de ${f(cfg.faixas.vibV.max,0)})`,"Verdes costumam ser as patogênicas (FAU/UF). Corte a ração e confira a bandeja (sobra alimenta o Vibrio); simbiótico todo dia (no bioflocos o probiótico subiu a sobrevivência de 77% para 92%, Aguilera-Rivera 2014); sem rodo agora; nunca antibiótico. Repita a placa em 2 a 3 dias (regra do app). Mortes começaram depois que as verdes subiram (Samocha)."]);
   const np=nutratPlano(hoje());
   const dec=decantadorAcao(hoje());if(dec&&dec.urg)out.push([dec.urg,"Decantador: "+dec.t,dec.p]);
-  const oda=leituraRecente("od",hoje());if(oda&&oda.v<cfg.doses.odAlarme&&oda.v>=4)out.push(["w",`Alarme de oxigênio: ${odT(oda.v)} abaixo de ${f(cfg.doses.odAlarme,1)}`,"Plano B: confira o soprador e deixe o reserva pronto. Abaixo de 4, ligue o reserva."]);
+  const oda=leituraRecente("od",hoje());if(oda&&oda.v<cfg.doses.odAlarme&&oda.v>=4)out.push(["w",`Alarme de oxigênio: ${odT(oda.v)} abaixo de ${odT(cfg.doses.odAlarme)}`,"Plano B: confira o soprador e deixe o reserva pronto. Abaixo de 4, ligue o reserva."]);
   const od=leituraRecente("od",hoje());if(od&&od.v<4)out.push([od.v<3?"bad":"w",`Pouco oxigênio (${odT(od.v)}): abra todos os registros e ligue o soprador reserva${od.v<3?"; abra o cilindro de O₂ na pedra porosa e use Oxitrat":""}`,"Só depois disso, Nutrat em dobro. O Nutrat não põe oxigênio: age como emulsificante e ajuda as bactérias a quebrar a gordura. Com estudo: mais oxigênio acelera as bactérias que transformam amônia em nitrito e nitrato, então subir o O₂ ajuda a baixar a amônia."]);
   if(np.dobra)out.push(["w",`Nutrat em dobro hoje: ${n0(np.ml/2)} mL de manhã + ${n0(np.ml/2)} mL à noite, diluído em 2 L`,"Porque: "+np.motivos.join("; ")+"."]);
   if(np.pausa)out.push(["w","Espuma sumiu e água clara: manter o Nutrat ou pausar","Reduza a bactéria (menos simbiótico). Se o floco morreu de vez, use o botão em Técnicas › Emergências."]);
@@ -473,7 +473,7 @@ function alertasV14(out){const H=hoje(),V=tanque().vol;const L=k=>leituraRecente
   if(phs.length>=2){const mx=Math.max(...phs.map(x=>x.v)),mn=Math.min(...phs.map(x=>x.v));if(mx-mn>0.5)out.push(["w",`pH balançou ${f(mx-mn,1)} hoje (${f(mn,1)} a ${f(mx,1)})`,"Muita alga: ela tira CO₂ de dia e devolve à noite. Feche o sombrite nas horas de sol, mantenha o floco marrom e a alcalinidade ≥ 150 (segura o pH)."])}
   const cedo=phs.filter(x=>x.h<8).sort((a,b)=>a.v-b.v)[0];if(cedo&&cedo.v<7.4)out.push(["w",`pH ${f(cedo.v,1)} de madrugada: CO₂ alto`,"Respiração da noite acumula CO₂. Academia de ar agora e meça de novo às 9 h antes de pensar em cal; se a alcalinidade estiver boa, o pH sobe sozinho com o ar."]);
   /* OD supersaturado */
-  const od=L("od");if(od&&od.v>9)out.push(["w",`OD ${odT(od.v)}: acima do que o ar consegue (≈ 7 mg/L)`,"É fotossíntese de alga (água verde). À noite ela consome e o OD despenca. Feche o sombrite nas horas de sol e meça às 5–6 h."]);
+  const od=L("od");if(od&&od.v>9)out.push(["w",`OD ${odT(od.v)}: acima do que o ar consegue (≈ 100%, 7 mg/L)`,"É fotossíntese de alga (água verde). À noite ela consome e o OD despenca. Feche o sombrite nas horas de sol e meça às 5–6 h."]);
   /* nitrato */
   const no3=L("no3");if(no3&&no3.v>300)out.push(["bad",`Nitrato ${n0(no3.v)} mg/L: dano crônico`,"Kuhn et al. 2010: em 6 semanas, sobrevivência 64% com 435 mg/L e 15% com 910. Troque parte da água (10–20%) com água preparada sem cloro."]);else if(no3&&no3.v>177)out.push(["w",`Nitrato ${n0(no3.v)} mg/L: acima do seguro (177)`,"Furtado et al. 2015 dão 177 mg/L como nível seguro. Em Kuhn et al. 2010, com 220 mg/L a sobrevivência ainda foi igual à do controle (87%), mas o peso final já foi menor (8,7 g contra 9,3 g). Planeje troca parcial."]);
   /* sólidos e sulfeto */
@@ -495,7 +495,7 @@ const RITUAL=[["espuma","1. Olhar a espuma","Fina e limpa (tipo Sprite) está bo
  ["farelo","9. Farelo fermentado (carbono) no lugar do açúcar","Quantidade em Quanto aplicar hoje. Açúcar só com amônia > 1. Nada de melaço."],
  ["lodo","Decantador: tirar o lodo do registro do cone","Todo dia enquanto o decantador estiver ligado."],
  ["gerador","Plano B: testar gerador e alarme de OD","Toda segunda-feira. Cilindro de O₂ cheio?"],
- ["odnoite","OD de madrugada (3–5 h)","É a hora mais baixa do dia. Mínimo de 5,0 mg/L (≈ 72–76% de saturação); meta do dia 5,5 (≈ 80%), como no Xu 2025, que teve 84–95% de sobrevivência com OD médio de 5,6 ou mais. Lance em Parâmetros."],["ph14","pH à tarde (14–16 h), segunda leitura","Com sol o pH sobe à tarde: a diferença da manhã para a tarde mostra se a alcalinidade está segurando. Lance em Parâmetros."],
+ ["odnoite","OD de madrugada (3–5 h)","É a hora mais baixa do dia. Mínimo de 72–76% de saturação (5,0 mg/L); meta do dia 80% (5,5 mg/L), como no Xu 2025, que teve 84–95% de sobrevivência com OD médio de 5,6 ou mais. Lance em Parâmetros."],["ph14","pH à tarde (14–16 h), segunda leitura","Com sol o pH sobe à tarde: a diferença da manhã para a tarde mostra se a alcalinidade está segurando. Lance em Parâmetros."],
  ["od6","Camarão: OD e temperatura às 6 h","Lance em Parâmetros."],["od18","Camarão: OD e temperatura às 18 h","Lance em Parâmetros."],
  ["amon","Camarão: amônia e nitrito","3× por semana nas 6 primeiras semanas, depois 1×."],["alc","Camarão: alcalinidade","2× por semana. Reponha bicarbonato."]];
 function ritualDo(dia){const r=recs.find(x=>x.id==="ritual_"+dia);return r?Object.assign({itens:{}},r):{itens:{},espuma:""}}
@@ -757,7 +757,7 @@ function updCalc(){const v=tanque().vol,L=v*1000;const g=id=>num(($("#"+id)||{})
   const pp=g("k_ppm"),cl=g("k_cl");$("#o_cl").textContent=pp&&cl?`${n0(pp*v/(cl/100))} g de produto para ${pp} ppm em ${f(v,1)} m³. Dissolver num balde; ar forte até o teste de cloro dar zero.`:"";
   const am=g("k_am"),aa=g("k_aa");if(am!=null&&aa){const gr=(aa-am)*v/0.6;$("#o_alc").textContent=gr>0?`${n0(gr)} g de bicarbonato. Em parcelas de até 1 kg por dia (sobe ~30 mg/L cada); meça no dia seguinte.`:"Já está no alvo."}
   const tn=g("k_tan");$("#o_tan").textContent=tn?`${n0(tn*v*cfg.doses.acucar)} g de açúcar, dissolvido, ao longo do dia.`:""}
-function aptoLista(){return[["tan","Amônia total","< 1 mg/L",v=>v<1,2],["no2","Nitrito","< 1 mg/L",v=>v<1,2],["ss","Cone Imhoff","2–5 mL/L",v=>v>=2&&v<=5,1],["alc","Alcalinidade","≥ 150 mg/L",v=>v>=150,1],["ph","pH","7,5–8,0",v=>v>=7.5&&v<=8,2],["od","Oxigênio","> 5 mg/L",v=>v>5,1],["temp","Temperatura","26–30 °C",v=>v>=26&&v<=30,1],["sal","Salinidade",cfg.salLab!=null&&cfg.salLab!==""?"± 2 ppt da do laboratório ("+f(cfg.salLab,1)+")":"20–25 ppt (informe a do laboratório em Cadastro)",v=>cfg.salLab!=null&&cfg.salLab!==""?Math.abs(v-cfg.salLab)<=2:v>=20&&v<=25,1]]}
+function aptoLista(){return[["tan","Amônia total","< 1 mg/L",v=>v<1,2],["no2","Nitrito","< 1 mg/L",v=>v<1,2],["ss","Cone Imhoff","2–5 mL/L",v=>v>=2&&v<=5,1],["alc","Alcalinidade","≥ 150 mg/L",v=>v>=150,1],["ph","pH","7,5–8,0",v=>v>=7.5&&v<=8,2],["od","Oxigênio","> 72% (5 mg/L)",v=>v>5,1],["temp","Temperatura","26–30 °C",v=>v>=26&&v<=30,1],["sal","Salinidade",cfg.salLab!=null&&cfg.salLab!==""?"± 2 ppt da do laboratório ("+f(cfg.salLab,1)+")":"20–25 ppt (informe a do laboratório em Cadastro)",v=>cfg.salLab!=null&&cfg.salLab!==""?Math.abs(v-cfg.salLab)<=2:v>=20&&v<=25,1]]}
 const FAZER={tan:"Açúcar (amônia × m³ × 20 g), simbiótico e ar no máximo.",no2:"Ar no máximo, alcalinidade ≥ 150 e esperar o pico de nitrito passar.",ss:"Abaixo de 2: mais simbiótico. Acima de 5: Nutrat em dobro e menos ração de maturação.",alc:"Bicarbonato: (alvo − medido) × m³ ÷ 0,6, até 1 kg por dia.",ph:"Abaixo de 7,5: bicarbonato. Acima de 8,0: esperar e não usar cal.",od:"Mais difusores ou o soprador reserva.",temp:"Esperar estabilizar; cobrir o tanque se precisar.",sal:"Aclimatar devagar (no máximo 1–2 ppt por hora) ou ajustar com água doce/mar."};
 function caindo(k){const vs=recs.filter(r=>r.tipo==="leitura"&&r.valores&&r.valores[k]!=null).slice(0,2).map(r=>r.valores[k]);return vs.length<2?null:vs[0]<=vs[1]}
 function apto(){let ok=0;const AP=aptoLista();const rows=AP.map(x=>{const u=leituraRecente(x[0],hoje());const pass=u?x[3](u.v):null;const tend=(x[0]==="tan"||x[0]==="no2")?caindo(x[0]):null;const verde=pass&&tend!==false;if(verde)ok++;return{x,u,pass,tend,verde}});const man=[["cloro0","Cloro zero","Teste de cloro deu zero","Mais dias de ar forte, ou tiossulfato: 7 g por m³ para cada 1 mg/L de cloro (Boyd 2008); o app calcula pelo campo de cloro residual."],["plok","PL aprovada","Exame, teste de estresse e laudo de PCR","Não povoar com lote reprovado. Pedir outro lote."]];man.forEach(m=>{if(prep.feitos[m[0]])ok++});return{ok,total:AP.length+man.length,rows,man}}
@@ -778,7 +778,7 @@ const EMERG={
  ovo:["Cheiro de ovo podre no fundo","O que estou vendo: bolhas escuras, lodo preto, cheiro de ovo.",()=>[["Causa provável","sulfeto (H₂S) de lodo parado sem oxigênio: mata em pouca quantidade"],["Agora","rodo nos difusores e no fundo, academia de ar, decantador ligado"],["Ração","−30% até o cheiro sumir"],["Nutrat",`${n0(2*tanque().vol)} mL (2 mL por m³)`],["Prevenção","difusores sem ponto morto, rodo toda semana, cone até 15"]]],
  fezes:["Fios brancos boiando","O que estou vendo: fezes brancas na superfície, intestino branco.",()=>[["Suspeita","Vibrio (sobra de ração + matéria orgânica). Pode ser gregarina ou EHP: só o laboratório confirma."],["Agora","ração −30% por 3 dias e bandeja para conferir sobra; simbiótico e probiótico diários"],["Confirmar","placa TCBS (24 h; como fazer em Aprenda › Placa TCBS, e lance verdes e amarelas em Lançar › Água); microscópio do intestino; PCR de EHP se não melhorar"],["Reverte?","se for Vibrio e manejo, sim. EHP é crônico."]]],
  mancha:["Manchas brancas na casca","O que estou vendo: pontos brancos na carapaça, camarão avermelhado, para de comer.",()=>[["Suspeita","mancha branca (WSSV, vírus). Confirmação só por PCR."],["Agora","segurar a temperatura estável (sombrite, sem oscilação), não mexer na salinidade, ração −50%"],["Não há cura","acima de 32 °C o vírus se segura, mas o camarão sofre. Se o peso já vende, despesca de emergência."],["Biossegurança","não leve água nem puçá para outro tanque"]]],
- cauda:["Cauda branca e opaca","O que estou vendo: músculo da cauda com cor de cozido.",()=>[["Suspeita","mionecrose (IMNV, vírus) disparada por estresse. Confirmação por RT-PCR."],["Agora","menos manejo: adie biometria e transferências; OD ≥ 5 mg/L (≈ 72% de saturação a 28 °C e 22 ppt); sem choque de salinidade ou temperatura"],["Reverte?","não tem cura; tirar o estresse segura a mortalidade"]]],
+ cauda:["Cauda branca e opaca","O que estou vendo: músculo da cauda com cor de cozido.",()=>[["Suspeita","mionecrose (IMNV, vírus) disparada por estresse. Confirmação por RT-PCR."],["Agora","menos manejo: adie biometria e transferências; OD ≥ 72% de saturação (5 mg/L a 28 °C e 22 ppt); sem choque de salinidade ou temperatura"],["Reverte?","não tem cura; tirar o estresse segura a mortalidade"]]],
  hepato:["Camarão parado no fundo, pálido","O que estou vendo: letárgico, intestino vazio, hepatopâncreas claro.",()=>[["Suspeita","vibriose ou AHPND (mais comum nos primeiros 35 dias). Confirmação: placa TCBS (Aprenda › Placa TCBS; lance em Lançar › Água) e PCR."],["Agora","ração −50%, simbiótico/probiótico todo dia, decantador para baixar a matéria orgânica"],["Nunca","antibiótico no biofloco: mata o floco"],["Reverte?","vibriose leve sim; AHPND aguda raramente"]]],
  branquia:["Brânquia escura","O que estou vendo na biometria: brânquias pretas ou marrons.",()=>[["Causa","sólidos altos, sulfeto, amônia ou nitrito por dias (não é um micróbio só)"],["Medir","cone, amônia, nitrito"],["Corrigir","decantador, rodo, cone até 15"],["Reverte?","sim: some na próxima muda se a água melhorar"]]],
  casca:["Casca mole ou de papel","O que estou vendo: casca fina dias depois da muda.",()=>[["Conferir","alcalinidade ≥ 150, cálcio, magnésio e potássio pela salinidade (Parâmetros)"],["Ração","Azomite 3 g por kg (teto 4)"],["pH","estável; não mexa com ácido ou cal na janela de muda"],["Se vier com crescimento desigual e calor","suspeita de NHP: microscópio do hepatopâncreas e PCR"]]],
@@ -842,7 +842,7 @@ T.manejo_lua=()=>{const d0=new Date();const px=proximas(d0);let cal="";
    <div class="banner ${jm.on?"w":"ok"}"><b>${jm.on?"Hoje está na janela de muda ("+jm.qual+")":"Fora da janela de muda hoje"}</b><small>Próxima lua cheia: ${dt(isoDia(px.cheia))} · próxima lua nova: ${dt(isoDia(px.nova))}. A janela vai de 2 dias antes a 2 dias depois de cada uma. O cálculo é feito no aparelho, sem internet.</small></div>
    <h3>Próximos 28 dias</h3><div class="moonrow">${cal}</div><p class="muted">Em destaque: dias da janela de muda.</p>
    <h3>O que fazer na janela</h3><div class="card"><ol style="margin:0;padding-left:20px">
-    <li><b>Mais oxigênio:</b> abrir todos os difusores ou ligar o soprador reserva, meta de <b>OD ≥ 5,5 mg/L</b>, principalmente da meia-noite ao amanhecer. <span class="ev est">estudo</span> para a queda do OD à noite; <span class="ev camp">campo</span> para ligar o reserva na lua.</li>
+    <li><b>Mais oxigênio:</b> abrir todos os difusores ou ligar o soprador reserva, meta de <b>OD ≥ 80% (5,5 mg/L)</b>, principalmente da meia-noite ao amanhecer. <span class="ev est">estudo</span> para a queda do OD à noite; <span class="ev camp">campo</span> para ligar o reserva na lua.</li>
     <li><b>Ração −20%</b>: o app já aplica esse corte nos dias da janela. <span class="ev camp">estimativa do manual</span></li>
     <li><b>Conferir alcalinidade ≥ 150</b> (última: ${alc?f(alc.v,0)+" mg/L em "+dt(alc.data):"sem leitura"}), <b>cálcio e magnésio</b>, e repor bicarbonato se precisar. Na muda a casca nova endurece com o cálcio, o magnésio e a alcalinidade da água. <span class="ev est">estudo</span></li>
     <li><b>Azomite na ração a ${f(az,1)} g/kg</b>: hoje ${f(az*kg,1)} g para ${f(kg,2)} kg de ração. <span class="ev est">estudo</span> Tan 2014: 2–4 g/kg melhorou crescimento e imunidade; 6–8 g/kg não teve efeito.</li></ol></div>
@@ -934,7 +934,7 @@ T.aprenda_quando=()=>`<div class="learn"><h2>Quando aumentar ou reduzir a raçã
  <h3>1. A conta</h3><p><b>Ração do dia = vivos × peso médio (g) × % da tabela ÷ 100.</b> A % cai conforme ele cresce: 15% até 0,2 g, 12% até 0,5 g, 10% até 1 g, 6% até 3 g, 5% até 5 g, 4% até 10 g, 3,5% até 15 g e 3% depois. Por isso a <b>biometria semanal</b> é o que mais move a ração: ela troca a faixa da tabela.</p>
  <p>O app confere com a conta da Purdue: vivos × ganho semanal × conversão ÷ 7. Se as duas ficarem muito longe, desconfie da biometria ou da contagem.</p>
  <h3>2. SUBIR 5–10%: só com tudo isto junto</h3><ul>
-  <li>Bandeja <b>vazia</b> 1–2 h depois do trato;</li><li><b>OD ≥ 5</b> mg/L;</li><li><b>Amônia &lt; 1</b> e <b>nitrito &lt; 1</b> mg/L;</li><li><b>Não</b> ser dia de muda (lua cheia ou nova, ou muda vista).</li></ul>
+  <li>Bandeja <b>vazia</b> 1–2 h depois do trato;</li><li><b>OD ≥ 72%</b> (5 mg/L);</li><li><b>Amônia &lt; 1</b> e <b>nitrito &lt; 1</b> mg/L;</li><li><b>Não</b> ser dia de muda (lua cheia ou nova, ou muda vista).</li></ul>
  <p>Por quê: bandeja vazia mostra fome, mas se a água já está no limite, mais ração vira mais amônia e menos oxigênio. Subir aos poucos evita passar do ponto.</p>
  <h3>3. MANTER</h3><p>Quando sobrou <b>pouco</b> na bandeja. É o ponto certo: comeu quase tudo e não há desperdício.</p>
  <h3>4. BAIXAR 10–30%</h3><ul>
@@ -1541,10 +1541,10 @@ function numeros(s) {
       break; }
     out.push(String(tot + g + (dec || 0)));
   }
-  return out.join(" ").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
+  return out.join(" ").replace(/(\d+)\s+(virgula|ponto)\s+(\d+)/g, "$1.$3").replace(/(\d+)\s+([a-z]+)\s+e\s+0\.5\b/g, (m, a, u) => (+a + 0.5) + " " + u);
 }
 function falaTxt(s) {
-  return String(s).replace(/\s*CaCO₃/g, "").replace(/NH₃/g, "amônia tóxica").replace(/O₂/g, "O2").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus").replace(/mg\/L/g, " miligramas por litro").replace(/mL\/L/g, " mililitros por litro")
+  return String(s).replace(/(\d+)\.(\d+)/g, (m, a, b) => b.length === 3 && a !== "0" ? m : a + "," + b).replace(/\s*CaCO₃/g, "").replace(/NH₃/g, "amônia tóxica").replace(/O₂/g, "O2").replace(/m³/g, " metros cúbicos").replace(/°C/g, " graus").replace(/mg\/L/g, " miligramas por litro").replace(/mL\/L/g, " mililitros por litro")
     .replace(/UFC\/mL/g, " colônias por mililitro").replace(/(\d)\s?mL\b/g, "$1 mililitros").replace(/(\d)\s?kg\b/g, "$1 quilos").replace(/(\d)\s?g\b/g, "$1 gramas").replace(/(\d)\s?L\b/g, "$1 litros").replace(/\bppt\b/g, "partes por mil")
     .replace(/−/g, "menos ").replace(/×/g, " vezes ").replace(/≥/g, "maior ou igual a ").replace(/[⚠✔·›•]/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -1566,6 +1566,10 @@ async function grava(r, id) { id = id || ("r" + Date.now().toString(36) + Math.r
 function idadeD(data) { const d = diasEntre(data.slice(0, 10), hoje()); return d <= 0 ? (data.length > 10 ? "hoje às " + data.slice(11, 16) : "hoje") : d === 1 ? "ontem" : "há " + d + " dias"; }
 
 /* ---- respostas do app ---- */
+function curtoApp() { const al = alertas(), od = leituraRecente("od", hoje()), it = agendaDo(hoje()).filter(x => !x.feito)[0], o = [];
+  if (od) o.push("Oxigênio " + odFala(od.v) + ", " + idadeD(od.data) + ".");
+  o.push(al.length ? "Alertas: " + al.slice(0, 2).map(a => a[1]).join("; ") + "." : "Sem alertas."); if (it) o.push("Próximo: " + it.hora + ", " + it.t + ".");
+  return o.join(" ") + " Diga resumo completo para ouvir tudo."; }
 function resumo() {
   const out = [], dc = diaCultivo(hoje());
   out.push(dc == null ? "Tanque sem data de povoamento." : dc < 0 ? "Preparo da água, faltam " + (-dc) + " dias para povoar." : "Dia " + dc + " de cultivo.");
@@ -1589,13 +1593,14 @@ async function lancaLeitura(s) {
   await grava({ tipo: "leitura", data: o.data, valores: v, obs: "lançado por voz" });
   diz("Lancei" + ondeGrava() + ": " + Object.keys(v).map(k => PNv(k) + " " + valFala(k, v[k])).join("; ") + ".");
   const fx = Object.keys(v).filter(k => fora(k, v[k])).map(k => PNv(k) + " " + fora(k, v[k]) + ", a faixa boa é " + faixaTxt(k)); if (fx.length) diz("Atenção: " + fx.join("; ") + ".");
-  if (v.od != null && v.od < 3) diz("Oxigênio abaixo de 3: a ração do dia passa para suspender."); else if (v.od != null && v.od < 4) diz("Oxigênio abaixo de 4: a ração do dia cai 20%.");
+  if (v.od != null && v.od < 3) diz("Oxigênio abaixo de " + odFala(3) + ": a ração do dia passa para suspender."); else if (v.od != null && v.od < 4) diz("Oxigênio abaixo de " + odFala(4) + ": a ração do dia cai 20%.");
   const x = nh3(v.tan ?? (leituraRecente("tan", hoje()) || {}).v, v.ph ?? (leituraRecente("ph", hoje()) || {}).v, v.temp); if (x != null && x > 0.03 && (v.tan != null || v.ph != null)) diz("Amônia tóxica calculada: " + f(x, 3) + " mg/L, acima de 0,03.");
   const al = alertas().filter(a => a[0] === "bad"); if (al.length) diz("Alertas críticos: " + al.slice(0, 3).map(a => a[1] + ". " + a[2]).join(" "));
 }
 async function lancaTrato(s) {
   const q = s.match(/(\d+(?:\.\d+)?)\s*(kg|quilos?|kilos?|g|gramas?)?/); if (!q) return diz("Quantos gramas foram no trato?");
-  const g = +q[1] * (/^(kg|qui|kil)/.test(q[2] || "") ? 1000 : 1), dia = hoje(); let i = tratosDoDia(dia).length + 1; while (recs.some(r => r.id === "racao_" + dia + "_" + i)) i++;
+  const g = +q[1] * (/^(kg|qui|kil)/.test(q[2] || "") ? 1000 : 1), dia = hoje(), rr = diaCultivo(dia) >= 0 ? recomendacao(dia) : null;
+  if (!V.ok && rr && rr.porTrato > 0 && g > 1.5 * rr.porTrato) { V.conf = () => { V.ok = true; return lancaTrato(s).finally(() => V.ok = false); }; return diz(n0(g) + " g é mais que uma vez e meia o trato do app, que é " + n0(rr.porTrato) + " g. Confirma? Diga sim."); } let i = tratosDoDia(dia).length + 1; while (recs.some(r => r.id === "racao_" + dia + "_" + i)) i++;
   const d = new Date(), h = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"), b = /bandeja/.test(s) ? (/vazia|zer|limpa|comeu tudo/.test(s) ? "Vazia" : /muita|sobrou muito/.test(s) ? "Muita" : /pouca|pouco|sobr/.test(s) ? "Pouca" : "") : "", rac = prodRacao();
   await grava(Object.assign({ tipo: "racao", dia, trato: i, data: dia + "T" + h, hora: h, qtd: g, bandeja: b, muda: false }, rac ? { produto: rac.id } : {}), "racao_" + dia + "_" + i);
   const tot = tratosDoDia(dia).reduce((x, r) => x + (r.qtd || 0), 0), r = diaCultivo(dia) >= 0 ? recomendacao(dia) : null;
@@ -1607,7 +1612,7 @@ function produtoDe(s) { const a = ALIAS.find(([re]) => re.test(s)); if (a && PRO
 async function lancaAplicacao(s) {
   const p = produtoDe(s); if (!p) return diz("Não achei o produto. Fale o nome como está no Estoque.");
   const q = s.match(/(\d+(?:\.\d+)?)\s*(kg|quilos?|kilos?|g|gramas?|ml|mililitros?|l|litros?)?/); if (!q) return diz("Quanto de " + p + "? Fale com a unidade.");
-  const u = q[2] || "", un = /^(kg|qui|kil)/.test(u) ? "kg" : /^(ml|mili)/.test(u) ? "mL" : /^(l|litro)/.test(u) ? "L" : "g";
+  const u = q[2] || "", un = /^(kg|qui|kil)/.test(u) ? "kg" : /^(ml|mili)/.test(u) ? "mL" : /^(l|litro)/.test(u) ? "L" : /nutrat|acido|catalisador/i.test(p) ? "mL" : "g";
   await grava({ tipo: "aplicacao", data: agora(), produto: p, qtd: +q[1], un, obs: "lançado por voz" });
   diz("Aplicação lançada" + ondeGrava() + ": " + f(+q[1], +q[1] % 1 ? 1 : 0) + " " + un + " de " + p + ". Baixa do Estoque.");
   const ds = typeof doseSug === "function" ? doseSug(p) : ""; if (ds) diz("Dose do Cadastro: " + ds + ".");
@@ -1623,8 +1628,10 @@ async function trata(bruto) {
   if (tem(/\b(ajuda|comandos|o que (eu )?posso (falar|dizer))\b/)) return diz("Você pode falar: como está o tanque; o que tenho para fazer; quanto de ração hoje; lançar oxigênio 95 por cento, temperatura 29, pH 7 vírgula 8; amônia 0 vírgula 5 e nitrito 1; trato de 300 gramas, bandeja vazia; apliquei 600 gramas de puim; mortalidade 12; biometria 3 vírgula 5 gramas; espuma fina; emergência oxigênio; desfazer; repetir; e parar voz.");
   if (V.conf) { const c = V.conf; V.conf = null; if (tem(/\b(sim|confirmo|pode|isso)\b/)) return c(); return diz("Cancelado."); }
   if (tem(/\b(desfaz|desfazer|apaga o ultimo|apagar o ultimo|cancela o ultimo)\b/)) { const id = V.meus.pop(); if (!id) return diz("Não lancei nada por voz para desfazer."); await del(id); try { render(); } catch (e) { } return diz("Apaguei o último lançamento por voz."); }
-  if (tem(/emergencia|socorro/)) return diz(emergFala(s));
-  if (tem(/\b(como (esta|ta)|resumo|status|situacao|alertas?|me (atualiza|conta))\b/) && !leituras(s).od) return diz(resumo());
+  if (tem(/emergencia|socorro|falta de luz|faltou luz|soprador parou/)) return diz(emergFala(s));
+  if (tem(/\b(como (esta|ta)|resumo|status|situacao|alertas?|me (atualiza|conta))\b/) && !leituras(s).od) return diz(tem(/complet|detalh|tudo/) ? resumo() : curtoApp());
+  if (tem(/\b(qual|quanto|ultim)/) && !/\d/.test(s)) { const ks = PWv.filter(([re]) => re.test(s)).map(x => x[1]).filter((k, i, a) => a.indexOf(k) === i && !(k === "ph" && a.indexOf("phb") >= 0)); if (ks.length) return diz(ks.map(k => { const u = leituraRecente(k, hoje()); return u ? PNv(k) + " " + valFala(k, u.v) + ", " + idadeD(u.data) : PNv(k) + ": sem medida lançada"; }).join(". ") + "."); }
+  if (tem(/\b(coloquei|pus|botei|apliquei|joguei)\b.*\b(simbiotico|lote)\b/) && !/\d/.test(s)) { const dia = hoje(), r = ritualDo(dia), it = Object.assign({}, r.itens || {}, { simb: true }); await grava({ tipo: "ritual", dia, data: dia + "T05:00", itens: it, espuma: r.espuma || "" }, "ritual_" + dia); return diz("Simbiótico de hoje marcado como feito" + ondeGrava() + "."); }
   if (tem(/\b(o que (eu )?(tenho|faco|fazer)|agenda|pendente|tarefas?)\b/)) return diz(agendaFala());
   if (tem(/\b(quanto|qual)\b.*\b(racao|trato)\b|racao (de|do) (hoje|dia)/)) return diz(racaoFala());
   if (tem(/espuma/)) return lancaEspuma(s);
@@ -1649,10 +1656,10 @@ function fala(txt, depois) {
   partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); });
   mostra("🔊 " + txt);
 }
-function ouve() { if (!V.on || V.falando || V.ouvindo || !rc) return; try { rc.start(); V.ouvindo = true; mostra("🎙️ Ouvindo…"); } catch (e) { } }
-function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, ouve); } else ouve(); }
+function ouve() { if (!V.on || V.falando || V.ouvindo || !rc) return; try { rc.start(); V.ouvindo = true; V.tenta = 0; mostra("🎙️ Ouvindo…"); } catch (e) { if ((V.tenta = (V.tenta || 0) + 1) <= 4) setTimeout(ouve, 600); } } // iPhone: o microfone demora a soltar depois da fala
+function responde() { const t = V.buf.join(" "); V.buf = []; if (t) { V.ult = t; fala(t, () => setTimeout(ouve, 350)); } else ouve(); }
 function vozLiga() {
-  if (!SRv) return toast("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.");
+  if (!SRv) return toast("Este navegador não tem reconhecimento de voz. No iPhone, abra pelo Safari (não pelo ícone da tela inicial); no Android, pelo Chrome.");
   rc = new SRv(); rc.lang = "pt-BR"; rc.interimResults = false; rc.maxAlternatives = 1; rc.continuous = false;
   rc.onresult = async e => { const t = e.results[e.results.length - 1][0].transcript; V.ouvindo = false; mostra("🗣️ " + t); try { await trata(t); if (V.buf.length) V.erros = 0; } catch (er) { diz("Não consegui salvar: " + ((er && er.message) || "erro") + "."); } if (V.on) responde(); };
   rc.onend = () => { V.ouvindo = false; if (V.on && !V.falando) setTimeout(ouve, 300); };
@@ -1662,9 +1669,9 @@ function vozLiga() {
 }
 function desliga(msg) { V.on = false; V.conf = null; try { rc && rc.abort(); } catch (e) { } try { V.lock && V.lock.release(); } catch (e) { } V.lock = null; botao(); V.buf = []; if (msg) fala(msg); else { try { speechSynthesis.cancel(); } catch (e) { } mostra(""); } }
 document.addEventListener("visibilitychange", () => { if (V.on && document.visibilityState === "visible" && navigator.wakeLock) navigator.wakeLock.request("screen").then(l => V.lock = l).catch(() => { }); });
-const vst = document.createElement("style"); vst.textContent = "#bVoz{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);width:58px;height:58px;border-radius:50%;border:2px solid #fff;background:#1d4f91;color:#fff;font-size:26px;z-index:60;box-shadow:0 2px 10px #0006;cursor:pointer}#bVoz.on{background:#b3261e;animation:vozp 1.4s infinite}@keyframes vozp{50%{box-shadow:0 0 0 10px #b3261e33}}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);max-width:min(560px,calc(100% - 32px));background:#102030ee;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:60;pointer-events:none}";
+const vst = document.createElement("style"); vst.textContent = ".top>div:last-child{flex-wrap:wrap;justify-content:flex-end;min-width:0}.top>div:first-child{min-width:0}#btnNuvem{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media (max-width:430px){.top{gap:8px}.top h1{font-size:17px}#bVoz,#btnNuvem,#btnLancar{padding-left:9px;padding-right:9px}}#bVoz.on{background:#b3261e;border-color:#b3261e;color:#fff}#vozTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);max-width:min(560px,calc(100% - 32px));background:#102030ee;color:#fff;border-radius:10px;padding:8px 12px;font-size:14px;z-index:60;pointer-events:none}";
 document.head.appendChild(vst);
-const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); document.body.appendChild(bVoz);
+const bVoz = document.createElement("button"); bVoz.id = "bVoz"; bVoz.type = "button"; bVoz.className = "btn"; bVoz.textContent = "🎤"; bVoz.title = "Comando de voz"; bVoz.setAttribute("aria-label", "Comando de voz"); { const l = document.getElementById("btnLancar"); if (l) l.parentNode.insertBefore(bVoz, l); else document.body.appendChild(bVoz); } // no topo, ao lado do + Lançar: não cobre nada da tela
 const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidden = true; document.body.appendChild(vozTxt);
 function mostra(t) { vozTxt.hidden = !t; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
 function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹" : "🎤"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
