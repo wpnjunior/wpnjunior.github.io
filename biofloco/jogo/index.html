@@ -698,7 +698,7 @@ svg.graf{width:100%;height:auto;display:block}svg.graf text{fill:#8aa3ad;font:60
     st.entregas = st.entregas.filter(e => e.t > st.t);
   }
   function bombonaPasso(st) {
-    const bd = st.balde; if (bd.on && (st.t - bd.t0) >= 12 * 60 && !bd.avisou) { bd.avisou = true; ev(st, "info", "O lote ficou 12 h fechado. Passe para a bombona com Bactrat P e ar por 12 h.", "prebio_pronto"); }
+    const bd = st.balde; if (bd.on && (st.t - bd.t0) >= 24 * 60 && !bd.avisou) { bd.avisou = true; ev(st, "info", "O prebiótico fermentou (24 h). Passe para a bombona com 30 g de Bactrat P por balde.", "prebio_pronto"); }
     const b = st.bombona; if (b.fase === "vazia") return;
     const h = (st.t - b.t0) / 60;
     if (b.fase === "simbio") {
@@ -706,10 +706,10 @@ svg.graf{width:100%;height:auto;display:block}svg.graf text{fill:#8aa3ad;font:60
       b.pH = clamp(b.pH - (b.morta ? 0 : h < 30 ? 0.11 : 0.03) / 6, 3.8, 7.5);
       if (b.pH < 5) b.morta = true;
       if (b.morta) b.qual = Math.min(b.qual, 0.05);
-      else if (h <= 30) b.qual = clamp(h / 12, 0, 1); /* tese do Pimentel: 12 h fechado + 12 h com ar */
+      else if (h <= 30) b.qual = clamp(h / 24, 0, 1); /* caderno: 24 h de ar forte na bombona */
       else b.qual = Math.max(0.3, 1 - (Math.max(0, (st.t - (b.tf || b.t0)) / 60 - 30)) / 96); // balde novo renova o simbiótico
     }
-    if (b.fase === "simbio" && h >= 12 && !b.avisou2) { b.avisou2 = true; ev(st, "info", b.pH < 5 ? "Lote pronto, mas o pH caiu abaixo de 5: bactérias mortas." : "Lote do simbiótico pronto (12 h de ar): vai inteiro para o tanque.", "simbio_pronto"); }
+    if (b.fase === "simbio" && h >= 24 && !b.avisou2) { b.avisou2 = true; ev(st, "info", b.pH < 5 ? "Simbiótico pronto, mas o pH caiu abaixo de 5: bactérias mortas." : "Simbiótico pronto (24 h de ar): tire os 20 L do dia.", "simbio_pronto"); }
   }
 
   /* ---------- ações ---------- */
@@ -720,6 +720,7 @@ svg.graf{width:100%;height:auto;display:block}svg.graf text{fill:#8aa3ad;font:60
     const tem = st.estoque[item] || 0; if (tem < qtd) return false; st.estoque[item] = tem - qtd; return true; }
   function cobra(st, valor) { st.dinheiro -= valor; st.gasto += valor; }
 
+  const CBALDE = 600 * 0.3767 + 250 * 0.4211, NBALDE = 600 * 0.02172; // g de C e de N por balde de 20 L (puim Leite 2020; sacarose 42,11% C)
   let GANCHO = null; // modo automático do jogo: avisa cada ação e medida para a narração (nos testes fica desligado)
   function acao(st, tipo, p) {
     p = p || {}; const a = st.agua, cm = st.camarao; let msg = "", min = 0, ok = true;
@@ -767,30 +768,31 @@ svg.graf{width:100%;height:auto;display:block}svg.graf text{fill:#8aa3ad;font:60
       case "farelo": { if (!precisaAgua()) break; const g = p.g || 0; if (!gasta(st, "farelo", g)) { ok = false; msg = "Falta farelo."; break; }
         a.C += 0.3767 * g * 0.6 / V; a.OMc += 0.3767 * g * 0.25 / V; a.H += 0.25 * g / V; a.TAN += 0.02172 * g * 0.2 / V; /* puim matéria natural: 37,67% C e 2,17% N (Leite et al. 2020) */
         msg = `${g} g de farelo de arroz (puim) espalhado.`; min = TEMPO.aplicar; logA(st, msg); break; }
-      case "simbiotico": { if (!precisaAgua()) break; const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Não há lote de simbiótico na bombona."; break; }
-        const L = Math.min(p.L || b.litros, b.litros); const q = b.morta ? 0.05 : b.qual; const fr = L / Math.max(b.litros, 0.01), lote = fr * (b.litros / Math.max(b.lit0 || b.litros, 0.01));
-        const cOut = (b.Cg || 0) * fr, nOut = (b.Ng || 0) * fr; b.Cg = (b.Cg || 0) - cOut; b.Ng = (b.Ng || 0) - nOut; // receita da tese (Pimentel 2025, cap. III–V): por m³ 20 g de farelo (37,67% C, 2,17% N) + 2 g de açúcar (42,11% C) = 8,38 g C e 0,43 g N
-        const fq = (b.x || 1) * lote * 20 / V; /* um lote inteiro tem o efeito de bactéria da dose diária antiga (regra do app: a tese não mede Bacillus na água) */
-        a.Bac += 0.5 * fq * q; a.H += 0.8 * fq * q; a.C += cOut * 0.6 / V; a.OMc += cOut * 0.25 / V; a.TAN += nOut * 0.2 / V; /* 60% solúvel, 25% matéria orgânica, como o puim (regra do app) */
+      case "simbiotico": { if (!precisaAgua()) break; const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Não há simbiótico na bombona."; break; }
+        const L = Math.min(p.L || 20, b.litros); const q = b.morta ? 0.05 : b.qual; const f = L / V, fr = L / Math.max(b.litros, 1);
+        const cOut = (b.Cg || 0) * fr, nOut = (b.Ng || 0) * fr; b.Cg = (b.Cg || 0) - cOut; b.Ng = (b.Ng || 0) - nOut; // carbono e N que estão de fato na bombona (1 balde: 600 g puim × 37,67% + 250 g açúcar × 42,11% = 331,3 g C; 600 × 2,17% = 13,03 g N)
+        a.Bac += 0.5 * f * q; a.H += 0.8 * f * q; a.C += cOut * 0.6 / V; a.OMc += cOut * 0.25 / V; a.TAN += nOut * 0.2 / V; /* 60% solúvel, 25% matéria orgânica, como o puim (regra do app) */
         if (b.cat) { a.cat = 1; }
-        b.litros -= L; if (b.litros <= 0.05 * (b.lit0 || 1)) { b.fase = "vazia"; b.cat = false; b.bicarb = false; b.litros = 0; }
-        msg = `${b.fase === "vazia" ? "Lote inteiro" : L.toFixed(1).replace(".", ",") + " L"} do simbiótico no tanque${q < 0.3 ? " (fraco: bactérias mortas ou imaturo)" : ""}${b.cat ? ", flocado pelo catalisador" : ""}.`; min = TEMPO.aplicar; logA(st, msg); break; }
+        b.litros -= L; b.ultimo = st.t; if (b.litros <= 5) { b.fase = "vazia"; b.cat = false; b.bicarb = false; b.litros = 0; }
+        msg = `${Math.round(L)} L de simbiótico no tanque${q < 0.3 ? " (fraco: bactérias mortas ou imaturo)" : ""}${b.cat ? ", flocado pelo catalisador" : ""}.`; min = TEMPO.aplicar; logA(st, msg); break; }
       case "nh4cl": { if (!precisaAgua()) break; const g = p.g || Math.round(V); if (!gasta(st, "nh4cl", g)) { ok = false; msg = "Falta cloreto de amônio."; break; }
         a.TAN += 0.2619 * g / V; msg = `${g} g de cloreto de amônio: amônia +${(0.2619 * g / V).toFixed(2).replace(".", ",")} mg/L para as nitrificantes (Pimentel 2025: 1 mg/L do sal por dia na maturação).`; min = TEMPO.aplicar; logA(st, msg); break; }
-      case "prebiotico": { const b = st.balde;
-        if (b.on) { ok = false; msg = "O balde já está com um lote fechado."; break; }
+      case "prebiotico": { const b = st.balde; /* rotina do Wagner (decisão de 26/11, volta ao protocolo antigo): balde de 20 L vedado, 24 h no sol (caderno Só Bioflocos); 4 baldes na partida da bombona, depois 1 por dia (2 na emergência do Vibrio) */
+        if (b.on) { ok = false; msg = "O balde já está com prebiótico fermentando."; break; }
         if (a.Cl > 0.05) { ok = false; msg = "O cloro do tanque ainda não zerou: a água mataria os bacilos."; break; }
-        const x = p.x === 2 ? 2 : 1, fg = Math.round(20 * V * x), ag = Math.round(2 * V * x), bg = Math.round(2 * V * x); /* x = 2: lote dobrado (emergência; regra do app) */ // tese do Pimentel: por m³ 20 g de farelo, 2 g de açúcar, 2 g de bicarbonato; água 10× o farelo
-        if (!gasta(st, "farelo", fg) || !gasta(st, "acucar", ag) || !gasta(st, "bicarbonato", bg)) { ok = false; msg = "Falta farelo, açúcar ou bicarbonato."; break; }
-        Object.assign(b, { on: true, t0: st.t, avisou: false, n: 1, x });
-        msg = `Lote do simbiótico no balde fechado: ${fg} g de puim + ${ag} g de açúcar + ${bg} g de bicarbonato em ${(0.2 * V * x).toFixed(0)} L de água do tanque sem cloro (receita da tese do Pimentel). Fica 12 h fechado.`; min = TEMPO.bombona; logA(st, msg); break; }
-      case "simbio_iniciar": { const b = st.bombona, bd = st.balde; if (!bd.on || (st.t - bd.t0) < 12 * 60) { ok = false; msg = !bd.on ? "Faça o lote no balde primeiro." : "O lote ainda não completou 12 h fechado."; break; }
-        if (b.fase === "simbio" && !b.morta) { ok = false; msg = "A bombona ainda tem o lote anterior. Ponha no tanque ou descarte antes."; break; }
-        const x = bd.x || 1, gb = Math.max(1, Math.round(0.3 * V * x)); if (!gasta(st, "bactrat", gb)) { ok = false; msg = "Falta Bactrat P."; break; } /* tese: 0,2–0,4 g de Bacillus por m³; a quantidade de Bactrat é regra do app */
-        const lit = 0.2 * V * x; Object.assign(b, { fase: "simbio", t0: st.t, tf: st.t, pH: 7.2, litros: lit, lit0: lit, x, Cg: 8.376 * V * x, Ng: 0.4344 * V * x, qual: 0, bicarb: false, cat: false, avisou2: false, morta: false }); bd.on = false;
-        msg = `Lote na bombona com ${gb} g de Bactrat P, ar forte por 12 h. Depois vai inteiro para o tanque.`; min = TEMPO.bombona; logA(st, msg); break; }
-      case "bombona_bicarb": { const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Sem simbiótico na bombona."; break; } const gB = Math.round(2 * V * (b.x || 1)); if (!gasta(st, "bicarbonato", gB)) { ok = false; msg = "Falta bicarbonato."; break; } /* mais uma dose de bicarbonato do lote da tese (2 g/m³); o resgate e o efeito no pH são regra do app */
-        b.bicarb = true; b.pH = Math.min(7.5, b.pH + 1.2); msg = b.morta ? gB + " g de bicarbonato na bombona, mas as bactérias já morreram (pH passou abaixo de 5)." : gB + " g de bicarbonato na bombona (a dose do lote): o pH sobe de novo."; min = 5; logA(st, msg); break; }
+        const vaz = st.bombona.fase === "vazia", nb = vaz ? 4 : (p.x === 2 ? 2 : 1);
+        if (!gasta(st, "farelo", 600 * nb) || !gasta(st, "acucar", 250 * nb) || !gasta(st, "bicarbonato", 100 * nb)) { ok = false; msg = "Falta farelo, açúcar ou bicarbonato."; break; }
+        Object.assign(b, { on: true, t0: st.t, avisou: false, n: nb });
+        msg = `${nb > 1 ? nb + " baldes" : "1 balde"} de prebiótico de 20 L vedado${nb > 1 ? "s" : ""}, no sol: cada um com 600 g de puim + 250 g de açúcar + 100 g de bicarbonato + água do tanque sem cloro${vaz ? " (partida da bombona de 80 L)" : ""}. Fica 24 h sem ar (fase anaeróbica).`; min = TEMPO.bombona; logA(st, msg); break; }
+      case "simbio_iniciar": { const b = st.bombona, bd = st.balde; if (!bd.on || (st.t - bd.t0) < 24 * 60) { ok = false; msg = !bd.on ? "Faça o prebiótico no balde primeiro." : "O prebiótico ainda não fermentou (24 h)."; break; }
+        const nb = bd.n || 1; if (!gasta(st, "bactrat", 30 * nb)) { ok = false; msg = "Falta Bactrat P (30 g a cada balde, rotina do Wagner)."; break; }
+        if (b.fase === "simbio" && !b.morta) { const cab = Math.min(80, b.litros + 20 * nb) - b.litros, fr = cab / (20 * nb); b.litros += cab; b.Cg = (b.Cg || 0) + CBALDE * nb * fr; b.Ng = (b.Ng || 0) + NBALDE * nb * fr; /* só entra o carbono do que coube */ b.tf = st.t; bd.on = false;
+          msg = `${nb} balde${nb > 1 ? "s" : ""} de prebiótico + ${30 * nb} g de Bactrat P na bombona (${Math.round(b.litros)} L). Depois de 24 h de ar, tire os 20 L do dia.`; min = TEMPO.bombona; logA(st, msg); break; }
+        if (b.fase !== "vazia") { st.estoque.bactrat += 30 * nb; ok = false; msg = "A bombona ainda tem simbiótico azedado. Descarte antes."; break; }
+        Object.assign(b, { fase: "simbio", t0: st.t, tf: st.t, pH: 7.2, litros: Math.min(80, 20 * nb), lit0: 80, x: 1, Cg: CBALDE * nb, Ng: NBALDE * nb, qual: 0, bicarb: false, cat: false, avisou2: false, morta: false, ultimo: null }); bd.on = false;
+        msg = `Bombona de ${Math.min(80, 20 * nb)} L com ${nb} balde${nb > 1 ? "s" : ""} de prebiótico + ${30 * nb} g de Bactrat P, ar forte por 24 h.`; min = TEMPO.bombona; logA(st, msg); break; }
+      case "bombona_bicarb": { const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Sem simbiótico na bombona."; break; } if (!gasta(st, "bicarbonato", 80)) { ok = false; msg = "Falta bicarbonato."; break; } /* 80 g: regra do app (o caderno só dá a faixa 7,0–7,5) */
+        b.bicarb = true; b.pH = Math.min(7.5, b.pH + 1.2); msg = b.morta ? "80 g de bicarbonato na bombona, mas as bactérias já morreram (pH passou abaixo de 5)." : "80 g de bicarbonato na bombona: o pH sobe de novo."; min = 5; logA(st, msg); break; }
       case "bombona_cat": { const b = st.bombona; if (b.fase !== "simbio") { ok = false; msg = "Sem simbiótico na bombona."; break; } const mL = p.mL || 50; if (!gasta(st, "catalisador", mL)) { ok = false; msg = "Falta catalisador."; break; }
         if (b.pH < 6.8) { ok = false; msg = "Suba o pH da bombona para 7 com bicarbonato antes do catalisador."; st.estoque.catalisador += mL; break; }
         b.cat = true; msg = "Catalisador na bombona: o líquido engrossa e flocula na hora."; min = 5; logA(st, msg); break; }
@@ -1070,10 +1072,11 @@ svg.graf{width:100%;height:auto;display:block}svg.graf text{fill:#8aa3ad;font:60
     const nb = Math.round(V);
     out.push({ k: "nutrat", nome: "Nutrat", qtd: mot.length ? nb * 2 : nb, un: "mL", dobra: mot.length > 0, txt: mot.length ? `Em dobro (${nb} mL de manhã + ${nb} mL à tarde) porque: ${mot.join(", ")}.` : "1 mL por m³, diluído em 2 L, sobre os difusores.", base: "campo" });
     const form = dias == null || dias < 30;
-    if (simbHoje(st)) out.push({ k: "simbiotico", nome: "Simbiótico (lote da tese)", qtd: 1, un: "lote", txt: `Por m³: 20 g de puim + 2 g de açúcar + 2 g de bicarbonato + 0,3 g de Bactrat P; 12 h fechado + 12 h com ar; o lote inteiro no tanque. ${dias == null || dias < 15 ? "Todo dia até o dia 15." : "Depois do dia 15, 3 vezes por semana (seg, qua e sex; os dias são regra do app)."} Pimentel 2025 (tese FURG).`, base: "estudo" });
+    out.push({ k: "simbiotico", nome: "Simbiótico da bombona", qtd: 20, un: "L", txt: "Rotina do Wagner: 20 L por dia (1 L por m³), tirados da bombona de 80 L. Depois entra 1 balde de prebiótico de 20 L (600 g de puim + 250 g de açúcar + 100 g de bicarbonato, 24 h vedado) com 30 g de Bactrat P. 40 L só na emergência do Vibrio.", base: "campo" });
     if (kg > 0) {
       out.push({ k: "bicarbonato", nome: "Bicarbonato de rotina", qtd: Math.round(250 * kg), un: "g", txt: `0,25 kg por kg de ração × ${kg.toFixed(2)} kg.`, base: "estudo" });
       out.push({ k: "farelo", nome: "Farelo de arroz fermentado (carbono)", qtd: Math.round(500 * kg), un: "g", txt: `0,5 kg por kg de ração × ${kg.toFixed(2)} kg, Carbono principal, como no app. Leva a relação C:N para perto de 10.`, base: "campo" });
+      { const cn = cnDoDia(kg, 20); out.push({ k: "cn", nome: "Relação C:N do dia (ração + puim + 20 L de simbiótico)", qtd: "≈ " + cn.cn.toFixed(1).replace(".", ",") + " : 1", un: "", txt: `Carbono: ração ${cn.cR.toFixed(2)} kg + puim ${cn.cF.toFixed(2)} kg + simbiótico ${cn.cS.toFixed(3)} kg = ${cn.C.toFixed(2)} kg. Nitrogênio: ração ${cn.nR.toFixed(3)} kg + puim ${cn.nF.toFixed(3)} kg + simbiótico ${cn.nS.toFixed(4)} kg = ${cn.N.toFixed(3)} kg. ` + (cn.faltaC > 0.001 ? `Para chegar a 10 : 1 faltam ${cn.faltaC.toFixed(2)} kg de carbono = ${cn.fareloKg.toFixed(2)} kg a mais de puim.` : "Já passa de 10 : 1, não precisa de puim extra.") + " Referência 10 : 1 (Xu et al. 2022). Ração 45% de C e 40% de proteína; puim 37,67% C e 2,17% N (Leite 2020); açúcar 42,11% C; simbiótico conta o balde inteiro, sem descontar o que a fermentação gasta (regra do app).", base: "estudo" }); }
       out.push({ k: "azomite_racao", nome: "Azomite na ração", qtd: +(3 * kg).toFixed(1), un: "g", txt: "3 g por kg de ração (teto 4).", base: "estudo" });
     }
     if (alk && alk.v < 150) { const g = Math.min(1000, Math.round((160 - alk.v) * V / 0.595)); out.push({ k: "alc", nome: "Corrigir alcalinidade", qtd: g, un: "g", txt: `Alcalinidade ${alk.v}: (160 − ${alk.v}) × ${V.toFixed(1)} m³ ÷ 0,6. No máximo 1 kg de bicarbonato por dia${jm ? "" : "; ou cal hidratada em doses de até 200 g"}.`, base: "estudo" }); }
@@ -1096,8 +1099,11 @@ svg.graf{width:100%;height:auto;display:block}svg.graf text{fill:#8aa3ad;font:60
   }
 
   /* ---------- piloto: segue o app e o caderno (testes, ajudante e comparação de densidades) ---------- */
-  /* simbiótico pela tese do Pimentel (escolha do Wagner 23/11): todo dia na maturação e até o dia 15 depois de povoar; depois 3 vezes por semana */
-  function simbHoje(st, amanha) { const cm = st.camarao; const t = st.t + (amanha ? 1440 : 0); if (cm.povoado == null || !(cm.n > 0)) return true; if ((t - cm.povoado) / 1440 < 15) return true; return [1, 3, 5].includes(new Date(agoraMs(st) + (amanha ? 864e5 : 0)).getDay()); }
+  /* simbiótico pela rotina do Wagner (decisão de 26/11): bombona de 80 L, 1 balde de 20 L por dia, 20 L por dia no tanque */
+  /* C:N do dia como no app: ração (45% C; N = proteína ÷ 6,25), puim da rotina (0,5 kg por kg de ração) e os litros de simbiótico (cada litro = 1/20 de um balde) */
+  function cnDoDia(kg, litros) { const nR = kg * 0.40 / 6.25, cR = kg * 0.45, fa = 0.5 * kg, cF = fa * 0.3767, nF = fa * 0.02172, cS = (litros || 0) * CBALDE / 20 / 1000, nS = (litros || 0) * NBALDE / 20 / 1000;
+    const C = cR + cF + cS, N = nR + nF + nS, faltaC = Math.max(0, 10 * N - C); return { cn: N > 0 ? C / N : 0, C, N, cR, cF, cS, nR, nF, nS, fa, faltaC, fareloKg: faltaC / (0.3767 - 10 * 0.02172) }; }
+  function simbHoje() { return true; } /* rotina do Wagner (26/11): 20 L de simbiótico todo dia */
   function piloto(st, pf) {
     pf = Object.assign({ telas: true, cloro: 10, esperaCloro: true, inoculo: "nitrificante", nh4cl: true, carbono: true, bicarb: true, simbio: true, nutrat: true, sombrite: true, rodo: true, decantador: true,
       aguaDoce: true, lua: true, racao: 1, aclimatar: true, dens: 500, sal: 22, alvo: 12, minerais: true, acucar: true, prep: true, tratos: true, medir: true, despescar: true, maxDias: 125, maturar: 16 }, pf || {});
@@ -1105,13 +1111,12 @@ svg.graf{width:100%;height:auto;display:block}svg.graf text{fill:#8aa3ad;font:60
     const h = Math.floor(horaLocal(st) + 0.01), dia = diaIdx(st), V = Vm3(st);
     const uma = k => { if (P.d[k] === dia) return false; P.d[k] = dia; return true; };
     const A = (t, p) => acao(st, t, p);
-    if (pf.simbio && a.cheio && a.Cl <= 0.05 && h >= 6 && h <= 19) { const b = st.bombona, bd = st.balde; // lote da tese: 12 h no balde fechado + 12 h na bombona com ar; o lote inteiro vai para o tanque
+    if (pf.simbio && a.cheio && a.Cl <= 0.05 && h >= 6 && h <= 19) { const b = st.bombona, bd = st.balde; // rotina do Wagner: tira 20 L, entra 1 balde novo, faz o balde do dia seguinte
       if (b.fase === "simbio" && (b.morta || b.pH < 5)) A("bombona_descartar");
       if (b.fase === "simbio" && !b.morta && b.pH < 7.0) A("bombona_bicarb"); // caderno: manter 7,0–7,5
-      if (b.fase === "simbio" && !b.morta && st.t - b.t0 >= 12 * 60 && (P.fase === 2 || cm.n > 0) && simbHoje(st) && uma("simbap")) A("simbiotico");
-      if (b.fase === "simbio" && !b.morta && st.t - b.t0 >= 36 * 60) A("bombona_descartar"); // lote velho de dias sem uso
-      if (b.fase === "vazia" && bd.on && st.t - bd.t0 >= 12 * 60) A("simbio_iniciar");
-      if (!bd.on && st.bombona.fase === "vazia" && simbHoje(st, true) && uma("lote")) { A("prebiotico", { x: pf.loteX || 1 }); if (bd.on) bd.t0 -= bd.t0 % 60; } }
+      if (b.fase === "simbio" && !b.morta && st.t - b.t0 >= 24 * 60 && (P.fase === 2 || cm.n > 0) && uma("simbap")) A("simbiotico", { L: 20 * (pf.loteX || 1) });
+      if ((b.fase === "vazia" || (b.fase === "simbio" && !b.morta && b.litros <= 80 - 20 * (bd.n || 1) + 0.5)) && bd.on && st.t - bd.t0 >= 24 * 60) A("simbio_iniciar");
+      if (!bd.on && (st.bombona.fase === "vazia" || uma("balde"))) { A("prebiotico", { x: pf.loteX || 1 }); if (bd.on) bd.t0 -= bd.t0 % 60; } }
     if (pf.prep) {
       if (!a.cheio) { st.salAlvo = pf.sal; A("encher", { sal: pf.sal }); if (pf.cloro > 0) A("cloro", { g: Math.round(pf.cloro * Vm3(st) / 0.65) }); A("aeracao", { nivel: "max" }); P.fase = 1; return; }
       if (P.fase === 0) P.fase = cm.n > 0 ? 3 : 1;
@@ -1192,7 +1197,7 @@ svg.graf{width:100%;height:auto;display:block}svg.graf text{fill:#8aa3ad;font:60
     if (d.id === "verde" && s.t - t0 <= 6 * 60) { medir(s, "ph"); medir(s, "tan"); const ac = appDoses(s).find(x => x.k === "acido_fosforico"); if (ac) acao(s, "acido_fosforico", { mL: ac.qtd }); } /* app: medir o pH 1 h depois e repetir em doses pequenas */
     { piloto(s, { prep: false, despescar: false, aguaDoce: d.id !== "sal", racao: d.id === "vibrio" ? 0.65 : 0.75, loteX: d.id === "vibrio" ? 2 : 1, carbono: d.id !== "cone" }); if (["noite", "cone", "od3h", "sulfeto", "nitrito", "vibrio"].includes(d.id)) s.estufa.aeracao = "max"; if (d.id === "vibrio" && Math.floor(horaLocal(s)) === 8) { acao(s, "probiotico", { g: 30 }); /* lote dobrado pelo piloto (loteX 2) = o dobro da dose diária, como os 40 L escolhidos pelo Wagner */ } if (d.id === "verde" && ((s.t - t0 >= 12 * 60 && !s._re) || (s.t - t0 >= 21 * 60 && s._re === 1))) { s._re = (s._re || 0) + 1; medir(s, "tan"); const t2 = leit(s, "tan").v; if (t2 > 0.5) acao(s, "acucar", { g: Math.round(t2 * V * 20) }); } /* 21 h e 6 h: mede de novo e repete o açúcar (Avnimelech 1999) */ if (d.id === "sulfeto" && s.t - t0 > 1380 && s.t - t0 <= 1440) acao(s, "rodo"); if (d.id === "verde" && [10, 11, 12, 13, 14].includes(Math.floor(horaLocal(s)))) { medir(s, "ph"); medir(s, "tan"); medir(s, "temp"); const ac = appDoses(s).find(x => x.k === "acido_fosforico"); if (ac) acao(s, "acido_fosforico", { mL: ac.qtd }); } if (d.id === "calor") s.estufa.sombrite = true; /* ajuda: sombrite fechado nos três dias */ if (d.id === "verde") { s.estufa.sombrite = true; const hh = Math.floor(horaLocal(s)); if (hh === 10 || hh === 13) { const p = medir(s, "ph").v; if (p > 8.3) acao(s, "acido_fosforico", { mL: Math.round((p - 7.8) * 60 * V / 20) * 5 }); } } if (d.id === "noite" && s.agua.DO < 3.6 && !s._oxi) { s._oxi = 1; acao(s, "oxitrat", { g: 240 }); }; if (d.id === "alc" && Math.floor(horaLocal(s)) === 6 && s.t > t0 + 600) { const al = medir(s, "alk").v; if (al < 140) acao(s, "bicarbonato", { g: Math.round((165 - al) * V / 0.595) }); } }
   }
-  const API = { _efic: v => (EFIC = v), gancho: f => (GANCHO = f), vol: Vm3, horasTrato, piloto, desafioManejo, simbHoje, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
+  const API = { _efic: v => (EFIC = v), gancho: f => (GANCHO = f), vol: Vm3, horasTrato, piloto, desafioManejo, simbHoje, cnDoDia, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
     pctTabela, tratosTabela, curvaPeso, TANK, ITENS, PRECOS, TABELA, CURVA, interp, LC_NO2, LC_NH3, SAFE };
   if (typeof module !== "undefined" && module.exports) module.exports = API; else root.BFEngine = API;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -1216,7 +1221,7 @@ TX.itens = {
   oxitrat: { n: "Oxitrat", d: "Oxigênio em pó para emergência.", cor: "#e7c84e", onde: "tanque", un: "copo", max: 3, passo: 1, min: 1, ac: "oxitrat", par: "g", mult: 240, t: "1 copo de 200 mL efervesce e sobe o oxigênio na hora. É socorro, não rotina." },
   hth: { n: "Cloro HTH 65%", d: "Desinfeta a água crua.", cor: "#f4f4f4", onde: "tanque", un: "g", max: 1000, passo: 5, ac: "cloro", par: "g", t: "10 mg/L de cloro ativo já zeram as bactérias da água e somem em 3 a 5 dias com ar forte (manual; dose 10 a 20 mg/L: manual e Rekha e colegas, IJVASR 49(4)). Conta: mg/L × m³ ÷ 0,65." },
   tiossulfato: { n: "Tiossulfato", d: "Tira o cloro que sobrou.", cor: "#cfe3d3", onde: "tanque", un: "g", max: 500, passo: 5, ac: "tiossulfato", par: "g", t: "7 g por m³ para cada 1 mg/L de cloro. Meça o cloro antes." },
-  nh4cl: { n: "Cloreto de amônio", d: "Amônia para as nitrificantes na maturação.", cor: "#e6e3f0", onde: "tanque", un: "g", max: 200, passo: 5, ac: "nh4cl", par: "g", t: "Maturação da tese do Pimentel: 1 g por m³ por dia (20 g no tanque), junto com o lote do simbiótico, sem camarão. Com amônia acima de 1, não ponha." },
+  nh4cl: { n: "Cloreto de amônio", d: "Amônia para as nitrificantes na maturação.", cor: "#e6e3f0", onde: "tanque", un: "g", max: 200, passo: 5, ac: "nh4cl", par: "g", t: "Maturação da tese do Pimentel: 1 g por m³ por dia (20 g no tanque), junto com os 20 L de simbiótico, sem camarão. Com amônia acima de 1, não ponha." },
   kcl: { n: "Cloreto de potássio", d: "Repõe potássio.", cor: "#d99a9a", onde: "tanque", un: "g", max: 3000, passo: 50, ac: "kcl", par: "g", t: "Só depois de medir potássio. Corrigir no escuro desequilibra a proporção com o magnésio." },
   mgso4: { n: "Sulfato de magnésio", d: "Repõe magnésio.", cor: "#a9c7a0", onde: "tanque", un: "g", max: 5000, passo: 100, ac: "mgso4", par: "g", t: "Só depois de medir magnésio." },
   nitrificante: { n: "Nitrificante comercial", d: "Inóculo limpo de nitrificante 1 (Nitrosomonas: amônia em nitrito) e nitrificante 2 (Nitrobacter e Nitrospira: nitrito em nitrato).", cor: "#4f7cac", onde: "tanque", fixo: "inocular_nitrificante", t: "Encurta o pico de nitrito sem trazer doença. Só depois do cloro zerar." },
@@ -1242,7 +1247,7 @@ TX.missoes = [
   { t: "Pegue o cloro HTH na estante de preparo e aplique no tanque (cerca de 310 g dão 10 mg/L).", l: "A água crua traz bactérias, algas e às vezes vírus. O cloro por pelo menos 6 horas zera isso. Dose fraca (abaixo de 5 mg/L) deixa doença viva; o manual usa de 10 a 20.", ok: s => s.agua.ClMax >= 5, d: "Pegue o HTH na estante de preparo e leve até o tanque. São 310 g para os 20 m³ (10 mg/L)." },
   { t: "Abra o ar no máximo no soprador e use o Relógio. Meça o cloro com a maleta até dar zero.", l: "O cloro some com ar forte e sol. Com ar forte leva de 3 a 5 dias (manual); dose maior demora mais. Povoar com cloro mata a larva: só o teste diz que zerou.", ok: (s, g) => g.leu("cl") === 0 && s.agua.ClMax > 1, d: "No Relógio, passe um dia por vez e meça o cloro. Com pressa, o tiossulfato tira o cloro na hora." },
   { t: "Meça a alcalinidade e corrija com bicarbonato até 150 a 180.", l: "A alcalinidade é a reserva que segura o pH. As bactérias do floco gastam alcalinidade todo dia; sem ela o pH despenca.", ok: (s, g) => g.leu("alk") >= 150, d: "A conta em gramas é (160 − medido) × 20 ÷ 0,6. No máximo 1 kg de bicarbonato por dia." },
-  { t: "Na bombona: faça o lote do simbiótico no balde fechado. Depois de 12 h passe para a bombona com Bactrat P e ar.", l: "Receita da tese do Pimentel: por m³ de tanque 20 g de puim, 2 g de açúcar e 2 g de bicarbonato. 12 h fechado e 12 h com ar; o lote inteiro vai para o tanque. Abaixo de pH 5 as bactérias morrem.", ok: s => s.bombona.fase === "simbio", d: "O balde fica 12 h fechado. Depois leve o Bactrat P da estante Só Bioflocos até a bombona." },
+  { t: "Na bombona: faça os 4 baldes de prebiótico. Depois de 24 h passe para a bombona de 80 L com Bactrat P e ar.", l: "Rotina do Wagner: cada balde de 20 L leva 600 g de puim, 250 g de açúcar e 100 g de bicarbonato, vedado 24 h no sol. Na bombona, 30 g de Bactrat P por balde e ar forte. Depois saem 20 L por dia e entra 1 balde novo. Abaixo de pH 5 as bactérias morrem.", ok: s => s.bombona.fase === "simbio", d: "Os baldes ficam 24 h vedados. Depois leve o Bactrat P da estante Só Bioflocos até a bombona." },
   { t: "Maturação: todo dia o lote do simbiótico e 20 g de cloreto de amônio (estante de preparo). Inóculo é opcional.", l: "O manual só povoa com amônia e nitrito abaixo de 1 e cone entre 2 e 5: meça antes de soltar a larva. Nitrificante comercial é limpo. Floco do vizinho é rápido, mas pode trazer doença. Sem inóculo o nitrito sobe mais e por mais tempo.", ok: (s, g) => g.feito.simbiotico, d: "O simbiótico se pega na bombona e se despeja no tanque, sobre os difusores." },
   { t: "Pegue as pós-larvas na Chegada das pós-larvas, leve o saco ao tanque e aclimate antes de soltar.", l: "O saco vem com outra salinidade e outra temperatura. Larva solta de uma vez leva choque e parte morre em horas.", ok: s => s.camarao.n > 0, d: "Aclimate devagar: iguale a salinidade e a temperatura do saco com as do tanque antes de soltar." },
   { t: "Dê o primeiro trato (balde de ração no depósito) e confira a bandeja depois.", l: "Bandeja limpa: pode subir um pouco. Sobrou muito: baixe. Sobra apodrece, gasta oxigênio e vira amônia.", ok: (s, g) => g.feito.trato && g.feito.bandeja, d: "O Celular mostra os gramas de cada trato. A bandeja se confere umas 2 horas depois." },
@@ -1278,8 +1283,8 @@ TX.gloss = [
   ["Oxigênio dissolvido (OD)", "Só com ar o teto é cerca de 6,8 mg/L a 28 °C e 25 ppt (tabela de saturação). Os difusores de disco (bolha fina, 1 por m²) chegam perto do teto. O Nutrat não mexe no oxigênio: ele limpa a matéria orgânica que o gasta."],
   ["Cone Imhoff", "Mede o volume de floco em 1 litro. Meta 10 a 15 mL/L."],
   ["Floco", "Grumos de bactérias, algas e restos. Come amônia e vira alimento."],
-  ["Lote do simbiótico", "Por m³: 20 g de puim, 2 g de açúcar e 2 g de bicarbonato, 12 h no balde fechado."],
-  ["Simbiótico", "O lote + Bactrat P com ar forte na bombona por 12 h; vai inteiro para o tanque."],
+  ["Prebiótico", "Balde de 20 L vedado com 600 g de puim, 250 g de açúcar e 100 g de bicarbonato, 24 h no sol, sem ar."],
+  ["Simbiótico", "Bombona de 80 L com ar forte: prebiótico + 30 g de Bactrat P por balde. Saem 20 L por dia para o tanque."],
   ["Relação C:N", "Carbono por nitrogênio que entra no tanque. Perto de 10 as bactérias do floco dão conta da amônia."],
   ["Muda", "Troca da casca. Mais comum perto da lua cheia e da nova. Casca mole é hora frágil."],
   ["Academia", "Uma hora de ar no máximo de manhã para revolver tudo."],
@@ -1301,7 +1306,7 @@ TX.emerg = [
   ["Mortalidade de manhã", "Meça OD, amônia, nitrito e temperatura. Faça biometria e olhe brânquia, casca e cauda. Dúvida: microscópio, TCBS ou PCR."],
   ["Água acima de 32 °C", "Sombrite fechado, ar forte, ração −25% acima de 33."]
 ];
-TX.ritual = ["Olhar a espuma e a cor da água", "Medir oxigênio, temperatura e pH", "Nutrat sobre os difusores", "Simbiótico (lote da tese)", "Bicarbonato de rotina e puim", "Academia: 1 h de ar no máximo às 8 h", "Tratos no número da tabela (6 a 3 por dia, conforme o peso), com bandeja", "Sombrite conforme o sol", "Segunda-feira: rodo no fundo", "Lote do simbiótico em dia"];
+TX.ritual = ["Olhar a espuma e a cor da água", "Medir oxigênio, temperatura e pH", "Nutrat sobre os difusores", "Simbiótico (20 L da bombona)", "Bicarbonato de rotina e puim", "Academia: 1 h de ar no máximo às 8 h", "Tratos no número da tabela (6 a 3 por dia, conforme o peso), com bandeja", "Sombrite conforme o sol", "Segunda-feira: rodo no fundo", "Lote do simbiótico em dia"];
 TX.fonte = { espaco: "Fróes et al. 2013 (densidade acima de 1.111/m³)", amonia: "Lin e Chen 2001", nitrito: "Lin e Chen 2003", oxigenio: "Vinatea 2009; FURG 2022", calor: "Kumlu e Türkmen 2010; crônico é modelo", frio: "Kumlu e Türkmen 2010", pH: "modelo do jogo (sem estudo de faixa letal)", nitrato: "Kuhn 2010; Furtado 2015", cloro: "regra de zero cloro (sem estudo)", sulfeto: "Li 2017", salinidade: "Burbano-Gallardo 2017", aclimatacao: "limiares §15G (proposta do modelo; Winarni 2022: passos menores, mais sobrevivência)", canibalismo: "modelo da muda", natural: "perda de fundo (modelo)", fome: "modelo", vibriose: "Samocha; modelo", ahpnd: "WOAH", mancha_branca: "Millard 2020; Granja 2006", mionecrose: "modelo", nhp: "modelo", bolha: "modelo", co2: "Furtado 2017", caibra: "Roy 2007", manejo_muda: "modelo da muda (manual: nada de manejo na janela)" };
 TX.causa = { espaco: "Falta de espaço (densidade alta)", amonia: "Amônia", nitrito: "Nitrito", oxigenio: "Falta de oxigênio", calor: "Calor", frio: "Frio", pH: "pH fora da faixa", nitrato: "Nitrato", cloro: "Cloro", sulfeto: "H₂S do fundo", salinidade: "Choque de salinidade", aclimatacao: "Perda na soltura", canibalismo: "Canibalismo na muda", natural: "Perda normal", fome: "Fome", vibriose: "Vibriose", ahpnd: "AHPND", mancha_branca: "Mancha branca", mionecrose: "Mionecrose", nhp: "NHP", bolha: "Bolha de gás", co2: "CO₂", caibra: "Cãibra", manejo_muda: "Manejo na janela de muda" };
 
@@ -1351,7 +1356,7 @@ TX.ajuda = {
   sulfeto: [["Ar no máximo antes de mexer no fundo.", "O rodo solta lodo e sulfeto na água."], ["Passe o rodo (Ferramentas).", "Acaba com a zona morta: cada rodo corta o sulfeto pela metade."], ["Ligue o decantador e aplique Nutrat.", "Tira o lodo que subiu."], ["No dia seguinte, rodo de novo.", "Uma vez só não limpa seis semanas."], ["Daqui para frente, rodo toda semana.", "É o que evita o problema."]],
   cloro: [["Pegue o tiossulfato na estante de preparo e aplique 60 g no tanque.", "7 g por m³ para cada 1 mg/L: tira o cloro na hora."], ["Ar no máximo.", "Ajuda o resto do cloro a sair."], ["Meça o cloro: tem que dar zero.", "Só o teste confirma."], ["Aplique simbiótico.", "O cloro também matou parte do floco."]],
   nitrito: [["Meça nitrito, alcalinidade e salinidade.", "O cloreto protege: nível seguro de 15 mg/L a 25 ppt e de 6 mg/L a 15 ppt (Lin e Chen 2003)."], ["Bicarbonato até a alcalinidade passar de 150.", "As bactérias do nitrito param sem alcalinidade."], ["Ração −15% e ar no máximo.", "Menos amônia entrando e mais oxigênio para a nitrificação."], ["Não troque água nem aplique cloro.", "Você perderia as bactérias que estão resolvendo."], ["Paciência: meça todo dia.", "O nitrito cai quando a segunda turma de bactérias cresce."]],
-  vibrio: [["Baixe a ração em 30 a 40% e confira a bandeja.", "Vibrio vive de sobra de ração e matéria orgânica."], ["Descarte a bombona azedada e refaça: lote no balde fechado (12 h) e bombona com Bactrat P (12 h).", "Sem bacilos vivos o Vibrio toma conta. No bioflocos, o probiótico subiu a sobrevivência de 77% para 92% (Aguilera-Rivera 2014)."], ["Enquanto o simbiótico fermenta, 30 g de Bactrat P direto na água por dia (regra do app; sem estudo da dose).", "Põe bacilos na água já, sem esperar 48 h."], ["Com o lote pronto, lote dobrado todo dia até o Vibrio baixar (o dobro da dose diária, como os 40 L que o Wagner escolheu na bombona; regra do app, sem estudo da dose).", "Os bacilos do simbiótico tomam o lugar do Vibrio."], ["Ar no máximo, nada de rodo e semeie a placa TCBS.", "Camarão estressado adoece mais; o rodo levanta matéria orgânica; a placa é a única medida de Vibrio que você tem."]],
+  vibrio: [["Baixe a ração em 30 a 40% e confira a bandeja.", "Vibrio vive de sobra de ração e matéria orgânica."], ["Descarte a bombona azedada e refaça: 4 baldes de prebiótico (24 h vedados) e bombona com Bactrat P (24 h de ar).", "Sem bacilos vivos o Vibrio toma conta. No bioflocos, o probiótico subiu a sobrevivência de 77% para 92% (Aguilera-Rivera 2014)."], ["Enquanto o simbiótico fermenta, 30 g de Bactrat P direto na água por dia (regra do app; sem estudo da dose).", "Põe bacilos na água já, sem esperar 48 h."], ["Com a bombona pronta, 40 L por dia até o Vibrio baixar, com 2 baldes novos por dia (escolha do Wagner; regra do app, sem estudo da dose).", "Os bacilos do simbiótico tomam o lugar do Vibrio."], ["Ar no máximo, nada de rodo e semeie a placa TCBS.", "Camarão estressado adoece mais; o rodo levanta matéria orgânica; a placa é a única medida de Vibrio que você tem."]],
 };
 
 </script>
@@ -1443,20 +1448,22 @@ function tarefas() {
   if (!a.cheio) { add("Encher o tanque com 20 a 25 ppt.", "Caixa d'água e registro"); return out; }
   // bombona e balde
   if (!j.bombona) {
-    if (!bd.on && b.fase === "vazia") add("Fazer o lote do simbiótico no balde fechado (fica 12 h).", "Bombona e balde");
-    if (bd.on && b.fase === "vazia") { const hb = (st.t - bd.t0) / 60; add(hb >= 12 ? "Passar o lote para a bombona: leve o Bactrat P até ela." : "Lote fechado no balde: faltam " + nf(12 - hb, 0) + " h para passar à bombona.", "Estante Só Bioflocos e bombona"); }
-    if (b.fase === "simbio") { const p = E.leit(st, "phBomb"), novo = p && p.t >= b.t0 ? p : null; if (!novo || st.t - novo.t > 8 * 60) add("Medir o pH da bombona.", "Bombona e balde"); else if (novo.v < 7) add("pH do lote em " + nf(novo.v, 1) + ": pôr bicarbonato (faixa 7,0–7,5 do caderno; mais uma dose do lote, 2 g por m³, é regra do app).", "Bombona e balde", 1);
-      if (st.t - b.t0 >= 12 * 60 && E.simbHoje(st)) add("O lote está pronto: ponha o lote inteiro no tanque.", "Bombona e tanque"); }
+    if (!bd.on && b.fase === "vazia") add("Fazer os 4 baldes de prebiótico para a partida da bombona (24 h vedados).", "Bombona e balde");
+    if (bd.on && b.fase === "vazia") { const hb = (st.t - bd.t0) / 60; add(hb >= 24 ? "Passar o prebiótico para a bombona: leve o Bactrat P até ela (30 g por balde)." : "Prebiótico fermentando no balde: faltam " + nf(24 - hb, 0) + " h para passar à bombona.", "Estante Só Bioflocos e bombona"); }
+    if (b.fase === "simbio") { const p = E.leit(st, "phBomb"), novo = p && p.t >= b.t0 ? p : null; if (!novo || st.t - novo.t > 8 * 60) add("Medir o pH da bombona.", "Bombona e balde"); else if (novo.v < 7) add("pH da bombona em " + nf(novo.v, 1) + ": pôr 80 g de bicarbonato (faixa 7,0–7,5 do caderno; os 80 g são regra do app).", "Bombona e balde", 1);
+      const hoje0 = st.t - ((st.t + 360) % 1440 + 1440) % 1440; if (st.t - b.t0 >= 24 * 60 && !(b.ultimo >= hoje0) && (cm.n > 0 || G.feito.nh4cl)) add("Tirar os 20 L de simbiótico do dia e pôr no tanque.", "Bombona e tanque");
+      if (!bd.on && b.litros > 0) add("Fazer o balde de prebiótico do dia (entra na bombona amanhã).", "Bombona e balde");
+      if (bd.on && (st.t - bd.t0) >= 24 * 60 && b.litros <= 60.5) add("Passar o balde fermentado para a bombona com 30 g de Bactrat P.", "Estante Só Bioflocos e bombona"); }
   }
   if (!(cm.n > 0) && !cm.despescado) { // preparo da água
-    const cl = le("cl"), al = le("alk", 72), pronto = b.fase === "simbio" && st.t - b.t0 >= 12 * 60;
+    const cl = le("cl"), al = le("alk", 72), pronto = b.fase === "simbio" && st.t - b.t0 >= 24 * 60;
     if (a.ClMax < 1 && !G.feito.inocular_nitrificante && !G.feito.inocular_vizinho) add("Desinfetar a água com cloro HTH (cerca de 310 g, 10 mg/L).", "Estante de preparo e tanque");
     else if (a.ClMax >= 1 && (!cl || cl.v > 0 || cl.t < st.t - 36 * 60)) { if (st.estufa.aeracao !== "max") add("Abrir o ar no máximo para o cloro sair.", "Soprador"); add(cl && cl.v > 0 ? "Cloro ainda em " + nf(cl.v, 1) + " mg/L: esperar (Relógio) e medir de novo. Tiossulfato tira na hora." : "Medir o cloro até dar zero.", "Bancada de análises"); return out; }
     if (!al) add("Medir a alcalinidade.", "Bancada de análises"); else if (al.v < 150) add("Alcalinidade em " + nf(al.v, 0) + ": corrigir com bicarbonato até 150 a 180.", "Estante Só Bioflocos");
     if (!le("sal", 200)) add("Medir a salinidade.", "Bancada de análises");
-    if (!G.feito.inocular_nitrificante && !G.feito.inocular_vizinho && !G.feito.nh4cl) add("Maturação da tese: todo dia 1 lote do simbiótico + 20 g de cloreto de amônio (estante de preparo). Inóculo é opcional.", "Estante de preparo");
+    if (!G.feito.inocular_nitrificante && !G.feito.inocular_vizinho && !G.feito.nh4cl) add("Maturação: todo dia 20 L de simbiótico + 20 g de cloreto de amônio (estante de preparo). Inóculo é opcional.", "Estante de preparo");
     if (pronto) { if (!G.feito.simbiotico) add("Aplicar o primeiro simbiótico no tanque.", "Bombona e tanque"); { const ta = le("tan", 74), ni = le("no2", 74); if (!ta || !ni) add("Medir amônia e nitrito antes de povoar: o manual só povoa com os dois abaixo de 1.", "Bancada de análises"); else if (ta.v >= 1 || ni.v >= 1) add("Amônia ou nitrito em 1 ou mais: esperar a água amadurecer (simbiótico e Relógio) e medir de novo antes de povoar.", "Relógio"); } add("Povoar: pegar as pós-larvas e aclimatar antes de soltar.", "Chegada das pós-larvas", 1); }
-    else add("Esperar o lote do simbiótico ficar pronto (12 h fechado + 12 h com ar). Use o Relógio.", "Relógio");
+    else add("Esperar o simbiótico ficar pronto (24 h de balde vedado + 24 h de bombona com ar). Use o Relógio.", "Relógio");
     return out;
   }
   if (cm.despescado) return [{ t: "Ciclo despescado.", onde: "", urg: 0 }];
@@ -1473,7 +1480,7 @@ function tarefas() {
     if (feitos > 0 && h >= 20 && !st.leituras.some(l => l.k === "bandeja" && Math.floor((l.t + 360) / 1440) === dia)) add("Conferir a bandeja.", "Balde de ração no tanque"); }
   if (!j.rotina) { const RE = { nutrat: /Nutrat/, simbiotico: /simbiótico no tanque/, bicarbonato: /g de bicarbonato:/, farelo: /puim/, acucar: /açúcar/, alc: /g de bicarbonato:/, acido_fosforico: /ácido fosfórico/, agua_doce: /água doce/ };
     const LUG = { nutrat: "Estante Só Bioflocos", simbiotico: "Bombona e balde", decantador: "Decantador", agua_doce: "Caixa d'água e registro", azomite_racao: "Depósito de ração" };
-    if (h >= 6 && h < 20) E.appDoses(st).forEach(d => { if (d.k === "azomite_racao") return; if (d.k === "simbiotico" && !(b.fase === "simbio" && st.t - b.t0 >= 24 * 60)) return; if (RE[d.k] && hoje(RE[d.k])) return;
+    if (h >= 6 && h < 20) E.appDoses(st).forEach(d => { if (d.k === "azomite_racao" || d.k === "cn") return; if (d.k === "simbiotico" && !(b.fase === "simbio" && st.t - b.t0 >= 24 * 60)) return; if (RE[d.k] && hoje(RE[d.k])) return;
       add(d.nome + ": " + (typeof d.qtd === "number" ? nf(d.qtd) + " " + d.un : d.qtd) + ".", LUG[d.k] || "Estante Só Bioflocos", d.k === "acucar" || d.k === "decantador" ? 1 : 0); });
     if (h >= 8 && h < 9 && st.estufa.aeracao !== "max") add("Academia: ar no máximo por 1 hora.", "Soprador"); if (h >= 9 && st.estufa.aeracao === "max" && !jm && !(le("od", 6) && le("od", 6).v < 5)) add("Voltar o ar ao normal (a academia acabou).", "Soprador");
     if (a.diasSemRodo >= 7 && !jm) add("Passar o rodo no fundo (já faz " + Math.round(a.diasSemRodo) + " dias).", "Ferramentas", 1); }
@@ -1572,8 +1579,9 @@ function usarNoTanque() {
   if (k === "simb") return abre("Simbiótico no tanque", c => {
     const b = st.bombona; if (b.fase !== "simbio") { P(c, "A bombona está vazia."); G.mao = null; return; }
     const s = G.modo === "real" ? null : E.appDoses(st).find(x => x.k === "simbiotico");
-    P(c, (s ? s.txt + " " : "") + "O lote tem " + nf(b.litros, 1) + " L e vai inteiro.", "nota");
-    c.appendChild(bt("Despejar o lote sobre os difusores", () => { faz("simbiotico"); if (st.bombona.fase !== "simbio") G.mao = null; fecha(); }, "p")); });
+    P(c, (s ? s.txt + " " : "") + "A bombona tem " + nf(b.litros, 0) + " L.", "nota");
+    c.appendChild(bt("Despejar 20 L sobre os difusores", () => { faz("simbiotico", { L: 20 }); G.mao = null; fecha(); }, "p"));
+    c.appendChild(bt("Despejar 40 L (só emergência do Vibrio)", () => { faz("simbiotico", { L: 40 }); G.mao = null; fecha(); })); });
   if (it.fixo) return abre(it.n, c => { P(c, it.t); c.appendChild(bt("Colocar no tanque", () => { faz(it.fixo); G.mao = null; fecha(); }, "p")); });
   abre(it.n, c => {
     P(c, it.t); const s = sug(k);
@@ -1654,18 +1662,19 @@ function prateleira(tit, lista) {
 function bombona() {
   abre("Bombona e balde", c => {
     const b = st.bombona, bd = st.balde, hb = (st.t - b.t0) / 60, ph = E.leit(st, "phBomb");
-    P(c, "Balde: " + (bd.on ? "lote fechado há " + nf((st.t - bd.t0) / 60, 0) + " h (precisa de 12 h)." : "vazio."));
-    P(c, "Bombona: " + (b.fase === "simbio" ? "lote com ar há " + nf(hb, 0) + " h, " + nf(b.litros, 1) + " L." + (hb < 12 ? " Ainda no ar (12 h)." : " Pronto: vai inteiro para o tanque.") + (b.morta ? " AZEDOU: bactérias mortas, descarte." : "") + (ph && ph.t >= b.t0 ? " Último pH medido: " + nf(ph.v, 1) + "." : " pH ainda não medido.") : "vazia."));
-    if (!bd.on) { c.appendChild(bt("Fazer o lote do simbiótico (receita da tese)", () => { faz("prebiotico"); bombona(); }, b.fase === "vazia" ? "p" : "")); c.appendChild(bt("Fazer lote dobrado (emergência)", () => { faz("prebiotico", { x: 2 }); bombona(); })); }
-    if (b.fase === "vazia") { if (G.mao === "bactrat") c.appendChild(bt("Montar o simbiótico com Bactrat P", () => { const r = faz("simbio_iniciar"); if (r.ok) G.mao = null; bombona(); }, "p")); else P(c, "Para passar o lote à bombona, traga o Bactrat P da estante Só Bioflocos (com o lote de 12 h fechado pronto).", "nota"); }
+    P(c, "Balde: " + (bd.on ? (bd.n || 1) + " balde" + ((bd.n || 1) > 1 ? "s" : "") + " de prebiótico vedado" + ((bd.n || 1) > 1 ? "s" : "") + " há " + nf((st.t - bd.t0) / 60, 0) + " h (precisa de 24 h)." : "vazio."));
+    P(c, "Bombona: " + (b.fase === "simbio" ? "com ar há " + nf(hb, 0) + " h, " + nf(b.litros, 0) + " de 80 L." + (hb < 24 ? " Ainda formando (24 h de ar)." : " Pronto: saem 20 L por dia.") + (b.morta ? " AZEDOU: bactérias mortas, descarte." : "") + (ph && ph.t >= b.t0 ? " Último pH medido: " + nf(ph.v, 1) + "." : " pH ainda não medido.") : "vazia."));
+    if (!bd.on) { c.appendChild(bt(b.fase === "vazia" ? "Fazer os 4 baldes de prebiótico (partida)" : "Fazer o balde de prebiótico do dia", () => { faz("prebiotico"); bombona(); }, "p")); if (b.fase !== "vazia") c.appendChild(bt("Fazer 2 baldes (emergência do Vibrio)", () => { faz("prebiotico", { x: 2 }); bombona(); })); }
+    if (bd.on && (st.t - bd.t0) >= 24 * 60 && b.fase === "simbio") { if (G.mao === "bactrat") c.appendChild(bt("Passar o prebiótico para a bombona com Bactrat P", () => { const r = faz("simbio_iniciar"); if (r.ok) G.mao = null; bombona(); }, "p")); else P(c, "Para passar o balde à bombona, traga o Bactrat P da estante Só Bioflocos (30 g por balde).", "nota"); }
+    if (b.fase === "vazia") { if (G.mao === "bactrat") c.appendChild(bt("Montar o simbiótico com Bactrat P", () => { const r = faz("simbio_iniciar"); if (r.ok) G.mao = null; bombona(); }, "p")); else P(c, "Para montar a bombona, traga o Bactrat P da estante Só Bioflocos (com os baldes de 24 h prontos).", "nota"); }
     else {
       c.appendChild(bt("Medir o pH da bombona (3 min)", () => { faz("bombona_ph"); bombona(); }));
-      c.appendChild(bt("Pôr " + Math.round(2 * E.vol(st) * (b.x || 1)) + " g de bicarbonato na bombona (dose do lote)", () => { faz("bombona_bicarb"); bombona(); }));
+      c.appendChild(bt("Pôr 80 g de bicarbonato na bombona", () => { faz("bombona_bicarb"); bombona(); }));
       if (G.mao === "catalisador") { const le = dose(c, { un: "mL", min: 10, max: 150, passo: 10, val: 50, nota: "Com o pH da bombona perto de 7. O líquido engrossa e flocula." }); c.appendChild(bt("Pôr o catalisador", () => { faz("bombona_cat", { mL: le() }); bombona(); }, "p")); }
-      c.appendChild(bt("Levar o lote ao tanque", () => pega("simb"), hb >= 12 ? "p" : ""));
+      c.appendChild(bt("Levar 20 L ao tanque", () => pega("simb"), hb >= 24 ? "p" : ""));
       let arm = false; const d = bt("Descartar e lavar a bombona", () => { if (!arm) { arm = true; d.textContent = "Toque de novo para confirmar"; return; } faz("bombona_descartar"); bombona(); }, "r"); c.appendChild(d);
     }
-    if (G.modo === "aprender") P(c, "Dica: receita da tese do Pimentel. Por m³ de tanque: 20 g de puim + 2 g de açúcar + 2 g de bicarbonato + 0,3 g de Bactrat P, água 10× o farelo. 12 h no balde fechado, 12 h na bombona com ar, e o lote inteiro vai para o tanque. Todo dia na maturação e até o dia 15; depois 3 vezes por semana. Abaixo de pH 5 as bactérias morrem.", "nota");
+    if (G.modo === "aprender") P(c, "Dica: rotina do Wagner. Balde de 20 L vedado com 600 g de puim + 250 g de açúcar + 100 g de bicarbonato, 24 h no sol (fase sem ar). A bombona de 80 L começa com 4 baldes e 30 g de Bactrat P por balde, com ar forte. Depois, todo dia: saem 20 L para o tanque e entra 1 balde novo. pH da bombona entre 7,0 e 7,5; abaixo de 5 as bactérias morrem.", "nota");
   });
 }
 function registroAgua() {
@@ -2400,7 +2409,7 @@ function trata(bruto) {
   if (tem(/(montar|iniciar|comecar).*simbiotico|bactrat|balde na bombona|por o balde/)) return age("simbio_iniciar");
   if (tem(/catalisador/)) { const q = qtd(s); return age("bombona_cat", { mL: q ? q.v : 50 }); }
   if (tem(/descartar.*bombona|lavar a bombona/)) { V.conf = () => age("bombona_descartar"); return diz("Descartar e lavar a bombona? Diga sim para confirmar."); }
-  if (tem(/simbiotico/)) { if (st.bombona.fase !== "simbio") return diz("A bombona está vazia. Diga: fazer o lote do simbiótico."); const q = qtd(s), L = q && q.u !== "balde" ? q.v : Math.round(st.bombona.litros); if (!q) diz("Simbiótico: o lote inteiro, " + nf(L) + " litros (receita da tese)."); return age("simbiotico", { L: Math.min(L, Math.round(st.bombona.litros)) }); }
+  if (tem(/simbiotico/)) { if (st.bombona.fase !== "simbio") return diz("A bombona está vazia. Diga: fazer o lote do simbiótico."); const q = qtd(s), L = q && q.u !== "balde" ? q.v : 20; if (!q) diz("Simbiótico: 20 litros da bombona."); return age("simbiotico", { L: Math.min(L, Math.round(st.bombona.litros)) }); }
   // medir e consultar
   const ks = params(s), verbo = tem(/\b(medir|mede|meca|medicao|analisa|analisar|testar|teste|leitura)\b/);
   if (tem(/\bmedir tudo|mede tudo|todas as medidas|medir (a )?agua/)) return medir(tem(/tudo|todas/) ? ["od", "temp", "ph", "sal", "alk", "tan", "no2", "cone"] : ["od", "temp", "ph"]);
