@@ -372,7 +372,7 @@ function recomendacao(dia){
     else if(muita>=2){fat=0.8;txt=`${muita} tratos com MUITA sobra ontem: baixar 20%`;por="Sobra é ração que apodrece no fundo: gasta oxigênio, vira amônia e engorda o floco. Além de dinheiro perdido."}
     else if(muita===1){fat=0.9;txt="1 trato com muita sobra ontem: baixar 10%";por="Um trato com sobra já mostra oferta acima do apetite. Corte leve e confira de novo."}
     else if(vazia===bj.length){
-      if(bloqueios.length){fat=1;txt="Bandejas zeraram, mas NÃO subi: "+bloqueios.join(", ");por="O manual só manda subir 5–10% com bandeja vazia E OD ≥ 5 E amônia < 1 E nitrito < 1 E fora de dia de muda. Com qualquer um desses fora, mais ração piora a água."}
+      if(bloqueios.length){fat=1;txt="Bandejas zeraram, mas NÃO subi: "+bloqueios.join(", ");por="O manual só manda subir 5–10% com bandeja vazia E OD ≥ 72% (5 mg/L) E amônia < 1 E nitrito < 1 E fora de dia de muda. Com qualquer um desses fora, mais ração piora a água."}
       else{fat=1.07;txt="Todas as bandejas zeraram e a água está boa: subir 7%";por="Bandeja vazia 1–2 h depois do trato, com oxigênio, amônia e nitrito em ordem, mostra que o camarão comeu tudo e aguenta mais. Suba aos poucos (5–10%) para não passar do ponto."}}
     else {txt="Sobrou pouco ontem: manter";por="Pouca sobra é o ponto certo: ele comeu quase tudo sem desperdício."}
     base=totOntem*fat;
@@ -938,7 +938,7 @@ T.aprenda_quando=()=>`<div class="learn"><h2>Quando aumentar ou reduzir a raçã
  <h3>3. MANTER</h3><p>Quando sobrou <b>pouco</b> na bandeja. É o ponto certo: comeu quase tudo e não há desperdício.</p>
  <h3>4. BAIXAR 10–30%</h3><ul>
   <li><b>Sobrou muito</b> na bandeja: −10% (um trato) a −20% (dois ou mais). Sobra apodrece, gasta oxigênio e vira amônia.</li>
-  <li><b>OD &lt; 4</b>: −20%. Abaixo de 3, suspenda e ligue toda a aeração. Digerir gasta oxigênio.</li>
+  <li><b>OD &lt; 58% (4 mg/L)</b>: −20%. Abaixo de 3, suspenda e ligue toda a aeração. Digerir gasta oxigênio.</li>
   <li><b>Amônia &gt; 1</b>: açúcar (amônia × m³ × 20 g), ração mantida. <b>Amônia &gt; 3 ou NH₃ &gt; 0,1</b>: −30%. A amônia vem da proteína da ração.</li>
   <li><b>Nitrito &gt; 1</b>: alerta, alcalinidade no alto. <b>Nitrito &gt; 5</b>: −15%. As bactérias não estão dando conta.</li>
   <li><b>Cone Imhoff &gt; 20 mL/L</b>: −15% e Nutrat dobrado. Sem dreno, a carga só cai se entrar menos.</li>
@@ -1011,7 +1011,7 @@ T.aprenda_estudos=()=>{const E=[
  ["Carbono (C:N)","Halim et al. 2025, Aquaculture, Fish and Fisheries 5:e70032","10.1002/aff2.70032","parcial","Lido só pelo resumo. Bioflocos com melaço, C:N 10 a 25 (vannamei junto com camarão de água doce): C:N 10 deu sobrevivência de 95,3%, conversão 1,58 e o melhor retorno econômico.","Apoio para a referência 10 : 1, não é a base."],
  ["Carbono (C:N)","Cao et al. 2025, Bioresource Technology 435:132961","10.1016/j.biortech.2025.132961","nao","Carrossel: C:N 20 com glicose derrubou a amônia em 98%; C:N 15 deu +32% de peso.","Citado como não conferido."],
  ["Aeração","Han et al. 2025, Water 17(1):41","10.3390/w17010041","parcial","Bioflocos com 75, 35 e 10 L/min de ar: o DHA do floco foi maior com 75 L/min (resumo). O resto do carrossel veio do corpo do artigo.","Reforça ar no máximo e a academia de 1 h."],
- ["Oxigênio","Patkaew et al. 2024, Veterinary World 17:50","10.14202/vetworld.2024.50-58","ok","OD a 15 mg/L (O₂ puro) contra 5 mg/L por 30 dias: peso 14,73 contra 12,13 g e conversão 1,55 contra 2,51.","Reforça a meta OD ≥ 5 e o plano B com cilindro de O₂."],
+ ["Oxigênio","Patkaew et al. 2024, Veterinary World 17:50","10.14202/vetworld.2024.50-58","ok","OD a 15 mg/L (O₂ puro) contra 5 mg/L por 30 dias: peso 14,73 contra 12,13 g e conversão 1,55 contra 2,51.","Reforça a meta OD ≥ 72% (5 mg/L) e o plano B com cilindro de O₂."],
  ["Probiótico","Vega-Carranza et al. 2024, Animals 14:2676","10.3390/ani14182676","ok","Sem troca de água: Bacillus licheniformis e bactérias lácticas baixaram a amônia e aumentaram peso e sobrevivência.","Reforça o probiótico na bombona."],
  ["Temperatura","Zhang et al. 2025, Animals 15:2113","10.3390/ani15142113","ok","Consumo de ração em 30 min: 0,46 g a 20 °C e 0,95 g a 32 °C; amônia 12 mg/L e nitrito 40 mg/L também cortaram o consumo.","Ração −10% entre 22 e 26 °C (abaixo de 22, −25% como antes)."],
  ["Tratos por dia","Liang et al. 2025, Animals 15:192","10.3390/ani15020192","ok","Alimentador automático: 6 a 8 tratos por dia foi o melhor (ótimo 7,8), melhor que o manual.","Ideia para quando houver alimentador. O app segue com os tratos da tabela."],
