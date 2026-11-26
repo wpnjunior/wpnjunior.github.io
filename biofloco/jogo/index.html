@@ -1671,6 +1671,7 @@ function menu() {
     c.appendChild(bt(G.semSeta ? "Ligar a seta que mostra aonde ir" : "Desligar a seta que mostra aonde ir", () => { G.semSeta = !G.semSeta; rumoT = 0; fecha(); }));
     if (G.modo !== "desafio") c.appendChild(bt("Salvar agora", () => { salva(); aviso("Jogo salvo.", "bom", 3000); fecha(); }));
     c.appendChild(bt(G.som ? "Som: ligado" : "Som: desligado", () => { G.som = !G.som; somVolume(); menu(); }));
+    if (window.__voz && window.speechSynthesis) c.appendChild(bt("Voz da narração (escolher a mais natural)", () => window.__voz.painelVoz()));
     if (G.modo !== "desafio") c.appendChild(bt("Ver os gráficos até aqui (mostra a verdade)", () => graficos("Gráficos: verdade × medido")));
     c.appendChild(bt("Voltar ao início", () => { salva(); fecha(); capa(); }, "p"));
     P(c, "Mover: joystick ou W A S D. Usar: botão amarelo ou tecla E. Girar a câmera: arrastar a tela.", "nota");
@@ -2272,16 +2273,21 @@ function trata(bruto) {
 }
 
 /* ---- ouvir e falar ---- */
-let rc = null, vozPt = null;
-function escolheVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find(v => /pt[-_]BR/i.test(v.lang) && /google/i.test(v.name)) || vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null; }
+let rc = null, vozPt = null; const VR = { rate: 1 }; try { VR.rate = +localStorage.getItem("bf_vozv") || 1; } catch (e) { }
+/* a voz mais natural do aparelho: Edge/Windows "Online (Natural)", iPhone "Aprimorada/Premium", Chrome "Google"; o jogador pode escolher outra no Menu */
+const notaVoz = v => (/pt[-_]BR/i.test(v.lang) ? 10 : /^pt/i.test(v.lang) ? 4 : -99) + (/natural|neural|online/i.test(v.name) ? 6 : 0) + (/premium|enhanced|aprimorad|melhorad|siri/i.test(v.name) ? 5 : 0) + (/google/i.test(v.name) ? 3 : 0) + (/francisca|luciana|thalita|antonio|felipe|fernanda/i.test(v.name) ? 1 : 0) - (/compact|eloquence|novelty|robo/i.test(v.name) ? 6 : 0);
+const vozesPt = () => (window.speechSynthesis ? speechSynthesis.getVoices() : []).filter(v => /^pt/i.test(v.lang)).sort((a, b) => notaVoz(b) - notaVoz(a));
+function escolheVoz() { let nome = null; try { nome = localStorage.getItem("bf_voz"); } catch (e) { } const vs = vozesPt(); vozPt = (nome && vs.find(v => v.name === nome)) || vs[0] || null; }
 if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = escolheVoz; }
 function fala(txt, depois, quieto) {
   if (!window.speechSynthesis) { if (depois) depois(); return; }
   V.falando = true; try { rc && rc.abort(); } catch (e) { }
-  if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); const partes = falaTxt(txt).match(/[^.;:!?]+[.;:!?]*/g) || [txt]; let n = 0, fim = false;
+  if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); let fim = false;
+  // frases juntas em blocos de até ~230 letras: fala corrida, sem pausa a cada ponto (o Chrome corta falas muito longas)
+  const partes = []; (falaTxt(txt).match(/[^.;:!?]+[.;:!?]*/g) || [txt]).forEach(f => { const u = partes.length - 1; if (u >= 0 && (partes[u] + f).length <= 230) partes[u] += f; else partes.push(f); });
   const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
   V.trava = setTimeout(acabou, falaTxt(txt).length * 95 + 4000); // o Chrome às vezes não avisa o fim
-  partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); n++; });
+  partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = vozPt ? vozPt.lang : "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = VR.rate; u.pitch = 1; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); });
   if (!quieto) mostra("🔊 " + txt);
 }
 function ouve() {
@@ -2313,7 +2319,16 @@ const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidde
 function mostra(t) { vozTxt.hidden = !t || !V.on && !V.falando; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
 function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹ Voz" : "🎤 Voz"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
 bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
-window.__voz = { fala, trata: t => { V.buf = []; trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, falaTxt, V };
+function painelVoz() { // Menu > Voz da narração: escolher a voz e a velocidade, com teste
+  abre("Voz da narração", c => { const vs = vozesPt();
+    if (!vs.length) { P(c, "Este aparelho não tem voz em português instalada. No iPhone: Ajustes > Acessibilidade > Conteúdo Falado > Vozes > Português (Brasil) e baixe uma voz Aprimorada ou Premium. No Windows, o Edge já traz vozes naturais (Francisca, Antonio)."); return; }
+    P(c, "As vozes do topo são as mais naturais deste aparelho. Toque para ouvir e escolher.");
+    vs.forEach(v => { const b = el("button", "sel" + (vozPt && v.name === vozPt.name ? " on" : ""), v.name + (notaVoz(v) >= 15 ? "  ★ natural" : "")); b.type = "button"; b.style.textAlign = "left";
+      b.onclick = () => { vozPt = v; try { localStorage.setItem("bf_voz", v.name); } catch (e) { } fala("Olá, Wagner. Esta é a voz que vai narrar a aula do tanque de bioflocos.", null, true); painelVoz(); }; c.appendChild(b); });
+    const l = el("div", "lin"); [["Devagar", 0.9], ["Normal", 1], ["Rápida", 1.15]].forEach(([n, r]) => l.appendChild(bt(n + (VR.rate === r ? " ✓" : ""), () => { VR.rate = r; try { localStorage.setItem("bf_vozv", r); } catch (e) { } fala("Velocidade " + n.toLowerCase() + ".", null, true); painelVoz(); }))); c.appendChild(l);
+    P(c, "No iPhone, vozes Aprimoradas ou Premium soam bem melhor: Ajustes > Acessibilidade > Conteúdo Falado > Vozes > Português (Brasil).", "nota"); });
+}
+window.__voz = { fala, painelVoz, trata: t => { V.buf = []; trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, falaTxt, V };
 }
 
 /* ---------- modo automático: o jogo conduz o ciclo sozinho e dá a aula ----------
