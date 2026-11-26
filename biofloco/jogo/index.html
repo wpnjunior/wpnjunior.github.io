@@ -661,6 +661,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     const tem = st.estoque[item] || 0; if (tem < qtd) return false; st.estoque[item] = tem - qtd; return true; }
   function cobra(st, valor) { st.dinheiro -= valor; st.gasto += valor; }
 
+  let GANCHO = null; // modo automático do jogo: avisa cada ação e medida para a narração (nos testes fica desligado)
   function acao(st, tipo, p) {
     p = p || {}; const a = st.agua, cm = st.camarao; let msg = "", min = 0, ok = true;
     const V = Math.max(Vm3(st), 0.001), dentro = a.cheio;
@@ -851,6 +852,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       default: ok = false; msg = "Ação desconhecida: " + tipo;
     }
     if (ok && min > 0) avancar(st, min);
+    if (GANCHO) GANCHO(st, tipo, p, { ok, msg, min });
     return { ok, msg, min };
   }
   function precoKg(W) { return W < 8 ? 18 : W < 10 ? 22 : W < 12 ? 26 : W < 15 ? 30 : W < 18 ? 34 : 38; }
@@ -879,6 +881,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
       default: return { ok: false, msg: "Medida desconhecida." };
     }
     st.leituras.push({ t: st.t, k, v }); if (st.leituras.length > 5000) st.leituras.shift();
+    if (GANCHO) GANCHO(st, "medir", { k }, { ok: true, v });
     return { ok: true, v, msg: `${txt}: ${String(v).replace(".", ",")} ${u}`.trim() };
   }
 
@@ -1109,7 +1112,7 @@ svg text{fill:var(--fraco);font:11px var(--corpo)}
     if (pf.tratos && h === 21 && uma("bandeja")) A("bandeja");
   }
 
-  const API = { _efic: v => (EFIC = v), vol: Vm3, horasTrato, piloto, simbHoje, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
+  const API = { _efic: v => (EFIC = v), gancho: f => (GANCHO = f), vol: Vm3, horasTrato, piloto, simbHoje, appRacao, appDoses, appAlertas, appLote, leit,  novoEstado, acao, avancar, medir, olhar, verdade, relatorio, corAgua, espuma, horaLocal, agoraMs, diaIdx, janelaMuda, idadeLua, pHcalc, nh3Frac, doSat, tss,
     pctTabela, tratosTabela, curvaPeso, TANK, ITENS, PRECOS, TABELA, CURVA, interp, LC_NO2, LC_NH3, SAFE };
   if (typeof module !== "undefined" && module.exports) module.exports = API; else root.BFEngine = API;
 })(typeof window !== "undefined" ? window : globalThis);
@@ -1281,6 +1284,7 @@ const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const nf = (v, d) => v == null ? "—" : Number(v).toLocaleString("pt-BR", { minimumFractionDigits: d || 0, maximumFractionDigits: d == null ? 1 : d });
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const bt = (txt, fn, cls) => { const b = el("button", "bt" + (cls ? " " + cls : ""), txt); b.type = "button"; b.onclick = fn; return b; };
+let AUTO = null; // modo automático (auto.js)
 let st = null, G = null, skip = null, folhaAberta = false, relogioReal = 0, salvaT = 0;
 TX.itens.rede = { n: "Rede de despesca", d: "Despesca parcial ou total.", cor: "#44606e", onde: "tanque" };
 const FERR = ["rodo", "puca", "rede", "sonda"];
@@ -1396,7 +1400,7 @@ function tarefas() {
 const ONDE = [["balde de ração no tanque", "tanque"], ["registro", "agua"], ["bombona", "bomb"], ["só bioflocos", "prat1"], ["preparo", "prat2"], ["maleta", "banc"], ["bancada", "banc"], ["soprador", "ar"], ["pós-larvas", "pl"], ["ração", "racao"], ["decantador", "dec"], ["sombrite", "somb"], ["ferramentas", "ferr"], ["tanque", "tanque"], ["relógio", "bRel"], ["celular", "bCel"]];
 function ondeId(o) { o = (o || "").toLowerCase(); let m = null, mi = 1e9; ONDE.forEach(([k, id]) => { const i = o.indexOf(k); if (i >= 0 && i < mi) { mi = i; m = id; } }); return m; }
 function rumo() {
-  if (!G || !st || st.fim || G.semSeta || (G.des && G.des.fim)) return null;
+  if (!G || !st || st.fim || G.semSeta || (AUTO && AUTO.corre) || (G.des && G.des.fim)) return null;
   if (G.mao) { const it = TX.itens[G.mao]; return { id: it.onde === "bombona" ? "bomb" : it.onde === "racao" ? "racao" : "tanque" }; }
   const l = tarefas(), u = l.find(x => x.urg > 1 && ondeId(x.onde)), m = G.modo === "aprender" && TX.missoes[G.mis];
   if (!u && m && m.e) return { id: m.e };
@@ -1766,6 +1770,7 @@ function cenarioXu() { // Xu et al. 2025, Fishes 10:326: 200 e 800 camarões por
 
 /* ---------- capa ---------- */
 function capa() {
+  if (AUTO) AUTO.sai();
   st = null; G = null; skip = null; desf = null; $("bDesf").hidden = true; ["topo", "missao", "joy", "acoes"].forEach(i => $(i).hidden = true); $("capa").hidden = false;
   const c = $("capaBt"); c.innerHTML = ""; let livre = null, tem = false; const NS = 5;
   for (let s = 0; s < NS; s++) { const m = meta(s); if (!m) { if (livre == null) livre = s; continue; }
@@ -1778,6 +1783,7 @@ function capa() {
   c.appendChild(el("span", "tag", "Começar do zero"));
   c.appendChild(bt("Novo ciclo guiado (Aprender)", novo("aprender"), tem ? "" : "p"));
   c.appendChild(bt("Novo ciclo real, sem dicas", novo("real")));
+  c.appendChild(bt("Assistir: ciclo automático com aula em voz", () => { if (AUTO) AUTO.pede = true; novo("real")(); }));
   if (tem) c.appendChild(el("div", "nota", "Um ciclo novo não apaga os salvos: cabem " + NS + " jogos."));
   c.appendChild(bt("Desafio do dia", desafios)); c.appendChild(bt("Comparar densidades", comparar)); c.appendChild(bt("Cenário do estudo Xu", cenarioXu));
 }
@@ -1785,7 +1791,7 @@ function carrega(s) { try { const j = JSON.parse(localStorage.getItem(KEY + s));
 function entra() { $("bAjuda").hidden = G.modo !== "desafio"; $("bGuia").hidden = G.modo === "desafio";
   $("capa").hidden = true; ["topo", "acoes"].forEach(i => $(i).hidden = false); $("joy").hidden = !matchMedia("(pointer:coarse)").matches;
   boneco.position.set(G.px, 0, G.pz); somb.s = st.estufa.sombrite ? 1 : 0; somb.feito = -1; if (!st.clima.elev && st.t === 0) E.avancar(st, 10);
-  eventos(); missao(); hud(); somLiga();
+  eventos(); missao(); hud(); somLiga(); if (AUTO) AUTO.entra();
 }
 $("bFazer").onclick = fazerAgora; $("bAjuda").onclick = ajudaDes; $("bDesf").onclick = desfazer; $("bCel").onclick = () => celular(0); $("bRel").onclick = relogio; $("bGuia").onclick = () => guia(0); $("bMenu").onclick = menu;
 
@@ -1984,7 +1990,8 @@ function quadro(agora) {
   const dt = Math.min(0.05, (agora - ultimo) / 1000); ultimo = agora; tAnim += dt;
   // tempo do jogo
   if (G && st) {
-    if (skip && !folhaAberta) { const t0 = performance.now();
+    if (AUTO && AUTO.passo(dt)) { }
+    else if (skip && !folhaAberta) { const t0 = performance.now();
       do { const m = Math.min(60 - (st.t % 60 || 0) || 60, skip.ate - st.t); if (m > 0) { E.avancar(st, m); posTempo(); } if (skip && (skip.parar || st.t >= skip.ate || st.fim)) { skip = null; if (G) salva(); } } while (skip && !folhaAberta && G && performance.now() - t0 < 9); }
     else if (!folhaAberta) { relogioReal += dt; if (relogioReal > 20) { relogioReal = 0; E.avancar(st, 10); posTempo(); } }
     if (G && salvaT > 0 && (salvaT -= dt) <= 0 && !skip) salva();
@@ -2268,14 +2275,14 @@ function trata(bruto) {
 let rc = null, vozPt = null;
 function escolheVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find(v => /pt[-_]BR/i.test(v.lang) && /google/i.test(v.name)) || vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null; }
 if (window.speechSynthesis) { escolheVoz(); speechSynthesis.onvoiceschanged = escolheVoz; }
-function fala(txt, depois) {
+function fala(txt, depois, quieto) {
   if (!window.speechSynthesis) { if (depois) depois(); return; }
   V.falando = true; try { rc && rc.abort(); } catch (e) { }
   if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); const partes = falaTxt(txt).match(/[^.;:!?]+[.;:!?]*/g) || [txt]; let n = 0, fim = false;
   const acabou = () => { if (fim) return; fim = true; clearTimeout(V.trava); V.falando = false; mostra(""); if (depois) depois(); };
   V.trava = setTimeout(acabou, falaTxt(txt).length * 95 + 4000); // o Chrome às vezes não avisa o fim
   partes.forEach((p, i) => { const u = new SpeechSynthesisUtterance(p.trim()); u.lang = "pt-BR"; if (vozPt) u.voice = vozPt; u.rate = 1.05; if (i === partes.length - 1) { u.onend = acabou; u.onerror = acabou; } speechSynthesis.speak(u); n++; });
-  mostra("🔊 " + txt);
+  if (!quieto) mostra("🔊 " + txt);
 }
 function ouve() {
   if (!V.on || V.falando || V.ouvindo || !rc) return;
@@ -2306,7 +2313,195 @@ const vozTxt = document.createElement("div"); vozTxt.id = "vozTxt"; vozTxt.hidde
 function mostra(t) { vozTxt.hidden = !t || !V.on && !V.falando; vozTxt.textContent = t.length > 260 ? t.slice(0, 257) + "…" : t; }
 function botao() { bVoz.classList.toggle("on", V.on); bVoz.textContent = V.on ? "⏹ Voz" : "🎤 Voz"; bVoz.title = V.on ? "Desligar comando de voz" : "Comando de voz"; }
 bVoz.onclick = () => { if (V.on) desliga(); else vozLiga(); };
-window.__voz = { trata: t => { V.buf = []; trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, falaTxt, V };
+window.__voz = { fala, trata: t => { V.buf = []; trata(t); const r = V.buf.join(" "); V.buf = []; return r; }, numeros, falaTxt, V };
+}
+
+/* ---------- modo automático: o jogo conduz o ciclo sozinho e dá a aula ----------
+   As decisões são as do piloto do motor (E.piloto): o mesmo manejo do app e do caderno Só Bioflocos que os testes usam.
+   A narração só junta textos que o jogo já tem (missões, produtos, perguntas, mensagens do motor), com as fontes citadas neles.
+   Pausar devolve o controle ao jogador; Continuar retoma de onde o tanque está. */
+{ // bloco próprio
+const A = { on: false, rodando: false, voz: true, vel: 0, fila: [], atual: null, ate: 0, falando: false, tok: 0, hp: -1, ev: [], col: false, visto: {}, manha: -1, jm: false, alvo: null, fimDito: false, lock: null, pede: false };
+const VEL = [{ n: "1×", m: 60, k: 1 }, { n: "4×", m: 240, k: 1.6 }, { n: "12×", m: 720, k: 2.5 }]; // minutos do jogo por segundo
+E.gancho((s, tipo, p, r) => { if (A.col && s === st) A.ev.push({ tipo, p: p || {}, r: r || {} }); });
+const VOZ = () => window.__voz && window.__voz.fala;
+
+/* ---- textos: só o que o jogo já tem ---- */
+const M = i => TX.missoes[i].l, IT = k => TX.itens[k], Q = k => TX.quiz[k].e;
+const NITRI = "Os dois personagens da nitrificação: a nitrificante 1 (Nitrosomonas) come a amônia e solta nitrito; a nitrificante 2 (Nitrobacter e Nitrospira) come o nitrito e solta nitrato.";
+const ALTA = "Acima de 600 por metro quadrado, ou com sólidos acima de 500, o manejo de maior sobrevivência dos estudos de alta densidade (Xu 2025; Samocha 2012) é ar contínuo e troca de água para segurar os sólidos entre 200 e 500.";
+const NOME = { od: "oxigênio", temp: "temperatura", ph: "pH", sal: "salinidade", alk: "alcalinidade", tan: "amônia", no2: "nitrito", no3: "nitrato", cl: "cloro", cone: "cone Imhoff", ca: "cálcio", mg: "magnésio", k: "potássio" };
+const UN = { temp: "°C", sal: "ppt", alk: "mg/L", tan: "mg/L", no2: "mg/L", no3: "mg/L", cl: "mg/L", cone: "mL/L", ca: "mg/L", mg: "mg/L", k: "mg/L" };
+const CONCEITO = { od: () => TX.gloss.find(g => /^Oxig/.test(g[0]))[1], tan: () => M(9), no2: () => NITRI + " " + M(9), alk: () => M(3), cone: () => M(10), cl: () => M(2), ca: () => M(16) };
+const QF = { od: "od", temp: "temp", ph: "ph", alk: "alk", tan: "tan", no2: "no2", cone: "cone" }; // fora da faixa: a explicação da pergunta do jogo
+const num = s => +String(s).replace(",", ".");
+function naFaixa(k, v) { const f = TX.faixa[k]; let m; if (!f) return null;
+  if ((m = f.match(/^≥\s*([\d,]+)/))) return v >= num(m[1]); if ((m = f.match(/^<\s*([\d,]+)/))) return v < num(m[1]);
+  if ((m = f.match(/^([\d,]+)–([\d,]+)/))) return v >= num(m[1]) && v <= num(m[2]); if (f === "0") return v <= 0.05; return null; }
+function odT(v) { const a = st.agua, s = a.cheio ? E.doSat(a.T, a.S) : 0; return s ? nf(v / s * 100, 0) + "% de saturação (" + nf(v, 1) + " mg/L)" : nf(v, 1) + " mg/L"; }
+function valT(k, v) { return k === "od" ? odT(v) : nf(v, k === "ph" || k === "temp" ? 1 : v === 0 ? 0 : v < 1 ? 2 : v < 10 ? 1 : 0) + (UN[k] ? " " + UN[k] : ""); }
+function faixaT(k) { const f = TX.faixa[k]; return (f || "").replace("≥ ", "pelo menos ").replace("< ", "abaixo de ") + (k === "od" ? " mg/L" : UN[k] ? " " + UN[k] : ""); }
+const dia = () => E.diaIdx(st);
+function novo(k) { const v = A.visto[k], d = dia(); if (v != null && d - v < 30) return false; A.visto[k] = d; return true; } // explicação inteira na 1ª vez e de 30 em 30 dias
+
+function narraMed(meds) {
+  const ult = {}; meds.forEach(m => ult[m.p.k] = m.r.v); const ks = Object.keys(ult).filter(k => NOME[k]);
+  if (!ks.length) return null; const fora = [], extra = [];
+  const partes = ks.map(k => { if (k === "cl") return "cloro " + valT(k, ult[k]) + (ult[k] > 0.05 ? ": ainda não zerou, sem inóculo e sem larva" : ": zerou");
+    const ok = naFaixa(k, ult[k]); if (ok === false) fora.push(k); return NOME[k] + " " + valT(k, ult[k]) + (ok === false ? ", fora da faixa de " + faixaT(k) : ""); });
+  ks.forEach(k => { if (CONCEITO[k] && novo("med_" + k)) extra.push(CONCEITO[k]()); });
+  fora.forEach(k => { if (QF[k] && TX.quiz[QF[k]] && novo("fora_" + k)) extra.push(Q(QF[k])); });
+  return { onde: "banc", leve: !fora.length && !extra.length, txt: "Medições na bancada: " + partes.join("; ") + "." + (fora.length ? "" : ks.length > 2 ? " Tudo na faixa." : "") + (extra.length ? " " + extra.join(" ") : "") };
+}
+function porque(tipo, p) {
+  const cm = st.camarao, h = Math.floor(dataLocal().h);
+  switch (tipo) {
+    case "encher": return ["agua", M(0)];
+    case "cloro": return ["prat2", M(1) + " " + IT("hth").t];
+    case "aeracao": if (p.nivel !== "max") return ["ar", ""];
+      if (!(cm.n > 0)) return ["ar", "Ar forte agora é para o cloro sumir. " + M(2), "ar_cloro"];
+      if (h === 8) return ["ar", "Academia. " + M(11) + " " + TX.missoes[11].d, "ar_acad"];
+      return ["ar", ALTA, "ar_alta"];
+    case "bicarbonato": return ["prat1", (cm.n > 0 ? Q("alk") : M(3)) + " " + IT("bicarbonato").t];
+    case "inocular_nitrificante": return ["prat2", NITRI + " " + IT("nitrificante").t + " " + M(5)];
+    case "inocular_vizinho": return ["prat2", IT("vizinho").t];
+    case "nh4cl": return ["prat2", IT("nh4cl").t + " Esse sal é a comida da nitrificante 1 (Nitrosomonas), que transforma a amônia em nitrito; em seguida a nitrificante 2 (Nitrobacter e Nitrospira) transforma o nitrito em nitrato. Assim as duas crescem antes de o camarão chegar."];
+    case "prebiotico": return ["bomb", M(4)];
+    case "simbio_iniciar": return ["bomb", "Bactrat P: " + IT("bactrat").d];
+    case "simbiotico": return ["bomb", "O simbiótico diário forma o floco e segura o Vibrio."];
+    case "bombona_bicarb": return ["bomb", "O caderno manda manter a bombona entre pH 7,0 e 7,5. Abaixo de pH 5 as bactérias morrem."];
+    case "bombona_descartar": return ["bomb", "Lote perdido ou velho demais vai fora: abaixo de pH 5 as bactérias morrem."];
+    case "nutrat": return ["prat1", IT("nutrat").d + " " + IT("nutrat").t];
+    case "farelo": return ["prat1", M(12) + " " + IT("farelo").t];
+    case "acucar": return ["prat1", IT("acucar").d + " " + IT("acucar").t];
+    case "acido_fosforico": return ["prat1", IT("acido_fosforico").t + " " + Q("ph")];
+    case "decantador": return ["dec", Q("cone")];
+    case "agua_doce": return ["agua", "Evaporação: a salinidade sobe; repor água doce sem cloro, pela água que falta no nível."];
+    case "troca": return ["agua", ALTA];
+    case "rodo": return ["ferr", M(15)];
+    case "kcl": return ["prat2", M(16) + " " + IT("kcl").t];
+    case "mgso4": return ["prat2", M(16) + " " + IT("mgso4").t];
+    case "biometria": return ["ferr", M(14)];
+    case "sombrite": return ["somb", M(13)];
+    case "povoar": return ["pl", "Depois da maturação, amônia e nitrito abaixo de 1: é hora de povoar. " + M(6) + " " + Q("povoou")];
+    case "trato": return ["racao", "Sobra apodrece, gasta oxigênio e vira amônia. Os gramas vêm da conta do celular, a mesma do app: tabela de ração pelo peso e pela biomassa, com trava por oxigênio, amônia e lua."];
+    case "bandeja": return ["tanque", "A bandeja diz se o trato foi certo: sobra apodrece, gasta oxigênio e vira amônia."];
+    case "mantas": return ["tanque", "No estudo de Zhang 2010, a 500 por metro quadrado, as telas baixaram a mortalidade de 36,5% para 13,5%."];
+    case "despesca": return ["ferr", ""];
+    default: return [null, ""];
+  }
+}
+const FALA = { encher: 1, cloro: 1, inocular_nitrificante: 1, inocular_vizinho: 1, povoar: 1, biometria: 1, rodo: 1, despesca: 1, decantador: 1, acucar: 1, acido_fosforico: 1, kcl: 1, mgso4: 1, troca: 1, bombona_descartar: 1 }; // o resto da rotina repetida só aparece escrito
+function narraAc(e) {
+  const [onde, why, chave] = porque(e.tipo, e.p); let txt = e.r.msg || "";
+  if (e.tipo === "trato") txt = "Trato das " + Math.floor(dataLocal().h) + " h: " + txt.replace(/^Trato de /, "");
+  let leve = !FALA[e.tipo]; if (why && novo(chave || e.tipo)) { txt += " " + why; leve = false; }
+  return txt ? { onde, txt, leve } : null;
+}
+function bomDia() {
+  const cm = st.camarao, jm = !!E.janelaMuda(E.agoraMs(st));
+  let t = "Bom dia. Dia " + (dia() + 1) + (cm.povoado != null && !cm.despescado ? ", cultivo dia " + (Math.floor((st.t - cm.povoado) / 1440) + 1) : cm.n > 0 ? "" : ", fase de preparo e maturação da água") + ". " + nomeLua() + ".";
+  if (jm && !A.jm) t += " Começou a janela de muda da lua. " + Q("janela_muda"); A.jm = jm;
+  return t;
+}
+function narraEv(evs) {
+  const meds = evs.filter(e => e.tipo === "medir" && e.r.ok), acs = evs.filter(e => e.tipo !== "medir" && e.r.ok);
+  const h = Math.floor(dataLocal().h), d = dia();
+  const soTempPh = meds.every(m => m.p.k === "temp" || m.p.k === "ph"), md = meds.length && (!soTempPh || acs.length) ? narraMed(meds) : null;
+  if (h >= 6 && h < 8 && A.manha !== d && (acs.length || meds.length > 2)) { A.manha = d; poe({ onde: md && md.onde, txt: bomDia() + (md ? " " + md.txt : "") }); } // o bom-dia com as medições sai sempre em voz
+  else poe(md);
+  acs.forEach(e => poe(narraAc(e)));
+}
+function poe(it) { if (it && it.txt) A.fila.push(it); }
+
+/* ---- passo do relógio: piloto de hora em hora, a aula segura o tempo enquanto fala ---- */
+const pf = () => ({ dens: st.cfg.densidade || 500 });
+function roda() { A.ev = []; A.col = true; try { E.piloto(st, pf()); } finally { A.col = false; } narraEv(A.ev); posTempo(); }
+function mostraItem(it) {
+  A.atual = it; A.alvo = it.onde || A.alvo; legenda(it.txt); const tok = ++A.tok;
+  if (it.leve) { A.falando = false; A.ate = performance.now() + 1100 / VEL[A.vel].k; A.atualLeve = true; return; } A.atualLeve = false;
+  if (A.voz && VOZ() && window.speechSynthesis) { A.falando = true; VOZ()(it.txt, () => { if (tok === A.tok) A.falando = false; }, true); }
+  else { A.falando = false; A.ate = performance.now() + clamp(it.txt.length * 55, 2500, 14000) / VEL[A.vel].k; }
+}
+function fimTxt() {
+  const f = st.fim; if (!f) return "";
+  const c = (f.causas || []).slice(0, 3).filter(x => x.pct >= 0.5).map(x => (x.k === "aclimatacao" ? "Perda na soltura" : TX.causa[x.k] || x.k) + " " + nf(x.pct, 1) + "%");
+  return (f.morreu ? "O lote se perdeu. " : "Despesca feita. ") + "Sobrevivência " + nf(f.sobrevivencia, 1) + "%" + (f.pesoFinal ? ", peso médio " + nf(f.pesoFinal, 1) + " g" : "") + (f.kg ? ", " + nf(f.kg, 0) + " kg" : "") + (f.fcr ? ", conversão " + nf(f.fcr, 2) : "") + "." + (c.length ? " Perdas maiores: " + c.join("; ") + "." : "") + " A meta do jogo é 90% ou mais. O relatório completo está na tela.";
+}
+A.passo = dt => {
+  if (!A.on || !G || !st) return false;
+  if (!A.rodando) return false; // pausado: o jogo volta ao normal e o jogador assume
+  anda(dt);
+  if (A.atual) { if (A.voz && !A.atualLeve ? A.falando : performance.now() < A.ate) return true; A.atual = null; legenda(""); if (A.fimDito) { A.rodando = false; barra(); return true; } }
+  if (st.fim) { if (!A.fimDito) { A.fimDito = true; A.fila = []; mostraItem({ txt: fimTxt() }); } return true; }
+  if (folhaAberta) return true;
+  if (A.fila.length) { mostraItem(A.fila.shift()); return true; }
+  A.acc = (A.acc || 0) + VEL[A.vel].m * dt; const t0 = performance.now();
+  while (A.acc >= 10 && !st.fim && !A.fila.length && !folhaAberta && performance.now() - t0 < 12) {
+    const hAbs = Math.floor(st.t / 60);
+    if (hAbs !== A.hp) { A.hp = hAbs; G.hAj = hAbs; roda(); if (A.fila.length || st.fim) break; }
+    const m = Math.min(10, 60 - (st.t % 60) || 60); E.avancar(st, m); A.acc -= m; G.hAj = Math.floor(st.t / 60); posTempo();
+  }
+  if (A.acc > 60) A.acc = 60;
+  return true;
+};
+/* o boneco vai até o lugar do que está sendo feito (contorna o tanque) */
+function anda(dt) {
+  if (!A.alvo) return; const p = boneco.position, e = A.alvo === "tanque" ? null : EST.find(x => x.id === A.alvo); let tx, tz;
+  if (e) { const r = Math.hypot(e.x, e.z), f = (r - 1.1) / r; tx = clamp(e.x * f, -5.7, 6.3); tz = clamp(e.z * f, -4.55, 4.55); } else { const r = Math.hypot(p.x, p.z) || 1; tx = p.x / r * 3.4; tz = p.z / r * 3.4; }
+  const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz); if (d < 0.06) { A.alvo = null; return; }
+  const v = Math.min(d, 3.4 * dt), r0 = Math.hypot(p.x, p.z);
+  if (r0 < 3.4 && Math.hypot(tx, tz) > 3.35) { const a0 = Math.atan2(p.z, p.x), a1 = Math.atan2(tz, tx); let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    if (Math.abs(da) > 0.2) { const na = a0 + Math.sign(da) * Math.min(Math.abs(da), v / 3.4), nx = Math.cos(na) * 3.4, nz = Math.sin(na) * 3.4; boneco.rotation.y = Math.atan2(nx - p.x, nz - p.z); p.x = nx; p.z = nz; passoA += dt * 9; G.px = p.x; G.pz = p.z; return; } }
+  p.x += dx / d * v; p.z += dz / d * v; const r = Math.hypot(p.x, p.z); if (r < 3.2) { p.x *= 3.2 / r; p.z *= 3.2 / r; }
+  boneco.rotation.y = Math.atan2(dx, dz); passoA += dt * 9; G.px = p.x; G.pz = p.z;
+}
+/* eventos do motor (alarmes, lições, perguntas) entram na aula; a pergunta vem com a resposta e o porquê */
+const eventosJogo = eventos;
+eventos = function () {
+  if (!A.on || !A.rodando || !st) return eventosJogo();
+  for (const e of st.eventos) { if (e.v) continue; e.v = 1;
+    if (e.tipo === "quiz") { const q = TX.quiz[e.chave]; if (q && !G.quiz[e.chave]) { G.quiz[e.chave] = 1; poe({ txt: "Pergunta de prova: " + q.q + " Resposta: " + q.o[q.c] + ". " + q.e }); } continue; }
+    if (e.tipo === "licao") { poe({ txt: "Lição: " + e.txt }); continue; }
+    poe({ txt: (e.tipo === "alarme" ? "Atenção: " : "") + e.txt, leve: e.tipo !== "alarme" }); if (e.tipo === "alarme") bip(880, 0.25); }
+};
+
+/* ---- tela: botão Automático no alto e barra de controle embaixo ---- */
+const css = document.createElement("style");
+css.textContent = "#aulaBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:6px;flex-wrap:nowrap;justify-content:center;width:max-content;max-width:calc(100% - 32px);z-index:25}" +
+  "#aulaTxt{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 70px);width:min(620px,calc(100% - 32px));max-height:34vh;overflow:auto;background:#0d1b22eb;color:#fff;border:1px solid var(--linha);border-radius:10px;padding:10px 14px;font-size:15px;line-height:1.4;z-index:25}" +
+  "#bAuto.on{background:#2d7d57;border-color:#2d7d57;color:#fff}#aulaBar .bt{padding:10px 12px;white-space:nowrap}@media (max-width:480px){#aulaTxt{font-size:14px;max-height:30vh}#aulaBar .bt{padding:10px 9px;font-size:14px}}";
+document.head.appendChild(css);
+const bAuto = el("button", "bt", "Automático"); bAuto.id = "bAuto"; bAuto.type = "button"; bAuto.title = "O jogo faz o manejo sozinho e explica"; $("botoes").insertBefore(bAuto, $("bFazer"));
+const bar = el("div"); bar.id = "aulaBar"; bar.hidden = true; document.body.appendChild(bar);
+const txt = el("div"); txt.id = "aulaTxt"; txt.hidden = true; txt.setAttribute("aria-live", "polite"); document.body.appendChild(txt);
+const bPausa = bt("⏸ Pausar", () => A.rodando ? pausa() : continua(), "p"), bVozA = bt("", () => { A.voz = !A.voz; if (!A.voz) { A.tok++; A.falando = false; try { speechSynthesis.cancel(); } catch (e) { } if (A.atual) A.ate = performance.now() + 2500; } else if (VOZ()) { if (A.atual) { const it = A.atual; mostraItem(it); } else VOZ()("Narração ligada.", null, true); } barra(); }),
+  bVel = bt("", () => { A.vel = (A.vel + 1) % VEL.length; barra(); }), bSai = bt("Sair", () => desliga());
+[bPausa, bVozA, bVel, bSai].forEach(b => bar.appendChild(b));
+function legenda(t) { txt.textContent = t ? (A.atual && !A.atual.leve && A.voz ? "🔊 " : "") + t : ""; txt.hidden = !t; }
+function barra() {
+  bAuto.classList.toggle("on", A.on); bAuto.textContent = A.on ? "Automático ✓" : "Automático"; bar.hidden = !A.on;
+  bPausa.textContent = A.rodando ? "⏸ Pausar" : st && st.fim ? "Fim" : "▶ Continuar"; bPausa.disabled = !!(st && st.fim && !A.rodando);
+  bVozA.textContent = A.voz ? "🔊 Aula" : "🔇 Texto"; bVozA.title = A.voz ? "Narração em voz ligada" : "Só legenda, sem voz"; bVel.textContent = "⏩ " + VEL[A.vel].n; bVel.title = "Velocidade do relógio";
+  const corre = A.on && A.rodando; ["joy", "acoes", "avisos"].forEach(i => { const x = $(i); if (x) x.style.visibility = corre ? "hidden" : ""; });
+  if (!corre) legenda(A.on && !A.rodando && !(st && st.fim) ? "Pausado. Agora é com você: ande, meça e aplique. Toque em Continuar para o jogo seguir sozinho de onde o tanque está." : "");
+}
+function trava(on) { try { if (on && navigator.wakeLock && !A.lock) navigator.wakeLock.request("screen").then(l => A.lock = l).catch(() => { }); if (!on && A.lock) { A.lock.release(); A.lock = null; } } catch (e) { } }
+function liga(comVoz) {
+  if (!G || !st || G.modo === "desafio") return;
+  A.on = true; A.rodando = true; A.fimDito = !!st.fim; if (comVoz != null) A.voz = comVoz; A.fila = []; A.atual = null; A.acc = 0; A.hp = Math.floor(st.t / 60) - 1; skip = null; fecha(); trava(true); barra();
+  // a primeira fala sai dentro do toque: o iPhone só deixa o site falar depois de um toque do usuário
+  mostraItem({ txt: "Modo automático. Daqui em diante o jogo faz o manejo sozinho, seguindo o app e o caderno Só Bioflocos, e explica o que faz e por quê. Toque em Pausar quando quiser assumir." });
+}
+function pausa() { A.rodando = false; A.tok++; A.falando = false; try { speechSynthesis.cancel(); } catch (e) { } if (A.atual && !A.fimDito) A.fila.unshift(A.atual); A.atual = null; A.alvo = null; trava(false); barra(); salva(); }
+function continua() { if (st.fim) return; A.rodando = true; A.hp = Math.floor(st.t / 60) - 1; A.acc = 0; skip = null; fecha(); trava(true); barra();
+  mostraItem(A.fila.length ? A.fila.shift() : { txt: "Continuando de " + dataLocal().hm + "." }); } // fala dentro do toque (iPhone)
+function desliga() { A.on = false; A.rodando = false; A.tok++; A.falando = false; A.fila = []; A.atual = null; A.alvo = null; try { speechSynthesis.cancel(); } catch (e) { } trava(false); barra(); }
+bAuto.onclick = () => { if (A.on) desliga(); else liga(); };
+AUTO = { passo: A.passo, get corre() { return A.on && A.rodando; }, // a seta é do jogador: some enquanto o jogo anda sozinho
+  entra() { bAuto.hidden = G.modo === "desafio"; desliga(); if (A.pede) { A.pede = false; liga(true); } }, sai() { A.pede = false; desliga(); }, get pede() { return A.pede; }, set pede(v) { A.pede = v; } };
+document.addEventListener("visibilitychange", () => { if (A.on && A.rodando && document.visibilityState === "visible") { A.lock = null; trava(true); } });
+window.__auto = { A, liga, pausa, continua, desliga, narraMed, porque };
 }
 
 window.__jogo = { get st() { return st; }, get G() { return G; }, tarefas, desfazer, fazerAgora, usar, EST, celular, relogio, guia, pular, iniciaDesafio, ajudaDes, rumo, relatorio };
