@@ -256,7 +256,7 @@ const DEFAULTS={
     ca:{min:null,max:null,cmin:null,cmax:null},mg:{min:null,max:null,cmin:null,cmax:null},k:{min:null,max:null,cmin:null,cmax:null}},
   tabela:[[0,15,6],[0.2,12,5],[0.5,10,5],[1,6,5],[3,5,4],[5,4,4],[10,3.5,3],[15,3,3]],
   curva:[0.02,0.05,0.15,0.4,0.8,1.5,3,4.5,6,7.5,9,10.5,12,13.5,15],
-  eco:{preco:null,kw:0.75,tarifa:0.85},
+  eco:{preco:null,kw:0.8,tarifa:1.17},
   doses:{azomite:3,bicarb:0.25,acucar:20,alcAlvo:160,nutrat:1,simbForm:1,simbMan:0.75,probBombona:30,probLote:0.3,farelo:0.5,odAlarme:4.5,cnAlvo:10,prot:null,catalisador:null}
 };
 /* Produtos do manejo: a mesma lista do jogo Simulador Tanque Biofloco (engine.js ITENS). Aplicação com o mesmo nome baixa do Estoque. */
@@ -270,7 +270,7 @@ const PRECO_REF={"Ração 40% PB":9,"Bactrat P (probiótico)":900,"Nutrat":350,"
 const PL_MILHEIRO_REF=22;
 function precoRef(p){if(!p)return 0;if(p.precoRef!=null&&p.precoRef!=="")return +p.precoRef||0;const n=normTxt(p.nome);for(const k in PRECO_REF)if(normTxt(k)===n)return PRECO_REF[k];if(p.grupo==="RACAO")return PRECO_REF["Ração 40% PB"];return 0}
 function temCompra(pid){return G("entrada").some(e=>e.produto===pid&&e.qtd>0)}
-function precoVendaRef(W){return W<8?18:W<10?22:W<12?26:W<15?30:W<18?34:38}
+function precoVendaRef(W){return Math.max(15,Math.round(21+(W-10)))} /* conferido 26/11/2026: R$ 21/kg com 10 g (Feed&Food abr/2026; IBGE PPM 2025 Ceará) + R$ 1/g (ABCC 2021) */
 function faltaProd(){return PROD_SUG.filter(s=>!produtos().some(p=>normTxt(p.nome)===normTxt(s[0]))&&!(s[1]==="RACAO"&&produtos().some(p=>p.grupo==="RACAO")))}
 const PRODUTOS=["Simbiótico (lote da tese)","Cloreto de amônio (maturação)"].concat(PROD_SUG.filter(x=>x[1]!=="RACAO"&&!/^(Kit|Reagente|Placa|Mantas|Nitrificante)/.test(x[0])).map(x=>x[0])).concat(["Melaço","Outro"]);
 const TIPOS={leitura:"Parâmetros",biometria:"Biometria",mortalidade:"Mortalidade",aplicacao:"Aplicação",racao:"Trato",ritual:"Ritual"};
@@ -1214,7 +1214,7 @@ T.financeiro_rentab=()=>{const x=rentab(),p=x.prev,e=x.e;const cor=v=>v>=0?"ok":
    <div class="fg" style="margin-top:8px"><div class="f"><label for="e_preco">Preço de venda (R$ por kg)</label><input id="e_preco" type="number" inputmode="decimal" step="any" value="${e.preco??""}" placeholder="${precoVendaRef(cfg.pesoAlvo)} (estimativa)"></div>
    <div class="f"><label for="e_kw">Potência do soprador (kW)</label><input id="e_kw" type="number" inputmode="decimal" step="any" value="${e.kw??""}"></div>
    <div class="f"><label for="e_tar">Tarifa de energia (R$ por kWh)</label><input id="e_tar" type="number" inputmode="decimal" step="any" value="${e.tarifa??""}"></div></div>
-   <div class="muted">Energia: potência × 24 h × dias de cultivo × tarifa. Os padrões (0,75 kW e R$ 0,85) são estimativa. Se você já lança a conta de luz em Financeiro › a Pagar como custo do ciclo, ponha 0 na potência para não contar duas vezes. Preço de venda em branco usa a referência por tamanho: até 10 g R$ 22, até 12 g R$ 26, até 15 g R$ 30, até 18 g R$ 34.</div>
+   <div class="muted">Energia: potência × 24 h × dias de cultivo × tarifa. Os padrões: 0,8 kW (soprador 1,1 CV do caderno Só Bioflocos) e R$ 1,17 por kWh (Coelba residencial B1 com impostos, REH ANEEL 3.578/2026; troque pela sua tarifa rural). Se você já lança a conta de luz em Financeiro › a Pagar como custo do ciclo, ponha 0 na potência para não contar duas vezes. Preço de venda em branco usa a referência conferida em 26/11/2026: R$ 21/kg com 10 g e mais R$ 1 por grama (Feed&Food, abril de 2026; IBGE PPM 2025; ABCC). Ração, larvas e insumos seguem sem fonte: ponha os seus preços.</div>
    <div class="row" style="margin-top:10px"><button class="btn p" type="button" data-salvar="eco">✓ Salvar</button></div></div>`};
 T.financeiro_custos=()=>{const r=resultado();const pre=cfg.dataPovoamento?lote(hoje()):null;
   const precoAlvo=(r.custoKg||0);return T.financeiro_rentab()+`<h2>Custo do ciclo e preço mínimo</h2><div class="grid">${kpi("Custo até hoje",brl(r.custo))}${kpi("Custo por kg",r.custoKg?brl(r.custoKg):"–",r.kg?"despescado":"biomassa atual")}${kpi("Custo por m³",brl(r.custo/tanque().vol),f(tanque().vol,1)+" m³")}${kpi("Ração no custo",r.custo?f(r.racaoR/r.custo*100,0)+"%":"–","")}</div>
