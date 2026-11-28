@@ -229,7 +229,7 @@ label.opt{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid
 const MENU=[
  ["hoje","Hoje",[["inicio_painel","Mapa do tanque"],["diario_hoje","Agenda e anotações"],["manejo_ritual","Ritual do dia"],["diario_semana","Próximos 7 dias"],["tecnicas_botoes","🚨 Emergências"]]],
  ["lancar","Lançar",[["manejo_racao","Ração"],["manejo_parametros","Água"],["manejo_biometria","Biometria"],["manejo_mortalidade","Mortalidade"],["manejo_aplicacoes","Aplicações e insumos"]]],
- ["acomp","Acompanhar",[["relatorios_graficos","Gráficos"],["diario_linha","Linha do tempo"],["manejo_projecao","Projeção p/ despesca"],["manejo_lua","Calendário lunar"],["relatorios_historico","Histórico geral"]]],
+ ["acomp","Acompanhar",[["relatorios_graficos","Gráficos"],["diario_linha","Linha do tempo"],["manejo_projecao","Projeção p/ despesca"],["manejo_lua","Calendário lunar"],["relatorios_pdf","📄 PDF do ciclo"],["relatorios_historico","Histórico geral"]]],
  ["gestao","Gestão",[["#","Ciclo"],["producao_ciclo","Ciclo"],["producao_povoamento","Povoamento"],["producao_despesca","Despesca"],["producao_historico","Histórico"],["#","Estoque"],["estoque_produtos","Produtos"],["estoque_entradas","Entradas"],["estoque_saidas","Saídas"],["estoque_balancete","Balancete"],["#","Financeiro"],["financeiro_pagar","a Pagar"],["financeiro_receber","a Receber"],["financeiro_caixa","Caixa"],["financeiro_custos","Custos"]]],
  ["aprenda","Aprenda",[["aprenda_quando","Quando mexer na ração"],["tecnicas_lembretes","Lembretes Só Bioflocos"],["aprenda_regras","Regras do app e estudos"],["aprenda_estudos","Estudos dos carrosséis"],["aprenda_tcbs","Placa TCBS (Vibrio)"]]],
  ["ajustes","Ajustes",[["#","Preparo"],["preparo_passos","Dia 0 a 21"],["preparo_calc","Calculadoras"],["preparo_check","Apto a povoar?"],["#","Cadastro"],["cadastro_tanque","Tanque"],["cadastro_faixas","Faixas da água"],["cadastro_tabela","Tabela de ração"],["cadastro_doses","Doses"]]],
@@ -619,7 +619,7 @@ function abrirLogin(){
     d.close();toast("Conectado. Enviando para a nuvem…")};
   if(!d.open)d.showModal()}
 function baixarArquivo(blob,nome){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
-if(WEB&&/[?&]teste=1/.test(location.search))window.__bf={put:(...a)=>put(...a),del:(...a)=>del(...a),recs:()=>recsAll,sync:()=>wdb.sync(),exportar:k=>exportar(k),grids:()=>Object.keys(GRID)};
+if(WEB&&/[?&]teste=1/.test(location.search))window.__bf={put:(...a)=>put(...a),del:(...a)=>del(...a),recs:()=>recsAll,sync:()=>wdb.sync(),exportar:k=>exportar(k),grids:()=>Object.keys(GRID),pdf:()=>pdfPronto};
 if(WEB){document.addEventListener("click",ev=>{if(ev.target.closest("#status,#btnNuvem"))abrirLogin()});
   if("serviceWorker" in navigator&&location.protocol!=="file:")addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 
@@ -894,7 +894,7 @@ function chartDuo(esp,real,unit,dec){
   g+=`<line x1="${L}" x2="${L+18}" y1="${H-3}" y2="${H-3}" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/><text x="${L+22}" y="${H}" font-size="9" fill="var(--muted)">esperado</text><line x1="${L+80}" x2="${L+98}" y1="${H-3}" y2="${H-3}" stroke="var(--accent)" stroke-width="2.5"/><text x="${L+102}" y="${H}" font-size="9" fill="var(--muted)">seu (${esc(unit)})</text>`;
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Esperado e real">${g}</svg></div>`}
 function cartaoPlano(){
-  const bt=`<div class="row" style="margin-top:6px"><button class="btn p sm" type="button" data-acao="iniciar">▶ Iniciar ciclo</button><button class="btn sm del" type="button" data-acao="reset">${pendDel==="_reset"?"Confirmar: apagar tudo deste perfil":"↺ Reset"}</button></div>`;
+  const bt=`<div class="row" style="margin-top:6px"><button class="btn p sm" type="button" data-acao="iniciar">▶ Iniciar ciclo</button><button class="btn sm del" type="button" data-acao="reset">${pendDel==="_reset"?"Confirmar: apagar tudo deste perfil":"↺ Reset"}</button><button class="btn sm" type="button" data-acao="pdfCiclo">📄 PDF do ciclo</button></div>`;
   if(!cfg.plano)return `<div class="card" style="margin-bottom:12px"><b>Plano do ciclo</b><div class="muted">Toque em Iniciar para escolher o dia do preparo, a densidade e o peso de despesca. O app monta o calendário até a despesca e compara o que você lança com o esperado.</div>${bt}</div>`;
   const p=cfg.plano,dc=diaCultivo();let h=`<div class="card" style="margin-bottom:12px"><b>Plano do ciclo</b><div class="muted">Preparo ${dt(p.dia1)} · povoamento ${dt(cfg.dataPovoamento)} · despesca ${dt(p.despesca)} (${p.dias} dias de cultivo) · ${f(p.kg,0)} kg esperados</div>`;
   if(dc!=null&&dc>=0){const rs=realSeries();const ub=rs.peso[rs.peso.length-1],us=rs.sob[rs.sob.length-1],ur=rs.rac[rs.rac.length-1];
@@ -1339,6 +1339,67 @@ function eventosLinha(){const ev=[];const ic={leitura:"💧",biometria:"⚖️",
   gest.forEach(g=>{if(g.k==="povoamento")ev.push({d:g.data+"T07:00",ic:"🐟",t:"Povoamento: "+n0(g.qtd)+" PL",s:g.lab||""});if(g.k==="despesca")ev.push({d:g.data+"T07:00",ic:"🧺",t:"Despesca "+(g.tipo==="TOTAL"?"total":"parcial")+": "+f(g.kg,1)+" kg",s:g.cli||""});if(g.k==="entrada"){const p=gById(g.produto)||{};ev.push({d:g.data+"T08:00",ic:"📦",t:"Compra: "+(p.nome||"?")+" "+f(g.qtd,1)+" "+(p.unidade||""),s:g.forn||""})}});
   if(cfg.dataPovoamento){ev.push({d:addDias(cfg.dataPovoamento,-21)+"T00:00",ic:"🧪",t:"Início do preparo da água",s:"Dia 0 de 21"})}
   return ev.filter(e=>e.d).sort((a,b)=>a.d<b.d?1:-1)}
+/* ===================== PDF do ciclo: calendário + diário, do dia 0 do preparo até a despesca =====================
+   Não cria regra nova: o "Previsto" é a mesma agenda do app (agendaDo) e o "Registrado" é a mesma linha do tempo (eventosLinha). */
+const JSPDF_URL="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";let pdfPronto=null,pdfGerando=false;
+function carregaJsPDF(){if(window.jspdf)return Promise.resolve();return new Promise((ok,no)=>{const s=document.createElement("script");s.src=JSPDF_URL;s.onload=()=>window.jspdf?ok():no(new Error("gerador de PDF"));s.onerror=()=>no(new Error("Precisa de internet na primeira vez para baixar o gerador de PDF"));document.head.appendChild(s)})}
+const pdfTx=s=>String(s==null?"":s).replace(/≥/g,">=").replace(/≤/g,"<=").replace(/[−–—]/g,"-").replace(/→/g,"->").replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/…/g,"...").replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g,"").replace(/\s{2,}/g," ").trim();
+function cicloLimites(){if(!cfg.dataPovoamento)return null;const ini=(cfg.plano&&cfg.plano.dia1)||addDias(cfg.dataPovoamento,-PREPARO_DIAS);
+  const tot=(typeof gest!=="undefined"?gest:[]).filter(g=>g.k==="despesca"&&g.tipo==="TOTAL"&&g.ciclo===(cfg.cicloId||"c1")).map(g=>g.data).sort()[0];
+  const fim=tot||(cfg.plano&&cfg.plano.despesca);return fim&&fim>=ini?{ini,fim,real:!!tot}:null}
+function rotuloDia(d,lim){const dc=diaCultivo(d);if(d===lim.fim)return["DESP","Despesca"+(lim.real?"":" prevista")+" (cultivo dia "+dc+")"];
+  if(dc<0)return["P"+(dc+PREPARO_DIAS),"Preparo dia "+(dc+PREPARO_DIAS)+" de "+PREPARO_DIAS];if(dc===0)return["POV","Povoamento (cultivo dia 0)"];return["D"+dc,"Cultivo dia "+dc]}
+async function gerarPdfCiclo(){const lim=cicloLimites();if(!lim)throw new Error("Inicie o ciclo no Mapa do tanque (Plano do ciclo) para o app saber o dia 1 e a despesca");
+  await carregaJsPDF();const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4"});const W=210,H=297,M=12;const hj=hoje();
+  const dias=[];for(let d=lim.ini;d<=lim.fim;d=addDias(d,1))dias.push(d);
+  const evDia={};eventosLinha().forEach(e=>{const k=e.d.slice(0,10);(evDia[k]=evDia[k]||[]).push(e)});Object.values(evDia).forEach(l=>l.sort((a,b)=>a.d<b.d?-1:1));
+  const nomePerfil=(PERFIS.find(p=>p[0]===perfilAtual())||[0,""])[1];const t=tanque();
+  const txt=(s,x,y,o)=>doc.text(pdfTx(s),x,y,o);const cor=(r,g,b)=>doc.setTextColor(r,g,b);
+  const rodape=()=>{doc.setFont("helvetica","normal");doc.setFontSize(7);cor(140,140,140);txt("Tanque Biofloco · diário do ciclo · gerado em "+dt(hj),M,H-6);txt("pág. "+doc.getNumberOfPages(),W-M,H-6,{align:"right"});cor(0,0,0)};
+  // capa
+  doc.setFont("helvetica","bold");doc.setFontSize(20);txt("Diário do ciclo",M,24);doc.setFontSize(12);doc.setFont("helvetica","normal");
+  txt("Tanque Biofloco"+(nomePerfil?" · "+nomePerfil:""),M,32);
+  const dA=d=>d.split("-").reverse().join("/");const capa=[["Preparo (dia 0)",dA(lim.ini)],["Povoamento",dA(cfg.dataPovoamento)],[lim.real?"Despesca total":"Despesca prevista",dA(lim.fim)],["Dias no calendário",String(dias.length)],
+    ["Tanque",f(t.vol,1)+" m³ · "+n0(cfg.densidade)+" camarões/m² · "+n0(t.pls)+" PL"],["Peso de despesca",f(cfg.pesoAlvo,0)+" g"],["Esperado",cfg.plano?f(cfg.plano.kg,0)+" kg":"–"]];
+  let y=46;doc.setFontSize(11);capa.forEach(([a,b])=>{doc.setFont("helvetica","bold");txt(a,M,y);doc.setFont("helvetica","normal");txt(b,M+50,y);y+=7});
+  y+=6;doc.setFontSize(9);cor(70,70,70);doc.splitTextToSize(pdfTx("Como ler: o calendário mostra cada dia do ciclo (P = dia do preparo, D = dia de cultivo, POV = povoamento, DESP = despesca; Lua nova/Lua cheia = janela de muda; Bio = biometria da semana; ponto verde = dia com registro). No diário, cada dia traz o PREVISTO pelo app, com [x] no que foi feito, e o REGISTRADO por você. Dias que ainda não chegaram vêm com linhas para anotar à mão. Previsto é o plano do app no dia em que o PDF foi gerado: muda quando a biometria ou a água mudam."),W-2*M).forEach(l=>{doc.text(l,M,y);y+=4.6});cor(0,0,0);rodape();
+  // calendário: uma página por mês
+  const MES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"],SEM=["dom","seg","ter","qua","qui","sex","sáb"];
+  const meses=[...new Set(dias.map(d=>d.slice(0,7)))];
+  meses.forEach(mk=>{doc.addPage();const [a,m]=mk.split("-").map(Number);doc.setFont("helvetica","bold");doc.setFontSize(16);txt("Calendário · "+MES[m-1]+" de "+a,M,20);
+    const cw=(W-2*M)/7,top=30,primeiro=new Date(a,m-1,1).getDay(),nd=new Date(a,m,0).getDate(),linhas=Math.ceil((primeiro+nd)/7),ch=Math.min(38,(H-top-24)/linhas);
+    doc.setFontSize(8);SEM.forEach((s,i)=>txt(s,M+i*cw+cw/2,top-2,{align:"center"}));
+    for(let i=0;i<linhas*7;i++){const x=M+(i%7)*cw,yy=top+Math.floor(i/7)*ch,dn=i-primeiro+1;doc.setDrawColor(190,190,190);
+      if(dn<1||dn>nd){doc.setFillColor(245,245,245);doc.rect(x,yy,cw,ch,"FD");continue}
+      const d=mk+"-"+String(dn).padStart(2,"0"),dentro=d>=lim.ini&&d<=lim.fim;
+      if(!dentro){doc.setFillColor(245,245,245);doc.rect(x,yy,cw,ch,"FD");cor(170,170,170);doc.setFont("helvetica","normal");doc.setFontSize(9);txt(String(dn),x+1.5,yy+4.5);cor(0,0,0);continue}
+      const [cur]=rotuloDia(d,lim),dc=diaCultivo(d);const esp=cur==="POV"||cur==="DESP";doc.setFillColor(...(esp?[255,236,200]:d===hj?[215,240,255]:dc<0?[238,246,236]:[255,255,255]));doc.rect(x,yy,cw,ch,"FD");
+      doc.setFont("helvetica","bold");doc.setFontSize(10);txt(String(dn),x+1.5,yy+4.8);doc.setFontSize(esp?9:8);cor(...(esp?[180,90,0]:[40,110,60]));txt(cur,x+cw-1.5,yy+4.8,{align:"right"});cor(0,0,0);
+      doc.setFont("helvetica","normal");doc.setFontSize(7);let ly=yy+10;const tag=s=>{txt(s,x+1.5,ly);ly+=3.4};
+      if(dc>=0&&janelaMuda(toDate(d)).on)tag(janelaMuda(toDate(d)).qual.replace(/^l/,"L"));if(dc>0&&dc%7===0)tag("Bio");if(d===hj)tag("HOJE");
+      if(evDia[d]){doc.setFillColor(40,160,80);doc.circle(x+cw-3,yy+ch-3,1.3,"F")}}
+    rodape()});
+  // diário: dia a dia
+  doc.addPage();y=M+4;const novaPag=()=>{rodape();doc.addPage();y=M+4};const precisa=h=>{if(y+h>H-12)novaPag()};
+  const linha=(s,ind,sz,bold,c)=>{doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(sz);const ls=doc.splitTextToSize(pdfTx(s),W-2*M-ind);ls.forEach(l=>{precisa(sz*0.42);if(c)cor(...c);doc.text(l,M+ind,y);cor(0,0,0);y+=sz*0.42})};
+  dias.forEach(d=>{const [,longo]=rotuloDia(d,lim);precisa(18);doc.setFillColor(...(d===hj?[215,240,255]:[230,242,232]));doc.rect(M,y-4.2,W-2*M,6,"F");
+    doc.setFont("helvetica","bold");doc.setFontSize(10.5);txt(SEM[new Date(d+"T12:00").getDay()]+" "+dt(d)+" · "+longo+(d===hj?" · HOJE":""),M+1.5,y);y+=5.5;
+    const prev=agendaDo(d).filter(x=>x.hora!=="Agora");linha("PREVISTO",0,8,true,[40,110,60]);
+    prev.forEach(x=>linha((d<=hj?(x.feito?"[x] ":"[  ] "):"[  ] ")+x.hora+"  "+x.t+(x.sub?" - "+x.sub:""),2,8));
+    const ev=evDia[d]||[];if(d<=hj||ev.length){linha("REGISTRADO",0,8,true,[30,80,160]);if(!ev.length)linha("Nada registrado neste dia.",2,8,false,[140,140,140]);
+      ev.forEach(e=>{const h=e.d.length>10?e.d.slice(11,16):"";linha((h&&h!=="23:59"&&h!=="00:00"?h+"  ":"")+e.t+(e.s?": "+e.s:""),2,8)})}
+    if(d>=hj){linha("ANOTAÇÕES",0,8,true,[120,120,120]);doc.setDrawColor(200,200,200);for(let i=0;i<3;i++){precisa(6);y+=5;doc.line(M+2,y,W-M,y)}y+=2}
+    y+=4});
+  rodape();const nome="diario-ciclo-"+(perfilAtual()||"app")+"-"+lim.ini+".pdf";return{blob:doc.output("blob"),nome,paginas:doc.getNumberOfPages(),dias:dias.length,ini:lim.ini,fim:lim.fim}}
+ACOES.pdfCiclo=async function(){if(pdfGerando)return;pdfGerando=true;toast("Montando o PDF do ciclo…");try{pdfPronto=await gerarPdfCiclo();go("acomp","relatorios_pdf");toast("PDF pronto",[pdfPronto.paginas+" páginas, "+pdfPronto.dias+" dias"])}catch(e){falha(e)}finally{pdfGerando=false}};
+ACOES.pdfBaixar=function(){if(pdfPronto)baixarArquivo(pdfPronto.blob,pdfPronto.nome)};
+ACOES.pdfShare=async function(){if(!pdfPronto)return;const fl=new File([pdfPronto.blob],pdfPronto.nome,{type:"application/pdf"});
+  try{if(navigator.canShare&&navigator.canShare({files:[fl]}))await navigator.share({files:[fl],title:"Diário do ciclo"});else baixarArquivo(pdfPronto.blob,pdfPronto.nome)}catch(e){if(e&&e.name!=="AbortError")baixarArquivo(pdfPronto.blob,pdfPronto.nome)}};
+T.relatorios_pdf=()=>{const lim=cicloLimites();let h=`<h2>PDF do ciclo</h2><div class="card"><div class="muted">Um PDF com o calendário do ciclo (um mês por página) e o diário de cada dia, do dia 0 do preparo até a despesca: o que o app previu (com ✔ no que foi feito) e o que você registrou. Dias que ainda não chegaram vêm com linhas para anotar à mão, então dá para imprimir e levar para o tanque.</div>`;
+  if(!lim)return h+`<div class="empty" style="margin-top:8px">Primeiro inicie o ciclo em Hoje › Mapa do tanque › Plano do ciclo.</div></div>`;
+  h+=`<div style="margin:8px 0">De <b>${dt(lim.ini)}</b> até <b>${dt(lim.fim)}</b> ${lim.real?"(despesca feita)":"(despesca prevista)"}.</div><button class="btn p" type="button" data-acao="pdfCiclo">${pdfGerando?"Montando…":"📄 Gerar PDF"}</button></div>`;
+  if(pdfPronto)h+=`<div class="card" style="margin-top:10px"><b>PDF pronto</b><div class="muted">${pdfPronto.paginas} páginas · ${pdfPronto.dias} dias (${dt(pdfPronto.ini)} a ${dt(pdfPronto.fim)})</div><div class="row" style="margin-top:6px">${navigator.share?`<button class="btn p sm" type="button" data-acao="pdfShare">📤 Compartilhar ou salvar</button>`:""}<button class="btn sm" type="button" data-acao="pdfBaixar">⬇ Baixar PDF</button></div><div class="muted" style="margin-top:6px">No iPhone: Compartilhar › Salvar em Arquivos, ou Imprimir.</div></div>`;
+  return h};
 T.diario_linha=()=>{const ev=eventosLinha();let h=`<h2>Linha do tempo do cultivo</h2><div class="row" style="margin-bottom:8px"><input class="busca" data-busca2 placeholder="Filtrar (ex.: alarme, trato, nota)" style="flex:1"></div><div class="tl" id="tl">`;let ult="";
   ev.slice(0,500).forEach(e=>{const d=e.d.slice(0,10);if(d!==ult){const dc=diaCultivo(d);h+=`<div class="tld">${dt(d)}${dc!=null?` · ${dc<0?"preparo dia "+Math.max(0,dc+21):"dia "+dc+" de cultivo"}`:""}</div>`;ult=d}
     h+=`<div class="tli ${e.cls||""}"><span class="tic">${e.ic}</span><div><b>${esc(e.t)}</b> <span class="muted">${e.d.slice(11,16)==="23:59"?"":e.d.slice(11,16)}</span><small>${esc(e.s||"")}</small></div></div>`});
