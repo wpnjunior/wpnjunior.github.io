@@ -2548,7 +2548,7 @@ window.__voz = { fala, painelVoz, trata: t => { V.buf = []; trata(t); const r = 
    A narração só junta textos que o jogo já tem (missões, produtos, perguntas, mensagens do motor), com as fontes citadas neles.
    Pausar devolve o controle ao jogador; Continuar retoma de onde o tanque está. */
 { // bloco próprio
-const A = { on: false, rodando: false, voz: true, vel: 0, fila: [], atual: null, ate: 0, falando: false, tok: 0, hp: -1, ev: [], col: false, visto: {}, manha: -1, jm: false, alvo: null, fimDito: false, lock: null, pede: false, pula: false, fase: null, foraK: {} };
+const A = { on: false, rodando: false, voz: true, vel: 0, fila: [], atual: null, ate: 0, falando: false, tok: 0, hp: -1, ev: [], col: false, visto: {}, manha: -1, jm: false, alvo: null, fimDito: false, lock: null, pede: false, pula: false, fase: null, foraK: {}, foraPior: {} };
 const VEL = [{ n: "1×", m: 60, k: 1 }, { n: "4×", m: 240, k: 1.6 }, { n: "12×", m: 720, k: 2.5 }]; // minutos do jogo por segundo
 E.gancho((s, tipo, p, r) => { if (A.col && s === st) A.ev.push({ tipo, p: p || {}, r: r || {} }); });
 const VOZ = () => window.__voz && window.__voz.fala;
@@ -2578,7 +2578,8 @@ function narraMed(meds) {
     const ok = naFaixa(k, ult[k]); if (ok === false) fora.push(k); return NOME[k] + " " + valT(k, ult[k]) + (ok === false ? ", fora da faixa de " + faixaT(k) : ""); });
   ks.forEach(k => { if (CONCEITO[k] && novo("med_" + k)) extra.push(CONCEITO[k]()); });
   fora.forEach(k => { if (QF[k] && TX.quiz[QF[k]] && novo("fora_" + k)) extra.push(Q(QF[k])); });
-  const d = dia(), saiu = fora.filter(k => A.foraK[k] == null || d - A.foraK[k] > 7); fora.forEach(k => A.foraK[k] = d); // acontecimento é sair da faixa depois de uma semana dentro; o vai e vem de todo dia é rotina repetida
+  const d = dia(), saiu = fora.filter(k => { const x = foraDist(k, +ult[k].toFixed(k === "ph" || k === "temp" || k === "od" ? 1 : ult[k] < 1 ? 2 : ult[k] < 10 ? 1 : 0)), ep = A.foraK[k] == null || d - A.foraK[k] > 7, pior = ep || x > (A.foraPior[k] || 0); if (pior) A.foraPior[k] = x; return pior; });
+  fora.forEach(k => A.foraK[k] = d); /* acontecimento: sair da faixa depois de uma semana dentro, ou ficar pior do que o pior valor já mostrado nessa saída (ex.: pH de 8,5 subindo para 9,3). O vai e vem igual de todo dia é rotina repetida. Regra do app (hospital 28/11). */
   return { onde: "banc", m: saiu.length > 0, leve: !fora.length && !extra.length, txt: "Medições na bancada: " + partes.join("; ") + "." + (fora.length ? "" : ks.length > 2 ? " Tudo na faixa." : "") + (extra.length ? " " + extra.join(" ") : "") };
 }
 function porque(tipo, p) {
@@ -2686,6 +2687,9 @@ A.passo = dt => {
    e para no primeiro acontecimento: fase nova, alarme, lição, pergunta, medida fora da faixa, janela de muda, biometria, despesca ou fim.
    O manejo é o mesmo do automático normal; só a aula da rotina igual fica de fora. Pedido do Wagner 28/11. */
 const PULA_MAX = 15; // dias: se nada novo acontecer, para e avisa
+function foraDist(k, v) { const f = TX.faixa[k]; let m; if (!f) return 0; // quanto a medida está longe da faixa (na unidade dela)
+  if ((m = f.match(/^≥\s*([\d,]+)/))) return num(m[1]) - v; if ((m = f.match(/^<\s*([\d,]+)/))) return v - num(m[1]);
+  if ((m = f.match(/^([\d,]+)–([\d,]+)/))) return v < num(m[1]) ? num(m[1]) - v : v - num(m[2]); if (f === "0") return v; return 0; }
 function pulaTira() { let i; while ((i = A.fila.findIndex(x => !x.m)) >= 0) A.fila.splice(i, 1); }
 function pulando() {
   pulaTira(); const t0 = performance.now();
@@ -2709,6 +2713,7 @@ function proxima() {
   if (A.pula) { A.pula = false; barra(); mostraItem({ txt: "Parei de pular. " + dataLocal().hm + "." }); return; }
   A.tok++; A.falando = false; try { speechSynthesis.cancel(); } catch (e) { } A.atual = null; A.alvo = null;
   pulaTira(); A.pula = true; A.pulaD0 = dia(); A.fase = A.fase || faseAgora();
+  if (A.voz && VOZ() && window.speechSynthesis) VOZ()("Pulando a rotina.", null, true); // fala dentro do toque: no iPhone a voz fica liberada para o aviso de quando o pulo parar
   if (!A.rodando) { A.rodando = true; A.hp = Math.floor(st.t / 60) - 1; skip = null; fecha(); trava(true); }
   barra();
 }
