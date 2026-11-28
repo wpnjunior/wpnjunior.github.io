@@ -2548,7 +2548,7 @@ window.__voz = { fala, painelVoz, trata: t => { V.buf = []; trata(t); const r = 
    A narração só junta textos que o jogo já tem (missões, produtos, perguntas, mensagens do motor), com as fontes citadas neles.
    Pausar devolve o controle ao jogador; Continuar retoma de onde o tanque está. */
 { // bloco próprio
-const A = { on: false, rodando: false, voz: true, vel: 0, fila: [], atual: null, ate: 0, falando: false, tok: 0, hp: -1, ev: [], col: false, visto: {}, manha: -1, jm: false, alvo: null, fimDito: false, lock: null, pede: false };
+const A = { on: false, rodando: false, voz: true, vel: 0, fila: [], atual: null, ate: 0, falando: false, tok: 0, hp: -1, ev: [], col: false, visto: {}, manha: -1, jm: false, alvo: null, fimDito: false, lock: null, pede: false, pula: false, fase: null, foraK: {} };
 const VEL = [{ n: "1×", m: 60, k: 1 }, { n: "4×", m: 240, k: 1.6 }, { n: "12×", m: 720, k: 2.5 }]; // minutos do jogo por segundo
 E.gancho((s, tipo, p, r) => { if (A.col && s === st) A.ev.push({ tipo, p: p || {}, r: r || {} }); });
 const VOZ = () => window.__voz && window.__voz.fala;
@@ -2578,7 +2578,8 @@ function narraMed(meds) {
     const ok = naFaixa(k, ult[k]); if (ok === false) fora.push(k); return NOME[k] + " " + valT(k, ult[k]) + (ok === false ? ", fora da faixa de " + faixaT(k) : ""); });
   ks.forEach(k => { if (CONCEITO[k] && novo("med_" + k)) extra.push(CONCEITO[k]()); });
   fora.forEach(k => { if (QF[k] && TX.quiz[QF[k]] && novo("fora_" + k)) extra.push(Q(QF[k])); });
-  return { onde: "banc", leve: !fora.length && !extra.length, txt: "Medições na bancada: " + partes.join("; ") + "." + (fora.length ? "" : ks.length > 2 ? " Tudo na faixa." : "") + (extra.length ? " " + extra.join(" ") : "") };
+  const d = dia(), saiu = fora.filter(k => A.foraK[k] == null || d - A.foraK[k] > 7); fora.forEach(k => A.foraK[k] = d); // acontecimento é sair da faixa depois de uma semana dentro; o vai e vem de todo dia é rotina repetida
+  return { onde: "banc", m: saiu.length > 0, leve: !fora.length && !extra.length, txt: "Medições na bancada: " + partes.join("; ") + "." + (fora.length ? "" : ks.length > 2 ? " Tudo na faixa." : "") + (extra.length ? " " + extra.join(" ") : "") };
 }
 function porque(tipo, p) {
   const cm = st.camarao, h = Math.floor(dataLocal().h);
@@ -2622,20 +2623,20 @@ const FALA = { encher: 1, cloro: 1, inocular_nitrificante: 1, inocular_vizinho: 
 function narraAc(e) {
   const [onde, why, chave] = porque(e.tipo, e.p); let txt = e.r.msg || "";
   if (e.tipo === "trato") txt = "Trato das " + Math.floor(dataLocal().h) + " h: " + txt.replace(/^Trato de /, "");
-  let leve = !FALA[e.tipo]; if (why && novo(chave || e.tipo)) { txt += " " + why; leve = false; }
-  return txt ? { onde, txt, leve, tipo: e.tipo } : null;
+  const k = chave || e.tipo, prim = A.visto[k] == null; let leve = !FALA[e.tipo]; if (why && novo(k)) { txt += " " + why; leve = false; }
+  return txt ? { onde, txt, leve, m: !!FALA[e.tipo] || (!!why && prim), tipo: e.tipo } : null; /* m = acontecimento: é onde o botão Próxima fase para */
 }
 function bomDia() {
   const cm = st.camarao, jm = !!E.janelaMuda(E.agoraMs(st));
   let t = "Bom dia. Dia " + (dia() + 1) + (cm.povoado != null && !cm.despescado ? ", cultivo dia " + (Math.floor((st.t - cm.povoado) / 1440) + 1) : cm.n > 0 ? "" : ", fase de preparo e maturação da água") + ". " + nomeLua() + ".";
-  if (jm && !A.jm) t += " Começou a janela de muda da lua. " + Q("janela_muda"); A.jm = jm;
+  A.jmNovo = jm && !A.jm; if (A.jmNovo) t += " Começou a janela de muda da lua. " + Q("janela_muda"); A.jm = jm;
   return t;
 }
 function narraEv(evs) {
   const meds = evs.filter(e => e.tipo === "medir" && e.r.ok), acs = evs.filter(e => e.tipo !== "medir" && e.r.ok);
   const h = Math.floor(dataLocal().h), d = dia();
   const soTempPh = meds.every(m => m.p.k === "temp" || m.p.k === "ph"), md = meds.length && (!soTempPh || acs.length) ? narraMed(meds) : null;
-  if (h >= 6 && h < 8 && A.manha !== d && (acs.length || meds.length > 2)) { A.manha = d; poe({ onde: md && md.onde, txt: bomDia() + (md ? " " + md.txt : "") }); } // o bom-dia com as medições sai sempre em voz
+  if (h >= 6 && h < 8 && A.manha !== d && (acs.length || meds.length > 2)) { A.manha = d; const t = bomDia(); poe({ onde: md && md.onde, txt: t + (md ? " " + md.txt : ""), m: A.jmNovo || !!(md && md.m) }); } // o bom-dia com as medições sai sempre em voz
   else poe(md);
   acs.forEach(e => poe(narraAc(e)));
 }
@@ -2645,7 +2646,11 @@ function poe(it) { if (it && it.txt) A.fila.push(it); }
 const pf = () => ({ dens: st.cfg.densidade || 500 });
 function roda() { A.ev = []; A.col = true;
   try { if (G.des) { if (!G.des.fim) { E.desafioManejo(st, G.des.id, G.des.t0, !A.desIni); A.desIni = true; } } else E.piloto(st, pf()); } finally { A.col = false; } // desafio: o manejo da Ajuda (o mesmo do teste)
-  narraEv(A.ev); posTempo(); }
+  narraEv(A.ev); const f = faseAgora(); if (A.fase && f !== A.fase) poe({ txt: "Nova fase: " + f + ".", m: true }); A.fase = f; posTempo(); }
+/* fases do ciclo, pelo estado do tanque: enchimento, cloração, maturação, cultivo, despesca */
+function faseAgora() { const a = st.agua, cm = st.camarao;
+  if (cm.despescado) return "despesca"; if (cm.povoado != null) return "cultivo, com camarão no tanque"; if (!a.cheio) return "enchimento do tanque";
+  if (a.Cl > 0.05) return "cloração, esperando o cloro zerar"; return a.ClMax > 1 ? "maturação da água, criando as bactérias antes do camarão" : "preparo da água"; }
 function mostraItem(it) {
   A.atual = it; A.alvo = it.onde || A.alvo; legenda(it.txt); if (it.tipo) respingo(it.tipo); const tok = ++A.tok;
   if (it.leve) { A.falando = false; A.ate = performance.now() + 1100 / VEL[A.vel].k; A.atualLeve = true; return; } A.atualLeve = false;
@@ -2666,6 +2671,7 @@ A.passo = dt => {
   if (G.des && G.des.fim) { if (!A.fimDito) { A.fimDito = true; A.fila = []; const r = G.des.res || []; mostraItem({ txt: (G.des.ok ? "Desafio vencido. " : "Não foi desta vez. ") + r.map(x => (x[0] ? "Certo: " : "Faltou: ") + x[1]).join(". ") + "." }); } return true; }
   if (st.fim) { if (!A.fimDito) { A.fimDito = true; A.fila = []; mostraItem({ txt: fimTxt() }); } return true; }
   if (folhaAberta) return true;
+  if (A.pula) return pulando();
   if (A.fila.length) { mostraItem(A.fila.shift()); return true; }
   A.acc = (A.acc || 0) + VEL[A.vel].m * dt; const t0 = performance.now();
   while (A.acc >= 10 && !st.fim && !A.fila.length && !folhaAberta && performance.now() - t0 < 12) {
@@ -2676,6 +2682,36 @@ A.passo = dt => {
   if (A.acc > 60) A.acc = 60;
   return true;
 };
+/* botão Próxima fase: corre o mesmo piloto, hora a hora, sem narrar a rotina repetida (tratos, medições na faixa, simbiótico),
+   e para no primeiro acontecimento: fase nova, alarme, lição, pergunta, medida fora da faixa, janela de muda, biometria, despesca ou fim.
+   O manejo é o mesmo do automático normal; só a aula da rotina igual fica de fora. Pedido do Wagner 28/11. */
+const PULA_MAX = 15; // dias: se nada novo acontecer, para e avisa
+function pulaTira() { let i; while ((i = A.fila.findIndex(x => !x.m)) >= 0) A.fila.splice(i, 1); }
+function pulando() {
+  pulaTira(); const t0 = performance.now();
+  while (!A.fila.length && !st.fim && !(G.des && G.des.fim) && !folhaAberta && performance.now() - t0 < 25) {
+    const hAbs = Math.floor(st.t / 60);
+    if (hAbs !== A.hp) { A.hp = hAbs; G.hAj = hAbs; roda(); eventos(); pulaTira(); if (A.fila.length || st.fim) break; }
+    E.avancar(st, Math.min(10, 60 - (st.t % 60) || 60)); G.hAj = Math.floor(st.t / 60);
+  }
+  posTempo(); const nd = dia() - A.pulaD0;
+  if (A.fila.length || st.fim || (G.des && G.des.fim) || nd >= PULA_MAX) {
+    A.pula = false; A.acc = 0; barra(); const resumo = nd >= 1 ? "Pulei " + nd + (nd === 1 ? " dia" : " dias") + " de rotina igual. " : "";
+    if (A.fila.length) { const it = A.fila.shift(); it.txt = resumo + it.txt; mostraItem(it); }
+    else if (!st.fim && !(G.des && G.des.fim)) mostraItem({ txt: resumo + "Nada novo aconteceu nesse tempo: o tanque seguiu na rotina. " + dataLocal().hm + "." });
+    return true;
+  }
+  legenda("⏭ Pulando a rotina igual até o próximo acontecimento: dia " + (dia() + 1) + ", " + dataLocal().hm + ". Toque de novo para parar.");
+  return true;
+}
+function proxima() {
+  if (!A.on || !st || st.fim || (G.des && G.des.fim)) return;
+  if (A.pula) { A.pula = false; barra(); mostraItem({ txt: "Parei de pular. " + dataLocal().hm + "." }); return; }
+  A.tok++; A.falando = false; try { speechSynthesis.cancel(); } catch (e) { } A.atual = null; A.alvo = null;
+  pulaTira(); A.pula = true; A.pulaD0 = dia(); A.fase = A.fase || faseAgora();
+  if (!A.rodando) { A.rodando = true; A.hp = Math.floor(st.t / 60) - 1; skip = null; fecha(); trava(true); }
+  barra();
+}
 /* o boneco vai até o lugar do que está sendo feito (andaAte do jogo, contorna o tanque) */
 function anda(dt) { if (!A.alvo) return; const e = A.alvo === "tanque" ? { id: "tanque" } : EST.find(x => x.id === A.alvo); if (!e || andaAte(e, dt)) A.alvo = null; }
 /* eventos do motor (alarmes, lições, perguntas) entram na aula; a pergunta vem com a resposta e o porquê */
@@ -2683,28 +2719,31 @@ const eventosJogo = eventos;
 eventos = function () {
   if (!A.on || !A.rodando || !st) return eventosJogo();
   for (const e of st.eventos) { if (e.v) continue; e.v = 1;
-    if (e.tipo === "quiz") { const q = TX.quiz[e.chave]; if (q && !G.quiz[e.chave]) { G.quiz[e.chave] = 1; poe({ txt: "Pergunta de prova: " + q.q + " Resposta: " + q.o[q.c] + ". " + q.e }); } continue; }
-    if (e.tipo === "licao") { poe({ txt: "Lição: " + e.txt }); continue; }
-    poe({ txt: (e.tipo === "alarme" ? "Atenção: " : "") + e.txt, leve: e.tipo !== "alarme" }); if (e.tipo === "alarme") bip(880, 0.25); }
+    if (e.tipo === "quiz") { const q = TX.quiz[e.chave]; if (q && !G.quiz[e.chave]) { G.quiz[e.chave] = 1; poe({ txt: "Pergunta de prova: " + q.q + " Resposta: " + q.o[q.c] + ". " + q.e, m: true }); } continue; }
+    if (e.tipo === "licao") { poe({ txt: "Lição: " + e.txt, m: true }); continue; }
+    poe({ txt: (e.tipo === "alarme" ? "Atenção: " : "") + e.txt, leve: e.tipo !== "alarme", m: e.tipo === "alarme" }); if (e.tipo === "alarme") bip(880, 0.25); }
 };
 
 /* ---- tela: botão Automático no alto e barra de controle embaixo ---- */
 const css = document.createElement("style");
 css.textContent = "#aulaBar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;gap:6px;flex-wrap:nowrap;justify-content:center;width:max-content;max-width:calc(100% - 32px);z-index:25}" +
   "#aulaTxt{box-sizing:border-box;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 70px);width:min(620px,calc(100% - 32px));max-height:34vh;overflow:auto;background:#0d1b22eb;color:#fff;border:1px solid var(--linha);border-radius:10px;padding:10px 14px;font-size:15px;line-height:1.4;z-index:25}" +
-  "#bAuto.on{background:#2d7d57;border-color:#2d7d57;color:#fff}#aulaBar .bt{padding:10px 12px;white-space:nowrap}@media (max-width:480px){#aulaTxt{font-size:14px;max-height:30vh}#aulaBar .bt{padding:10px 9px;font-size:14px}}";
+  "#bAuto.on{background:#2d7d57;border-color:#2d7d57;color:#fff}#aulaBar .bt{padding:10px 12px;white-space:nowrap;min-width:44px}@media (max-width:480px){#aulaTxt{font-size:14px;max-height:30vh}#aulaBar .bt{padding:10px 9px;font-size:14px}}";
 document.head.appendChild(css);
 const bAuto = el("button", "bt", "Automático"); bAuto.id = "bAuto"; bAuto.type = "button"; bAuto.title = "O jogo faz o manejo sozinho e explica"; $("botoes").insertBefore(bAuto, $("bFazer"));
 const bar = el("div"); bar.id = "aulaBar"; bar.hidden = true; document.body.appendChild(bar);
 const txt = el("div"); txt.id = "aulaTxt"; txt.hidden = true; txt.setAttribute("aria-live", "polite"); document.body.appendChild(txt);
 const bPausa = bt("⏸ Pausar", () => A.rodando ? pausa() : continua(), "p"), bVozA = bt("", () => { A.voz = !A.voz; if (!A.voz) { A.tok++; A.falando = false; try { speechSynthesis.cancel(); } catch (e) { } if (A.atual) A.ate = performance.now() + 2500; } else if (VOZ()) { if (A.atual) { const it = A.atual; mostraItem(it); } else VOZ()("Narração ligada.", null, true); } barra(); }),
-  bVel = bt("", () => { A.vel = (A.vel + 1) % VEL.length; barra(); }), bSai = bt("Sair", () => desliga());
-[bPausa, bVozA, bVel, bSai].forEach(b => bar.appendChild(b));
+  bVel = bt("", () => { A.vel = (A.vel + 1) % VEL.length; barra(); }), bSai = bt("Sair", () => desliga()), bProx = bt("⏭ Próxima", proxima);
+bProx.title = "Pula a rotina repetida e vai direto para a próxima fase ou o próximo acontecimento";
+[bPausa, bProx, bVozA, bVel, bSai].forEach(b => bar.appendChild(b));
 function legenda(t) { txt.textContent = t ? (A.atual && !A.atual.leve && A.voz ? "🔊 " : "") + t : ""; txt.hidden = !t; }
 function barra() {
   bAuto.classList.toggle("on", A.on); bAuto.textContent = A.on ? "Automático ✓" : "Automático"; bar.hidden = !A.on;
-  bPausa.textContent = A.rodando ? "⏸ Pausar" : st && st.fim ? "Fim" : "▶ Continuar"; bPausa.disabled = !!(st && st.fim && !A.rodando);
-  bVozA.textContent = A.voz ? "🔊 Aula" : "🔇 Texto"; bVozA.title = A.voz ? "Narração em voz ligada" : "Só legenda, sem voz"; bVel.textContent = "⏩ " + VEL[A.vel].n; bVel.title = "Velocidade do relógio";
+  const c = innerWidth < 440; // tela de celular: botões curtos para os cinco caberem numa linha (iPhone SE tem 320 px)
+  bPausa.textContent = A.rodando ? (c ? "⏸" : "⏸ Pausar") : st && st.fim ? "Fim" : c ? "▶" : "▶ Continuar"; bPausa.title = A.rodando ? "Pausar" : "Continuar"; bPausa.disabled = !!(st && st.fim && !A.rodando);
+  bProx.textContent = A.pula ? "⏹ Parar" : "⏭ Próxima"; bProx.disabled = !!(st && (st.fim || (G.des && G.des.fim)));
+  bVozA.textContent = c ? (A.voz ? "🔊" : "🔇") : A.voz ? "🔊 Aula" : "🔇 Texto"; bVozA.title = A.voz ? "Narração em voz ligada" : "Só legenda, sem voz"; bVel.textContent = (c ? "⏩" : "⏩ ") + VEL[A.vel].n; bVel.title = "Velocidade do relógio";
   const corre = A.on && A.rodando; ["joy", "acoes", "avisos"].forEach(i => { const x = $(i); if (x) x.style.visibility = corre ? "hidden" : ""; });
   if (!corre) legenda(A.on && !A.rodando && !(st && st.fim) ? "Pausado. Agora é com você: ande, meça e aplique. Toque em Continuar para o jogo seguir sozinho de onde o tanque está." : "");
 }
@@ -2717,15 +2756,16 @@ function liga(comVoz) {
   if (dz) { A.fimDito = !!G.des.fim; mostraItem({ txt: "Desafio no automático: " + dz.n + ". " + dz.txt + " O jogo vai seguir a Ajuda, nesta ordem: " + (TX.ajuda[dz.id] || []).map((p, i) => (i + 1) + ", " + p[0] + " " + p[1]).join(" ") }); return; }
   mostraItem({ txt: "Modo automático. Daqui em diante o jogo faz o manejo sozinho, seguindo o app e o caderno Só Bioflocos, e explica o que faz e por quê. Toque em Pausar quando quiser assumir." });
 }
-function pausa() { A.rodando = false; A.tok++; A.falando = false; try { speechSynthesis.cancel(); } catch (e) { } if (A.atual && !A.fimDito) A.fila.unshift(A.atual); A.atual = null; A.alvo = null; trava(false); barra(); salva(); }
+function pausa() { A.pula = false; A.rodando = false; A.tok++; A.falando = false; try { speechSynthesis.cancel(); } catch (e) { } if (A.atual && !A.fimDito) A.fila.unshift(A.atual); A.atual = null; A.alvo = null; trava(false); barra(); salva(); }
 function continua() { if (st.fim) return; A.rodando = true; A.hp = Math.floor(st.t / 60) - 1; A.acc = 0; skip = null; fecha(); trava(true); barra();
   mostraItem(A.fila.length ? A.fila.shift() : { txt: "Continuando de " + dataLocal().hm + "." }); } // fala dentro do toque (iPhone)
-function desliga() { A.on = false; A.rodando = false; A.tok++; A.falando = false; A.fila = []; A.atual = null; A.alvo = null; try { speechSynthesis.cancel(); } catch (e) { } trava(false); barra(); }
+function desliga() { A.pula = false; A.on = false; A.rodando = false; A.tok++; A.falando = false; A.fila = []; A.atual = null; A.alvo = null; try { speechSynthesis.cancel(); } catch (e) { } trava(false); barra(); }
 bAuto.onclick = () => { if (A.on) desliga(); else liga(); };
 AUTO = { passo: A.passo, get corre() { return A.on && A.rodando; }, // a seta é do jogador: some enquanto o jogo anda sozinho
   liga, entra() { bAuto.hidden = false; desliga(); if (A.pede) { A.pede = false; liga(true); } }, sai() { A.pede = false; desliga(); }, get pede() { return A.pede; }, set pede(v) { A.pede = v; } };
+addEventListener("resize", () => { if (A.on) barra(); });
 document.addEventListener("visibilitychange", () => { if (A.on && A.rodando && document.visibilityState === "visible") { A.lock = null; trava(true); } });
-window.__auto = { A, liga, pausa, continua, desliga, narraMed, porque };
+window.__auto = { A, liga, pausa, continua, desliga, narraMed, porque, proxima, faseAgora };
 }
 
 /* ---------- professor de IA: pergunta escrita ou falada; responde só com as nossas referências (função biofloco-ia no Supabase) ---------- */
